@@ -555,9 +555,140 @@ function ChatPanel({ mode, context, title, lang = "fr", onClose }) {
 }
 
 /* ============================================================================
+ * PRICING — modular plans (all services currently available)
+ * ==========================================================================*/
+// Base platform every restaurant starts from.
+const PLAN_BASE = {
+  id: "menu", name: "Wegemo Menu", price: 199, emoji: "🍽️", color: C.dark,
+  tagline: "Le socle de votre restaurant",
+  features: ["QR Codes", "Menu digital", "Commandes", "Paiement à la caisse", "Vue cuisine", "Inventaire automatique"],
+};
+// Paid add-on layered on top of the base.
+const PLAN_ADDON = {
+  id: "mobile-pay", name: "Option Paiement Mobile", price: 49, prefix: "+", emoji: "📲", color: C.accentBlue,
+  tagline: "Encaissez depuis le téléphone du client",
+  features: ["Stripe", "Apple Pay", "Google Pay", "Paiement depuis le téléphone"],
+};
+// Independent modules, each activable on its own.
+const PLAN_MODULES = [
+  { id: "growth", name: "Wegemo Growth", price: 99, emoji: "📈", color: C.accentGreen, tagline: "Faites revenir vos clients",
+    features: ["Matching influenceurs", "CRM", "Campagnes IA", "Relances clients"] },
+  { id: "voice", name: "Wegemo Voice", price: 99, emoji: "📞", color: C.accentPurple, tagline: "Un standard qui ne dort jamais",
+    features: ["Assistant téléphonique IA 24/7", "Réservations", "FAQ", "Prise de commandes"] },
+  { id: "manager", name: "Wegemo Manager", price: 149, emoji: "🧑‍💼", color: C.accentOrange, tagline: "Pilotez à distance",
+    features: ["Dashboard manager", "Statistiques", "Contrôle à distance", "Multi-utilisateurs"] },
+  { id: "franchise", name: "Wegemo Franchise", price: 299, emoji: "🏢", color: C.accent, tagline: "Gérez tout votre réseau",
+    features: ["Multi-sites", "Dashboard groupe", "Comparaison des établissements", "Gestion franchises"] },
+];
+// All-inclusive bundle.
+const PLAN_OS = {
+  id: "os", name: "Wegemo OS", price: 499, emoji: "🚀", color: C.accentPurple,
+  tagline: "Tout inclus, sans compromis",
+  features: ["Wegemo Menu", "Paiement Mobile", "Growth", "Voice", "Manager", "Franchise"],
+};
+
+function PlanCard({ plan, featured, onChoose, ctaLabel = "Choisir" }) {
+  return (
+    <Surface
+      style={{
+        padding: 22, display: "flex", flexDirection: "column", height: "100%",
+        border: `1.5px solid ${featured ? plan.color : C.border}`,
+        boxShadow: featured ? `0 12px 32px ${plan.color}22` : "none",
+        position: "relative", overflow: "hidden",
+      }}
+    >
+      {featured && (
+        <div style={{ position: "absolute", top: 14, right: -32, transform: "rotate(45deg)", background: plan.color, color: C.white, ...FF, fontSize: 11, fontWeight: 800, padding: "3px 36px" }}>
+          POPULAIRE
+        </div>
+      )}
+      <div style={{ fontSize: 30 }}>{plan.emoji}</div>
+      <h3 style={{ ...FF, fontSize: 19, fontWeight: 800, marginTop: 8 }}>{plan.name}</h3>
+      {plan.tagline && <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginTop: 2 }}>{plan.tagline}</p>}
+      <div style={{ ...FF, marginTop: 14, marginBottom: 14 }}>
+        <span style={{ fontSize: 34, fontWeight: 900, color: plan.color }}>{plan.prefix || ""}{plan.price}€</span>
+        <span style={{ fontSize: 14, color: C.textTertiary }}> /mois</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+        {plan.features.map((f) => (
+          <div key={f} style={{ ...FF, fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ color: plan.color, fontWeight: 800 }}>✓</span> {f}
+          </div>
+        ))}
+      </div>
+      <Btn
+        variant={featured ? "primary" : "subtle"}
+        size="md"
+        style={featured ? { marginTop: 18, background: plan.color } : { marginTop: 18 }}
+        onClick={() => onChoose?.(plan)}
+      >
+        {ctaLabel}
+      </Btn>
+    </Surface>
+  );
+}
+
+function PricingPage({ onBack, onSignup }) {
+  const toast = useToast();
+  const choose = (plan) => {
+    toast(`Offre « ${plan.name} » sélectionnée`, "success");
+    onSignup?.(plan);
+  };
+  const sectionTitle = (txt) => (
+    <h2 style={{ ...FF, fontSize: 20, fontWeight: 800, margin: "8px 0 14px" }}>{txt}</h2>
+  );
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg }}>
+      <div style={{ maxWidth: 1080, margin: "0 auto", padding: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+          <Logo size={26} />
+          <Btn variant="ghost" size="sm" onClick={onBack}>← Retour</Btn>
+        </div>
+
+        <div style={{ textAlign: "center", marginBottom: 8 }}>
+          <Tag color={C.accentGreen}>✓ Tous les services sont disponibles</Tag>
+          <h1 style={{ ...FF, fontSize: 34, fontWeight: 900, margin: "14px 0 8px" }}>
+            Une offre <span style={{ color: C.accent }}>modulaire</span>
+          </h1>
+          <p style={{ ...FF, fontSize: 16, color: C.textSecondary, maxWidth: 560, margin: "0 auto 28px" }}>
+            Démarrez avec le socle, ajoutez le paiement mobile, puis activez les modules dont vous avez besoin — ou prenez tout avec Wegemo OS.
+          </p>
+        </div>
+
+        {/* Socle + option */}
+        {sectionTitle("1. Le socle")}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginBottom: 28 }}>
+          <PlanCard plan={PLAN_BASE} featured onChoose={choose} ctaLabel="Commencer" />
+          <PlanCard plan={PLAN_ADDON} onChoose={choose} ctaLabel="Ajouter l'option" />
+        </div>
+
+        {/* Modules */}
+        {sectionTitle("2. Les modules (à la carte)")}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginBottom: 28 }}>
+          {PLAN_MODULES.map((m) => (
+            <PlanCard key={m.id} plan={m} onChoose={choose} ctaLabel="Activer" />
+          ))}
+        </div>
+
+        {/* All inclusive */}
+        {sectionTitle("3. Tout inclus")}
+        <div style={{ marginBottom: 32 }}>
+          <PlanCard plan={PLAN_OS} featured onChoose={choose} ctaLabel="Tout débloquer" />
+        </div>
+
+        <p style={{ ...FF, textAlign: "center", color: C.textTertiary, fontSize: 13 }}>
+          Sans engagement · Résiliable à tout moment · TVA non incluse
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================================
  * LANDING
  * ==========================================================================*/
-function LandingPage({ onDemo, onLogin, onSignup }) {
+function LandingPage({ onDemo, onLogin, onSignup, onPricing }) {
   const features = ["Commande par QR code", "Cuisine en temps réel", "Paiement Stripe intégré", "CRM & campagnes email", "Support 7j/7"];
   return (
     <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center" }}>
@@ -568,11 +699,14 @@ function LandingPage({ onDemo, onLogin, onSignup }) {
       <p style={{ ...FF, fontSize: 18, color: C.textSecondary, maxWidth: 520, marginBottom: 28 }}>
         Vos clients scannent, commandent et paient. Vous gérez tout depuis un seul tableau de bord.
       </p>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center", marginBottom: 36 }}>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center", marginBottom: 18 }}>
         <Btn variant="primary" size="lg" onClick={onDemo}>🚀 Voir la démo</Btn>
         <Btn variant="subtle" size="lg" onClick={onLogin}>Se connecter</Btn>
         <Btn variant="red" size="lg" onClick={onSignup}>Créer un compte</Btn>
       </div>
+      <button onClick={onPricing} style={{ ...FF, color: C.accentBlue, fontWeight: 700, fontSize: 15, marginBottom: 32 }}>
+        💎 Voir les offres & tarifs →
+      </button>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", maxWidth: 640 }}>
         {features.map((f) => (
           <Tag key={f} color={C.accentGreen}>✓ {f}</Tag>
@@ -2625,9 +2759,10 @@ function AppInner() {
   }
 
   // Public
+  if (view.page === "pricing") return <PricingPage onBack={() => setView({ page: "landing" })} onSignup={() => setView({ page: "signup" })} />;
   if (view.page === "login") return <SignupPage initialMode="login" onBack={() => setView({ page: "landing" })} onSuccess={() => setView({ page: "restaurants" })} />;
   if (view.page === "signup") return <SignupPage initialMode="signup" onBack={() => setView({ page: "landing" })} onSuccess={() => setView({ page: "restaurants" })} />;
-  return <LandingPage onDemo={() => setDemoUser(true)} onLogin={() => setView({ page: "login" })} onSignup={() => setView({ page: "signup" })} />;
+  return <LandingPage onDemo={() => setDemoUser(true)} onLogin={() => setView({ page: "login" })} onSignup={() => setView({ page: "signup" })} onPricing={() => setView({ page: "pricing" })} />;
 }
 
 export default function App() {
