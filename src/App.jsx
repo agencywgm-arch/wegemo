@@ -2591,7 +2591,7 @@ function AppInner() {
     if (user && view.page === "landing") setView({ page: "restaurants", restaurant: null });
   }, [user]);
 
-  if (path.startsWith("/oauth/gmail")) return <GmailCallback />;
+  if (path.includes("/oauth/gmail")) return <GmailCallback />;
   if (customerMatch) return <CustomerPage slug={decodeURIComponent(customerMatch[1])} tableNum={customerMatch[2]} />;
   if (loading) return <CenterMsg emoji="⏳" text="…" />;
 
