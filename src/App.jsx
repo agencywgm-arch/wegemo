@@ -772,11 +772,12 @@ const DASH_TABS = [
   { id: "settings", label: "Paramètres", icon: "⚙️" },
 ];
 
-function DashboardPage({ restaurant, onBack, onKitchen, onCustomerView }) {
+function DashboardPage({ restaurant, onBack, onKitchen, onCustomerView, onFranchise }) {
   const isMobile = useIsMobile();
   const store = useStore(restaurant.id);
   const [tab, setTab] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const showFranchise = onFranchise && (store.demoMode || restaurant.group_id);
 
   const sidebar = (
     <div style={{ width: 220, background: C.surface, borderRight: `1px solid ${C.border}`, padding: 16, display: "flex", flexDirection: "column", gap: 4, height: "100%", overflow: "auto" }}>
@@ -792,6 +793,7 @@ function DashboardPage({ restaurant, onBack, onKitchen, onCustomerView }) {
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 6, paddingTop: 12 }}>
         <Btn variant="subtle" size="sm" onClick={onKitchen}>👨‍🍳 Cuisine</Btn>
         <Btn variant="subtle" size="sm" onClick={onCustomerView}>📱 Vue client</Btn>
+        {showFranchise && <Btn variant="subtle" size="sm" onClick={onFranchise}>🏢 Groupe</Btn>}
         <Btn variant="ghost" size="sm" onClick={onBack}>← Restaurants</Btn>
       </div>
     </div>
@@ -1814,6 +1816,191 @@ function KitchenView({ restaurant, onExit }) {
 }
 
 /* ============================================================================
+ * FRANCHISE DASHBOARD (multi-restaurant group view)
+ * ==========================================================================*/
+function FranchiseDashboard({ group, demoMode, onExit }) {
+  const toast = useToast();
+  const [tab, setTab] = useState("performance");
+  const [restaurants, setRestaurants] = useState(demoMode ? DEMO_FRANCHISE_RESTAURANTS : []);
+  const [members, setMembers] = useState([]);
+  const [stats, setStats] = useState(demoMode ? DEMO_FRANCHISE_STATS : { revenue_today: 0, orders_today: 0, avg_basket: 0, customers: 0 });
+
+  useEffect(() => {
+    if (demoMode || !hasSupabase) return;
+    (async () => {
+      const { data: rs } = await supabase.from("restaurants").select("*").eq("group_id", group.id);
+      const { data: ms } = await supabase.from("group_members").select("*").eq("group_id", group.id);
+      const list = (rs || []).map((r) => ({ id: r.id, name: r.name, region: r.region || "—", revenue_today: 0, orders_today: 0, avg_basket: 0, growth: 0 }));
+      setRestaurants(list);
+      setMembers(ms || []);
+      setStats({
+        revenue_today: list.reduce((s, r) => s + r.revenue_today, 0),
+        orders_today: list.reduce((s, r) => s + r.orders_today, 0),
+        avg_basket: 0,
+        customers: 0,
+      });
+    })();
+  }, [group, demoMode]);
+
+  const kpis = [
+    { label: "CA groupe (jour)", value: eur(stats.revenue_today), color: C.accentGreen },
+    { label: "Commandes", value: stats.orders_today, color: C.accentBlue },
+    { label: "Panier moyen", value: eur(stats.avg_basket), color: C.accentOrange },
+    { label: "Clients", value: stats.customers, color: C.accentPurple },
+  ];
+  const alerts = restaurants.filter((r) => r.growth < 0);
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg }}>
+      <div style={{ background: C.dark, padding: "18px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 28 }}>{group.logo_emoji}</span>
+          <div>
+            <strong style={{ ...FF, color: C.white, fontSize: 18 }}>{group.name}</strong>
+            <div style={{ ...FF, color: C.textTertiary, fontSize: 12 }}>{restaurants.length} établissements</div>
+          </div>
+        </div>
+        <Btn variant="subtle" size="sm" onClick={onExit}>← Quitter</Btn>
+      </div>
+
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: 24 }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
+          {[["performance", "📈 Performance"], ["team", "👥 Équipe"], ["campaigns", "✉️ Campagnes"], ["calendar", "📅 Calendrier"]].map(([id, lbl]) => (
+            <button key={id} onClick={() => setTab(id)} style={{ ...FF, padding: "8px 16px", borderRadius: 11, fontWeight: 600, fontSize: 14, border: `1px solid ${tab === id ? C.text : C.border}`, background: tab === id ? C.text : C.surface, color: tab === id ? C.white : C.text }}>{lbl}</button>
+          ))}
+        </div>
+
+        {tab === "performance" && (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 16 }}>
+              {kpis.map((k) => (
+                <Surface key={k.label} style={{ padding: 16 }}>
+                  <span style={{ ...FF, fontSize: 13, color: C.textSecondary }}>{k.label}</span>
+                  <div style={{ ...FF, fontSize: 24, fontWeight: 900, color: k.color, marginTop: 4 }}>{k.value}</div>
+                </Surface>
+              ))}
+            </div>
+            {alerts.length > 0 && (
+              <Surface style={{ padding: 16, marginBottom: 16, borderColor: `${C.accent}55` }}>
+                <strong style={{ ...FF, color: C.accent }}>⚠️ Établissements en baisse</strong>
+                <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                  {alerts.map((r) => (
+                    <details key={r.id} style={{ ...FF, fontSize: 14 }}>
+                      <summary style={{ cursor: "pointer" }}>{r.name} — {r.growth}% vs hier</summary>
+                      <p style={{ color: C.textSecondary, marginTop: 6, paddingLeft: 16 }}>
+                        Recommandations : relancer les clients inactifs par campagne email, activer une promo Happy Hour, vérifier les ruptures de stock.
+                      </p>
+                    </details>
+                  ))}
+                </div>
+              </Surface>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
+              {restaurants.map((r) => (
+                <Surface key={r.id} style={{ padding: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <strong style={{ ...FF }}>{r.name}</strong>
+                    <Tag color={r.growth >= 0 ? C.accentGreen : C.accent}>{r.growth >= 0 ? "▲" : "▼"} {Math.abs(r.growth)}%</Tag>
+                  </div>
+                  <div style={{ ...FF, fontSize: 12, color: C.textTertiary, marginBottom: 8 }}>{r.region}</div>
+                  <Row label="CA jour" value={eur(r.revenue_today)} />
+                  <Row label="Commandes" value={r.orders_today} />
+                  <Row label="Panier moyen" value={eur(r.avg_basket)} />
+                </Surface>
+              ))}
+            </div>
+          </>
+        )}
+
+        {tab === "team" && <FranchiseTeam group={group} demoMode={demoMode} members={members} setMembers={setMembers} />}
+
+        {tab === "campaigns" && (
+          <Surface style={{ padding: 20 }}>
+            <strong style={{ ...FF }}>Campagne multi-restaurants</strong>
+            <p style={{ ...FF, fontSize: 13, color: C.textSecondary, margin: "6px 0 12px" }}>Ciblez un segment de clients sur une sélection d'établissements.</p>
+            <div style={{ marginBottom: 12 }}>
+              <span style={{ ...FF, fontSize: 13, fontWeight: 600, color: C.textSecondary }}>Établissements</span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                {restaurants.map((r) => <Tag key={r.id} color={C.accentBlue}>{r.name}</Tag>)}
+              </div>
+            </div>
+            <InputField label="Sujet" placeholder="Nouveauté dans tous nos restaurants !" />
+            <textarea placeholder="<h1>...</h1>" style={{ ...FF, width: "100%", minHeight: 90, padding: 12, borderRadius: 12, border: `1px solid ${C.borderStrong}`, outline: "none" }} />
+            <Btn variant="primary" style={{ marginTop: 10 }} onClick={() => toast("(Démo) Campagne groupe programmée", "success")}>Envoyer au groupe</Btn>
+          </Surface>
+        )}
+
+        {tab === "calendar" && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+            {SEASONAL_EVENTS.slice(0, 12).map((ev) => (
+              <Surface key={ev.id} style={{ padding: 16, borderLeft: `4px solid ${ev.color}` }}>
+                <div style={{ fontSize: 24 }}>{ev.emoji}</div>
+                <strong style={{ ...FF, fontSize: 15 }}>{ev.name}</strong>
+                <div style={{ ...FF, fontSize: 12, color: C.textTertiary }}>{ev.date}</div>
+                <p style={{ ...FF, fontSize: 12, color: C.textSecondary, marginTop: 4 }}>{ev.idea}</p>
+              </Surface>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FranchiseTeam({ group, demoMode, members, setMembers }) {
+  const toast = useToast();
+  const [form, setForm] = useState({ email: "", role: "manager", regions: "" });
+  const list = demoMode
+    ? [{ id: "gm1", email: "manager.lyon@demo.fr", role: "manager", regions: ["Rhône"] }, { id: "gm2", email: "chef.paris@demo.fr", role: "cuisine", regions: ["Île-de-France"] }]
+    : members;
+
+  const invite = async (e) => {
+    e.preventDefault();
+    const regions = form.regions.split(",").map((s) => s.trim()).filter(Boolean);
+    if (!demoMode && hasSupabase) {
+      const { data } = await supabase.from("group_members").insert({ group_id: group.id, email: form.email, role: form.role, regions }).select().single();
+      if (data) setMembers((p) => [...p, data]);
+    }
+    toast("Invitation envoyée", "success");
+    setForm({ email: "", role: "manager", regions: "" });
+  };
+
+  return (
+    <div>
+      <Surface style={{ padding: 18, marginBottom: 16 }}>
+        <strong style={{ ...FF }}>Inviter un membre</strong>
+        <form onSubmit={invite} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end", marginTop: 10 }}>
+          <div style={{ flex: "1 1 200px" }}><InputField label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></div>
+          <label style={{ ...FF, marginBottom: 14 }}>
+            <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Rôle</span>
+            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} style={{ ...FF, padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.borderStrong}` }}>
+              <option value="manager">Manager</option>
+              <option value="cuisine">Cuisine</option>
+            </select>
+          </label>
+          <div style={{ flex: "1 1 160px" }}><InputField label="Régions (séparées par ,)" value={form.regions} onChange={(e) => setForm({ ...form, regions: e.target.value })} /></div>
+          <Btn type="submit" variant="primary">Inviter</Btn>
+        </form>
+      </Surface>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {list.map((m) => (
+          <Surface key={m.id} style={{ padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Avatar name={m.email} color={m.role === "cuisine" ? C.accentOrange : C.accentBlue} />
+              <div>
+                <strong style={{ ...FF }}>{m.email}</strong>
+                <div style={{ ...FF, fontSize: 12, color: C.textSecondary }}>{(m.regions || []).join(", ") || "Toutes régions"}</div>
+              </div>
+            </div>
+            <Tag color={m.role === "cuisine" ? C.accentOrange : C.accentBlue}>{m.role}</Tag>
+          </Surface>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================================
  * CUSTOMER PAGE (state machine)
  * ==========================================================================*/
 function LangPicker({ lang, setLang, dark }) {
@@ -2119,11 +2306,97 @@ function Row({ label, value, color }) {
   );
 }
 
+// Lazily load Stripe.js (no npm dependency) and memoise the instance per key.
+let _stripeScript = null;
+const _stripeInstances = {};
+function loadStripe(publishableKey) {
+  if (!publishableKey) return Promise.resolve(null);
+  if (_stripeInstances[publishableKey]) return Promise.resolve(_stripeInstances[publishableKey]);
+  if (!_stripeScript) {
+    _stripeScript = new Promise((resolve, reject) => {
+      if (window.Stripe) return resolve();
+      const s = document.createElement("script");
+      s.src = "https://js.stripe.com/v3/";
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error("stripe_load_failed"));
+      document.head.appendChild(s);
+    });
+  }
+  return _stripeScript.then(() => {
+    if (!window.Stripe) return null;
+    _stripeInstances[publishableKey] = window.Stripe(publishableKey);
+    return _stripeInstances[publishableKey];
+  });
+}
+
+function StripeCardForm({ clientSecret, publishableKey, total, lang, onSuccess, onCancel }) {
+  const toast = useToast();
+  const mountRef = useRef(null);
+  const stateRef = useRef({ stripe: null, card: null });
+  const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const stripe = await loadStripe(publishableKey);
+      if (!stripe || cancelled) {
+        toast("Stripe indisponible.", "error");
+        return;
+      }
+      const elements = stripe.elements();
+      const card = elements.create("card", {
+        style: { base: { fontFamily: FF.fontFamily, fontSize: "16px", color: C.text } },
+      });
+      card.mount(mountRef.current);
+      stateRef.current = { stripe, card };
+      setReady(true);
+    })();
+    return () => {
+      cancelled = true;
+      stateRef.current.card?.destroy?.();
+    };
+  }, [publishableKey]);
+
+  const pay = async () => {
+    const { stripe, card } = stateRef.current;
+    if (!stripe || !card) return;
+    setBusy(true);
+    try {
+      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, { payment_method: { card } });
+      if (error) {
+        toast(error.message || "Paiement refusé", "error");
+        setBusy(false);
+        return;
+      }
+      if (paymentIntent?.status === "succeeded") onSuccess();
+      else {
+        toast("Paiement non finalisé.", "error");
+        setBusy(false);
+      }
+    } catch (e) {
+      toast(e.message || "Erreur de paiement", "error");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div>
+      <div ref={mountRef} style={{ padding: 14, border: `1px solid ${C.borderStrong}`, borderRadius: 12, background: C.surface, marginBottom: 14 }} />
+      <Btn variant="blue" size="lg" style={{ width: "100%" }} disabled={!ready || busy} onClick={pay}>
+        {busy ? "…" : `${t(lang, "payCard")} — ${eur(total)}`}
+      </Btn>
+      <button onClick={onCancel} style={{ ...FF, display: "block", margin: "12px auto 0", color: C.textSecondary, fontSize: 14 }}>{t(lang, "back")}</button>
+    </div>
+  );
+}
+
 function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, profile, lang, onBack, onDone }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
+  const [cardIntent, setCardIntent] = useState(null); // { clientSecret, publishableKey }
 
-  const createOrder = async (method) => {
+  const createOrder = useCallback(async (method) => {
     setBusy(true);
     try {
       if (!hasSupabase || restaurant.id === "demo") {
@@ -2132,7 +2405,6 @@ function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, p
         onDone(uid());
         return;
       }
-      // Build order
       const { data: order, error } = await supabase
         .from("orders")
         .insert({
@@ -2145,33 +2417,40 @@ function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, p
       const items = cart.map((c) => ({ order_id: order.id, menu_item_id: c.item.id, quantity: c.qty, detail: c.supplements.map((s) => s.name).join(", ") }));
       await supabase.from("order_items").insert(items);
       if (promo?.code) await supabase.rpc("increment_promo_use", { p_code: promo.code });
+      // Fire-and-forget receipt email when the customer left an address.
+      if (profile.email) {
+        const rows = cart.map((c) => `<tr><td>${c.qty}× ${c.item.name}</td><td align="right">${eur(c.lineTotal)}</td></tr>`).join("");
+        const html = `<h2>Merci pour votre commande chez ${restaurant.name} !</h2><table style="width:100%">${rows}<tr><td><b>Total</b></td><td align="right"><b>${eur(total)}</b></td></tr></table>`;
+        callFunction("send-receipt-email", { restaurant_id: restaurant.id, to_email: profile.email, subject: `Reçu — ${restaurant.name}`, html_body: html }).catch(() => {});
+      }
       onDone(order.id);
     } catch (e) {
       toast(e.message || "Erreur", "error");
-    } finally {
       setBusy(false);
     }
-  };
+  }, [restaurant.id, tableId, total, orderType, profile, cart, promo, onDone, toast]);
 
   const payCard = async () => {
-    // If the total is exactly 0 (e.g. 100% promo), skip Stripe entirely.
+    // If the total is exactly 0 (e.g. 100% promo), skip Stripe entirely —
+    // the edge function rejects amounts <= 0.
     if (total <= 0) return createOrder("card");
     setBusy(true);
     try {
       if (!hasSupabase || restaurant.id === "demo") {
+        // Demo: no real Stripe, just confirm.
         await new Promise((r) => setTimeout(r, 600));
         onDone(uid());
         return;
       }
       const data = await callFunction("create-payment-intent", { amount: total, restaurant_id: restaurant.id });
-      if (data?.error) {
+      if (data?.error || !data?.client_secret) {
         toast("Paiement carte indisponible — payez en espèces.", "error");
         setBusy(false);
         return;
       }
-      // In a full build, mount Stripe Elements with data.client_secret here.
-      toast("PaymentIntent créé — confirmation Stripe à intégrer.", "info");
-      await createOrder("card");
+      const pubKey = data.publishable_key || import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+      setCardIntent({ clientSecret: data.client_secret, publishableKey: pubKey });
+      setBusy(false);
     } catch (e) {
       toast(e.message || "Erreur", "error");
       setBusy(false);
@@ -2181,12 +2460,25 @@ function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, p
   return (
     <div style={{ padding: 20, minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-        <Btn variant="subtle" size="sm" onClick={onBack}>←</Btn>
+        <Btn variant="subtle" size="sm" onClick={cardIntent ? () => setCardIntent(null) : onBack}>←</Btn>
         <h2 style={{ ...FF, fontWeight: 800 }}>{t(lang, "total")} : {eur(total)}</h2>
       </div>
-      <Btn variant="primary" size="lg" style={{ marginBottom: 12 }} disabled={busy} onClick={() => createOrder("cash")}>💵 {t(lang, "payCash")}</Btn>
-      <Btn variant="blue" size="lg" disabled={busy} onClick={payCard}>💳 {t(lang, "payCard")}</Btn>
-      {busy && <p style={{ ...FF, textAlign: "center", marginTop: 16, color: C.textSecondary }}>…</p>}
+      {cardIntent ? (
+        <StripeCardForm
+          clientSecret={cardIntent.clientSecret}
+          publishableKey={cardIntent.publishableKey}
+          total={total}
+          lang={lang}
+          onSuccess={() => createOrder("card")}
+          onCancel={() => setCardIntent(null)}
+        />
+      ) : (
+        <>
+          <Btn variant="primary" size="lg" style={{ marginBottom: 12 }} disabled={busy} onClick={() => createOrder("cash")}>💵 {t(lang, "payCash")}</Btn>
+          <Btn variant="blue" size="lg" disabled={busy} onClick={payCard}>💳 {t(lang, "payCard")}</Btn>
+          {busy && <p style={{ ...FF, textAlign: "center", marginTop: 16, color: C.textSecondary }}>…</p>}
+        </>
+      )}
     </div>
   );
 }
@@ -2307,13 +2599,17 @@ function AppInner() {
   if (demoUser) {
     if (view.page === "kitchen") return <KitchenView restaurant={DEMO_RESTAURANT} onExit={() => setView({ page: "dashboard", restaurant: DEMO_RESTAURANT })} />;
     if (view.page === "customer") return <CustomerPage slug="demo" tableNum="1" />;
-    return <DashboardPage restaurant={DEMO_RESTAURANT} onBack={() => { setDemoUser(false); setView({ page: "landing" }); }} onKitchen={() => setView({ page: "kitchen" })} onCustomerView={() => setView({ page: "customer" })} />;
+    if (view.page === "franchise") return <FranchiseDashboard group={DEMO_GROUP} demoMode onExit={() => setView({ page: "dashboard", restaurant: DEMO_RESTAURANT })} />;
+    return <DashboardPage restaurant={DEMO_RESTAURANT} onBack={() => { setDemoUser(false); setView({ page: "landing" }); }} onKitchen={() => setView({ page: "kitchen" })} onCustomerView={() => setView({ page: "customer" })} onFranchise={() => setView({ page: "franchise" })} />;
   }
 
   // Authenticated
   if (user) {
     if (view.page === "kitchen" && view.restaurant) return <KitchenView restaurant={view.restaurant} onExit={() => setView({ page: "dashboard", restaurant: view.restaurant })} />;
     if (view.page === "customer" && view.restaurant) return <CustomerPage slug={view.restaurant.slug} tableNum="1" />;
+    if (view.page === "franchise" && view.restaurant?.group_id) {
+      return <FranchiseDashboard group={{ id: view.restaurant.group_id, name: view.restaurant.name, logo_emoji: "🏢" }} demoMode={false} onExit={() => setView({ page: "dashboard", restaurant: view.restaurant })} />;
+    }
     if (view.page === "dashboard" && view.restaurant) {
       return (
         <DashboardPage
@@ -2321,6 +2617,7 @@ function AppInner() {
           onBack={() => setView({ page: "restaurants", restaurant: null })}
           onKitchen={() => setView({ page: "kitchen", restaurant: view.restaurant })}
           onCustomerView={() => setView({ page: "customer", restaurant: view.restaurant })}
+          onFranchise={() => setView({ page: "franchise", restaurant: view.restaurant })}
         />
       );
     }
