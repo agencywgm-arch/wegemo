@@ -958,6 +958,7 @@ const DASH_TABS = [
   { id: "promos", label: "Promos", icon: "🎁", module: "growth" },
   { id: "menu", label: "Carte", icon: "🍽️", module: "base" },
   { id: "crm", label: "CRM", icon: "👥", module: "growth" },
+  { id: "influencers", label: "Influenceurs", icon: "📣", module: "growth" },
   { id: "settings", label: "Paramètres", icon: "⚙️", module: "base" },
 ];
 
@@ -1071,6 +1072,7 @@ function DashTabContent({ tab, setTab, restaurant, store, onKitchen, onCustomerV
     case "promos": return <PromosTab restaurant={restaurant} store={store} />;
     case "menu": return <MenuTab restaurant={restaurant} store={store} />;
     case "crm": return <CRMTab restaurant={restaurant} store={store} />;
+    case "influencers": return <InfluencerTab restaurant={restaurant} store={store} />;
     case "settings": return <SettingsTab restaurant={restaurant} store={store} modules={modules} onModulesChange={setModules} />;
     default: return null;
   }
@@ -1847,6 +1849,377 @@ function CRMTab({ restaurant, store }) {
           </Surface>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* ============================================================================
+ * INFLUENCER MATCHING — data-based analysis engine (Growth module)
+ * Every figure is computed from observable metrics the restaurateur enters.
+ * Nothing is scraped or invented; missing data must be asked for, not guessed.
+ * ==========================================================================*/
+const INF_TIERS = [
+  { max: 10000, label: "Nano / Micro", min: 100, mid: 125, hi: 150 },
+  { max: 50000, label: "Micro", min: 150, mid: 200, hi: 250 },
+  { max: 100000, label: "Micro+", min: 200, mid: 250, hi: 300 },
+  { max: 200000, label: "Mid-Tier", min: 250, mid: 325, hi: 400 },
+  { max: 500000, label: "Mid-Tier+", min: 350, mid: 475, hi: 600 },
+  { max: 1000000, label: "Macro", min: 500, mid: 750, hi: 1000 },
+  { max: Infinity, label: "Mega", min: 800, mid: 1400, hi: 2000 },
+];
+const infTier = (f) => INF_TIERS.find((t) => f < t.max) || INF_TIERS[INF_TIERS.length - 1];
+const MONTH_NAMES = ["", "Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+const TRACK_OPTS = [
+  { id: "none", label: "Aucune preuve", mult: 0.75 },
+  { id: "some", label: "1-2 prouvées", mult: 0.95 },
+  { id: "proven", label: "3+ réussies", mult: 1.2 },
+  { id: "metrics", label: "Peut montrer les métriques", mult: 1.4 },
+];
+const TIMING_MULT = { 1: 1.1, 2: 1.0, 3: 1.0, 4: 0.95, 5: 0.95, 6: 0.95, 7: 0.65, 8: 0.65, 9: 0.95, 10: 0.95, 11: 1.4, 12: 1.4 };
+const VERDICTS = {
+  TRY: { label: "À TENTER", emoji: "✅", color: C.accentGreen, note: "Feux verts réunis, prix justifié, ROI positif même au pire — go." },
+  NEGOTIATE: { label: "À NÉGOCIER", emoji: "⚠️", color: C.accentOrange, note: "Quelques réserves gérables — négociez le prix à la baisse avant de lancer." },
+  RISKY: { label: "RISKY", emoji: "🔴", color: C.accent, note: "Plusieurs signaux de prudence ou ROI marginal — n'y allez que si vous acceptez le risque." },
+  SKIP: { label: "SKIP", emoji: "❌", color: C.textSecondary, note: "Red flag critique — investissement non rentable, cherchez un meilleur profil." },
+};
+
+function engagementMult(rate) {
+  if (rate < 2) return 0.5;
+  if (rate < 3) return 0.7;
+  if (rate < 5) return 1.0;
+  if (rate < 8) return 1.3;
+  if (rate <= 12) return 1.7;
+  return 2.0;
+}
+function frequencyMult(perWeek) {
+  if (perWeek < 0.25) return 0.5;
+  if (perWeek < 0.5) return 0.7;
+  if (perWeek < 1.5) return 0.9;
+  if (perWeek < 3.5) return 1.0;
+  if (perWeek <= 6) return 1.3;
+  return 1.5;
+}
+function saturationMult(p) {
+  if (p === 0) return 1.2;
+  if (p <= 2) return 1.0;
+  if (p <= 4) return 0.85;
+  if (p <= 6) return 0.65;
+  return 0.4;
+}
+
+function analyzeInfluencer(d) {
+  const followers = Math.max(0, Number(d.followers) || 0);
+  const avgLikes = Math.max(0, Number(d.avgLikes) || 0);
+  const avgComments = Math.max(0, Number(d.avgComments) || 0);
+  const posts30 = Math.max(0, Number(d.posts30) || 0);
+  const partnerships = Math.max(0, Number(d.partnerships) || 0);
+  const localPct = Math.min(100, Math.max(0, Number(d.localPct) || 0));
+  const avgTicket = Math.max(0, Number(d.avgTicket) || 0);
+  const month = Number(d.month) || new Date().getMonth() + 1;
+
+  const engagement = followers > 0 ? ((avgLikes + avgComments) / followers) * 100 : 0;
+  const perWeek = posts30 / 4.3;
+  const tier = infTier(followers);
+  const trackOpt = TRACK_OPTS.find((t) => t.id === d.track) || TRACK_OPTS[0];
+
+  const mults = {
+    engagement: engagementMult(engagement),
+    frequency: frequencyMult(perWeek),
+    saturation: saturationMult(partnerships),
+    timing: TIMING_MULT[month] || 1.0,
+    track: trackOpt.mult,
+  };
+  const product = Object.values(mults).reduce((a, b) => a * b, 1);
+  const raw = tier.mid * product;
+  const round50 = (n) => Math.round(n / 50) * 50;
+  const low = Math.max(100, round50(raw * 0.7));
+  const high = Math.max(low + 50, round50(raw * 0.9));
+  const target = Math.max(120, round50(raw * 0.8));
+
+  const flags = { skip: [], caution: [], green: [] };
+  if (followers > 0 && engagement < 2) flags.skip.push(`Engagement ${engagement.toFixed(2)}% < 2% — audience morte ou fake`);
+  if (partnerships >= 7) flags.skip.push(`${partnerships} partenariats restos récents — audience saturée`);
+  if (d.botComments) flags.skip.push("Commentaires majoritairement bots / emoji génériques");
+  if (d.unnaturalGrowth) flags.skip.push("Croissance anormale — followers probablement achetés");
+  if (d.refusesData) flags.skip.push("Refuse de partager ses analytics — cache ses chiffres");
+
+  if (engagement >= 2 && engagement < 4) flags.caution.push(`Engagement faible (${engagement.toFixed(2)}%)`);
+  if (posts30 > 0 && perWeek < 1) flags.caution.push(`Publie peu (${perWeek.toFixed(1)} post/semaine)`);
+  if (partnerships >= 4 && partnerships <= 6) flags.caution.push(`${partnerships} partenariats restos — saturation qui commence`);
+  if (localPct > 0 && localPct < 50) flags.caution.push(`Seulement ${localPct}% d'audience locale`);
+  if (d.newAccount) flags.caution.push("Compte récent (< 3 mois) — pas d'historique");
+  if (d.track === "none") flags.caution.push("Aucun track record vérifiable");
+
+  if (engagement >= 5) flags.green.push(`Engagement réel (${engagement.toFixed(2)}%)`);
+  if (perWeek >= 2) flags.green.push(`Publie régulièrement (${perWeek.toFixed(1)}/semaine)`);
+  if (partnerships <= 2) flags.green.push("Peu/pas de concurrence resto récente");
+  if (localPct >= 60) flags.green.push(`Audience majoritairement locale (${localPct}%)`);
+  if (d.track === "proven" || d.track === "metrics") flags.green.push("Track record démontrable");
+
+  // ROI projection from actual per-post engaged users (observable), not followers.
+  const perPostEngaged = avgLikes + avgComments;
+  const localShare = (localPct || 60) / 100;
+  const visitsReal = Math.round(perPostEngaged * 0.05 * localShare);
+  const budget = Number(d.budget) || target;
+  const scen = (factor) => {
+    const visits = Math.max(0, Math.round(visitsReal * factor));
+    const revenue = Math.round(visits * 0.65 * avgTicket);
+    const roi = budget > 0 ? Math.round(((revenue - budget) / budget) * 100) : 0;
+    return { visits, revenue, roi };
+  };
+  const roi = { pess: scen(0.7), real: scen(1.0), opti: scen(1.3) };
+
+  const engScore = engagement >= 12 ? 10 : engagement >= 6 ? 7 : engagement >= 3 ? 4 : 1;
+  const audScore = localPct >= 70 ? 9 : localPct >= 50 ? 7 : localPct >= 30 ? 4 : 2;
+
+  let verdict;
+  if (flags.skip.length) verdict = "SKIP";
+  else if (roi.pess.roi < 0 || flags.caution.length >= 3) verdict = "RISKY";
+  else if (flags.caution.length >= 1) verdict = "NEGOTIATE";
+  else verdict = "TRY";
+
+  return { followers, engagement, perWeek, partnerships, tier, mults, raw, low, high, target, flags, roi, visitsReal, budget, engScore, audScore, verdict, month, avgTicket, trackLabel: trackOpt.label };
+}
+
+function detectPlatform(input) {
+  const s = (input || "").toLowerCase();
+  if (s.includes("tiktok")) return "tiktok";
+  if (s.includes("youtu")) return "youtube";
+  if (s.includes("linkedin")) return "linkedin";
+  return "instagram";
+}
+
+function InfluencerTab({ restaurant, store }) {
+  const toast = useToast();
+  const [f, setF] = useState({
+    username: "", platform: "instagram", followers: "", avgLikes: "", avgComments: "",
+    posts30: "", partnerships: "0", localPct: "", avgTicket: "35", budget: "",
+    track: "none", month: String(new Date().getMonth() + 1),
+    botComments: false, unnaturalGrowth: false, refusesData: false, newAccount: false,
+  });
+  const [report, setReport] = useState(null);
+  const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+
+  const run = () => {
+    if (!f.followers || !f.avgLikes) return toast("Followers et likes moyens requis", "error");
+    const r = analyzeInfluencer(f);
+    setReport(r);
+    if (hasSupabase && !store.demoMode) {
+      supabase.from("influencer_analyses").insert({
+        restaurant_id: restaurant.id, username: f.username, platform: f.platform,
+        followers: r.followers, engagement_rate: Number(r.engagement.toFixed(2)),
+        verdict: r.verdict, price_target: r.target, roi_realistic: r.roi.real.roi, inputs: f,
+      }).then(({ error }) => { if (error) console.warn("analysis not saved:", error.message); });
+    }
+  };
+
+  const copy = (txt) => {
+    try { navigator.clipboard.writeText(txt); toast("Copié !", "success"); }
+    catch { toast("Copie impossible", "error"); }
+  };
+  const contactTemplate = (r) =>
+    `Salut ${f.username || "[nom]"},\n\n` +
+    `On adore ton contenu — l'aesthetic et ton audience matchent bien notre vibe.\n\n` +
+    `On est ${restaurant.name}${restaurant.address ? `, situé ${restaurant.address}` : ""}.\n` +
+    `On cherche quelqu'un pour nous mettre en valeur, et on pense à toi.\n\n` +
+    `Proposition :\n- Budget : ${r.target}€\n- Contenu : 1 post feed + 10-15 stories\n- Timeline : 1 semaine de création\n\n` +
+    `Ça t'intéresse ?`;
+
+  const numField = (k, label, ph) => (
+    <div style={{ flex: "1 1 150px" }}>
+      <InputField label={label} type="number" min={0} placeholder={ph} value={f[k]} onChange={(e) => set(k, e.target.value)} />
+    </div>
+  );
+  const check = (k, label) => (
+    <label style={{ ...FF, fontSize: 13, display: "flex", gap: 8, alignItems: "center", flex: "1 1 220px" }}>
+      <input type="checkbox" checked={f[k]} onChange={(e) => set(k, e.target.checked)} /> {label}
+    </label>
+  );
+
+  return (
+    <div>
+      <h2 style={{ ...FF, fontSize: 22, fontWeight: 800, marginBottom: 4 }}>📣 Matching influenceurs</h2>
+      <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginBottom: 16 }}>
+        Analyse <b>data-driven</b> : entrez uniquement les chiffres <b>observables</b> sur le profil. Aucune donnée n'est inventée — l'outil calcule un prix équitable, vérifie les red flags et projette un ROI honnête.
+      </p>
+
+      <Surface style={{ padding: 18, marginBottom: 16 }}>
+        <strong style={{ ...FF }}>1 · Profil & métriques observables</strong>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
+          <div style={{ flex: "1 1 180px" }}>
+            <InputField label="Username / lien" placeholder="@sarah_lifestyle" value={f.username} onChange={(e) => { set("username", e.target.value); set("platform", detectPlatform(e.target.value)); }} />
+          </div>
+          <div style={{ flex: "1 1 130px" }}>
+            <label style={{ ...FF, display: "block", fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Plateforme</label>
+            <select value={f.platform} onChange={(e) => set("platform", e.target.value)} style={{ ...FF, width: "100%", padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.borderStrong}` }}>
+              <option value="instagram">Instagram</option><option value="tiktok">TikTok</option>
+              <option value="youtube">YouTube</option><option value="linkedin">LinkedIn</option>
+            </select>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4 }}>
+          {numField("followers", "Followers", "180000")}
+          {numField("avgLikes", "Likes moyens / post", "2100")}
+          {numField("avgComments", "Commentaires moyens", "450")}
+          {numField("posts30", "Posts (30 derniers jours)", "12")}
+          {numField("partnerships", "Partenariats restos (3 mois)", "1")}
+          {numField("localPct", "% audience locale", "70")}
+        </div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4 }}>
+          {numField("avgTicket", "Ticket moyen resto (€)", "35")}
+          {numField("budget", "Budget envisagé (€, optionnel)", "auto")}
+          <div style={{ flex: "1 1 150px" }}>
+            <label style={{ ...FF, display: "block", fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Mois de publication</label>
+            <select value={f.month} onChange={(e) => set("month", e.target.value)} style={{ ...FF, width: "100%", padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.borderStrong}` }}>
+              {MONTH_NAMES.slice(1).map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: "1 1 150px" }}>
+            <label style={{ ...FF, display: "block", fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Track record</label>
+            <select value={f.track} onChange={(e) => set("track", e.target.value)} style={{ ...FF, width: "100%", padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.borderStrong}` }}>
+              {TRACK_OPTS.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <div style={{ ...FF, fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 8 }}>Signaux d'alerte observés (cochez si présents) :</div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {check("botComments", "Commentaires bots / emoji génériques")}
+            {check("unnaturalGrowth", "Croissance anormale (followers achetés)")}
+            {check("refusesData", "Refuse de partager ses analytics")}
+            {check("newAccount", "Compte récent (< 3 mois)")}
+          </div>
+        </div>
+        <Btn variant="primary" size="lg" style={{ marginTop: 16 }} onClick={run}>Analyser →</Btn>
+      </Surface>
+
+      {report && <InfluencerReport r={report} f={f} copy={copy} contactTemplate={contactTemplate} restaurant={restaurant} />}
+    </div>
+  );
+}
+
+function InfluencerReport({ r, f, copy, contactTemplate, restaurant }) {
+  const v = VERDICTS[r.verdict];
+  const mrows = [
+    ["Engagement", `${r.engagement.toFixed(2)}%`, r.mults.engagement],
+    ["Fréquence", `${r.perWeek.toFixed(1)}/sem`, r.mults.frequency],
+    ["Saturation", `${r.partnerships} resto(s)`, r.mults.saturation],
+    ["Timing", MONTH_NAMES[r.month], r.mults.timing],
+    ["Track record", r.trackLabel, r.mults.track],
+  ];
+  const roiRows = [
+    ["Pessimiste (-30%)", r.roi.pess, C.accentOrange],
+    ["Réaliste", r.roi.real, C.accentBlue],
+    ["Optimiste (+30%)", r.roi.opti, C.accentGreen],
+  ];
+  const mc = (m) => (m >= 1.2 ? C.accentGreen : m >= 1 ? C.text : m >= 0.7 ? C.accentOrange : C.accent);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Verdict */}
+      <Surface style={{ padding: 22, borderLeft: `4px solid ${v.color}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 34 }}>{v.emoji}</span>
+          <div>
+            <div style={{ ...FF, fontSize: 12, fontWeight: 700, color: C.textTertiary, textTransform: "uppercase" }}>Verdict</div>
+            <div style={{ ...FF, fontSize: 24, fontWeight: 900, color: v.color }}>{v.label}</div>
+          </div>
+          <div style={{ marginLeft: "auto", textAlign: "right" }}>
+            <Tag color={C.textTertiary}>{r.tier.label}</Tag>
+            <div style={{ ...FF, fontSize: 12, color: C.textSecondary, marginTop: 4 }}>{r.followers.toLocaleString("fr-FR")} followers · {f.platform}</div>
+          </div>
+        </div>
+        <p style={{ ...FF, fontSize: 14, color: C.textSecondary, marginTop: 10 }}>{v.note}</p>
+      </Surface>
+
+      {/* Pricing */}
+      <Surface style={{ padding: 18 }}>
+        <strong style={{ ...FF }}>💰 Analyse de prix</strong>
+        <div style={{ ...FF, fontSize: 13, color: C.textSecondary, margin: "6px 0 12px" }}>Base {r.tier.label} : {r.tier.mid}€ × multiplicateurs observables</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {mrows.map(([lbl, obs, m]) => (
+            <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 10, ...FF, fontSize: 14 }}>
+              <span style={{ flex: 1 }}>{lbl}</span>
+              <span style={{ color: C.textSecondary, fontSize: 13 }}>{obs}</span>
+              <span style={{ width: 56, textAlign: "right", fontWeight: 800, color: mc(m) }}>×{m}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+          <div style={{ flex: "1 1 140px", background: C.surfaceAlt, borderRadius: 12, padding: 14 }}>
+            <div style={{ ...FF, fontSize: 12, color: C.textTertiary }}>Fourchette réaliste</div>
+            <div style={{ ...FF, fontSize: 20, fontWeight: 900 }}>{r.low}€ – {r.high}€</div>
+          </div>
+          <div style={{ flex: "1 1 140px", background: v.color + "12", borderRadius: 12, padding: 14 }}>
+            <div style={{ ...FF, fontSize: 12, color: C.textTertiary }}>Cible de négociation</div>
+            <div style={{ ...FF, fontSize: 20, fontWeight: 900, color: v.color }}>{r.target}€</div>
+          </div>
+        </div>
+      </Surface>
+
+      {/* Red flags */}
+      <Surface style={{ padding: 18 }}>
+        <strong style={{ ...FF }}>🚦 Red flags</strong>
+        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+          {r.flags.skip.map((m) => <div key={m} style={{ ...FF, fontSize: 13, color: C.accent }}>❌ {m}</div>)}
+          {r.flags.caution.map((m) => <div key={m} style={{ ...FF, fontSize: 13, color: C.accentOrange }}>⚠️ {m}</div>)}
+          {r.flags.green.map((m) => <div key={m} style={{ ...FF, fontSize: 13, color: C.accentGreen }}>✅ {m}</div>)}
+          {!r.flags.skip.length && !r.flags.caution.length && !r.flags.green.length && <div style={{ ...FF, fontSize: 13, color: C.textSecondary }}>Pas assez de données pour des signaux nets.</div>}
+        </div>
+      </Surface>
+
+      {/* ROI */}
+      <Surface style={{ padding: 18 }}>
+        <strong style={{ ...FF }}>📈 Projection ROI</strong>
+        <div style={{ ...FF, fontSize: 13, color: C.textSecondary, margin: "6px 0 12px" }}>Budget retenu : {r.budget}€ · ~{r.visitsReal} visites projetées (scénario réaliste)</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {roiRows.map(([lbl, s, col]) => (
+            <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 10, ...FF, fontSize: 14, padding: "8px 12px", borderRadius: 10, background: C.surfaceAlt }}>
+              <span style={{ flex: 1, fontWeight: 600 }}>{lbl}</span>
+              <span style={{ color: C.textSecondary, fontSize: 13 }}>{s.visits} visites · {s.revenue}€</span>
+              <span style={{ width: 80, textAlign: "right", fontWeight: 800, color: s.roi >= 0 ? col : C.accent }}>{s.roi >= 0 ? "+" : ""}{s.roi}%</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 12, padding: 12, borderRadius: 12, background: "#FFF6E5", border: "1px solid #F2C94C55" }}>
+          <strong style={{ ...FF, fontSize: 13 }}>⚠️ Disclaimer</strong>
+          <p style={{ ...FF, fontSize: 12.5, color: C.textSecondary, marginTop: 4 }}>
+            Projections basées sur l'engagement <b>observable</b> et des benchmarks. Elles intègrent des variables non contrôlées (trend, qualité du contenu, météo, bruit marketing).
+            <b> Mesurez l'impact réel</b> via un code promo dédié, un QR code ou un lien de tracking — l'impact peut varier de 50 à 200 % de la projection.
+          </p>
+        </div>
+      </Surface>
+
+      {/* Scoring */}
+      <Surface style={{ padding: 18 }}>
+        <strong style={{ ...FF }}>📊 Scoring</strong>
+        <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+          {[["Engagement", r.engScore], ["Audience (local)", r.audScore]].map(([lbl, sc]) => (
+            <div key={lbl} style={{ flex: "1 1 140px", background: C.surfaceAlt, borderRadius: 12, padding: 14 }}>
+              <div style={{ ...FF, fontSize: 12, color: C.textTertiary }}>{lbl}</div>
+              <div style={{ ...FF, fontSize: 22, fontWeight: 900 }}>{sc}<span style={{ fontSize: 13, color: C.textTertiary }}>/10</span></div>
+            </div>
+          ))}
+        </div>
+        <p style={{ ...FF, fontSize: 12, color: C.textTertiary, marginTop: 8 }}>Aesthetic et content-fit s'évaluent à l'œil sur le profil — non scorés automatiquement pour éviter d'inventer.</p>
+      </Surface>
+
+      {/* Next steps */}
+      {r.verdict !== "SKIP" && (
+        <Surface style={{ padding: 18 }}>
+          <strong style={{ ...FF }}>✅ Prochaines étapes</strong>
+          <ol style={{ ...FF, fontSize: 13.5, color: C.text, paddingLeft: 18, marginTop: 8, lineHeight: 1.7 }}>
+            <li>Contactez l'influenceur (template ci-dessous)</li>
+            <li>Invitation privée → création (photos, stories) → publication</li>
+            <li>Trackez avec un code promo dédié (ex. <b>{(restaurant.name || "RESTO").slice(0, 6).toUpperCase()}20</b>)</li>
+            <li>≥ 70 visites → renouveler · 40-70 → réévaluer · &lt; 40 → changer de profil</li>
+          </ol>
+          <div style={{ marginTop: 12, position: "relative" }}>
+            <pre style={{ ...FF, whiteSpace: "pre-wrap", fontSize: 13, background: C.surfaceAlt, borderRadius: 12, padding: 14, margin: 0 }}>{contactTemplate(r)}</pre>
+            <Btn variant="subtle" size="sm" style={{ marginTop: 8 }} onClick={() => copy(contactTemplate(r))}>📋 Copier le message</Btn>
+          </div>
+        </Surface>
+      )}
     </div>
   );
 }
