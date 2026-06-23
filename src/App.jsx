@@ -1978,6 +1978,23 @@ function analyzeInfluencer(d, content) {
   };
   const roi = { pess: scen(0.7), real: scen(1.0), opti: scen(1.3) };
 
+  // --- Decision intelligence ------------------------------------------------
+  // Break-even: highest price that still breaks even in the pessimistic case.
+  const breakEven = Math.max(0, Math.floor(roi.pess.revenue));
+  // Value added beyond direct covers: reusable UGC + repeat-client lifetime value.
+  const ugcValue = 500;                                  // ~1 pro-grade content set
+  const repeatValue = Math.round(roi.real.revenue * 0.25); // returning-customer LTV proxy
+  const valueAdded = ugcValue + repeatValue;
+  const totalReal = roi.real.revenue + valueAdded;
+  const totalRoi = budget > 0 ? Math.round(((totalReal - budget) / budget) * 100) : 0;
+  // Channel benchmark: what the same budget buys on paid ads (Paris ~0.80€ CPC,
+  // ~8% landing→visit) — a sanity check, not a promise.
+  const adVisits = budget > 0 ? Math.round((budget / 0.8) * 0.08) : 0;
+  const betterChannel = roi.real.visits >= adVisits ? "influencer" : "ads";
+  // Analysis confidence: how much rests on real data vs assumptions.
+  const realInputs = (d.followersReal ? 1 : 0) + (d.likesReal ? 1 : 0);
+  const confidencePct = Math.round(((realInputs + (d.localPct ? 1 : 0) + (Number(d.posts30) ? 1 : 0)) / 4) * 100);
+
   const engScore = engagement >= 12 ? 10 : engagement >= 6 ? 7 : engagement >= 3 ? 4 : 1;
 
   let verdict;
@@ -1986,7 +2003,7 @@ function analyzeInfluencer(d, content) {
   else if (flags.caution.length >= 1) verdict = "NEGOTIATE";
   else verdict = "TRY";
 
-  return { followers, engagement, perWeek, partnerships, tier, mults, raw, low, high, target, flags, roi, visitsReal, budget, engScore, fit, quality, localAssumed, localKnown: !!d.localPct, verdict, month, avgTicket, trackLabel: trackOpt.label };
+  return { followers, engagement, perWeek, partnerships, tier, mults, raw, low, high, target, flags, roi, visitsReal, budget, engScore, fit, quality, localAssumed, localKnown: !!d.localPct, verdict, month, avgTicket, trackLabel: trackOpt.label, breakEven, ugcValue, repeatValue, valueAdded, totalReal, totalRoi, adVisits, betterChannel, confidencePct };
 }
 
 function detectPlatform(input) {
@@ -2046,6 +2063,55 @@ function InfluencerTab({ restaurant, store }) {
     setF((p) => (p.avgTicketTouched ? p : { ...p, avgTicket: String(effectiveTicket) }));
   }, [effectiveTicket]);
 
+  // History of past analyses + tracked partnerships
+  const [history, setHistory] = useState([]);
+  const [campaigns, setCampaigns] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const loadHistory = useCallback(async () => {
+    if (!hasSupabase || store.demoMode) return;
+    const { data } = await supabase.from("influencer_analyses").select("*").eq("restaurant_id", restaurant.id).order("created_at", { ascending: false }).limit(12);
+    setHistory(data || []);
+  }, [restaurant.id, store.demoMode]);
+  const loadCampaigns = useCallback(async () => {
+    if (!hasSupabase || store.demoMode) return;
+    const { data } = await supabase.from("influencer_campaigns").select("*").eq("restaurant_id", restaurant.id).order("created_at", { ascending: false });
+    setCampaigns(data || []);
+  }, [restaurant.id, store.demoMode]);
+  useEffect(() => { loadHistory(); loadCampaigns(); }, [loadHistory, loadCampaigns]);
+
+  const launch = async (r) => {
+    const base = (restaurant.name || "RESTO").replace(/\W/g, "").slice(0, 6).toUpperCase() || "RESTO";
+    const code = `${base}${Math.floor(Math.random() * 90 + 10)}`;
+    if (!hasSupabase || store.demoMode) { toast(`(Démo) Partenariat lancé · code ${code}`, "success"); return; }
+    const { error } = await supabase.from("influencer_campaigns").insert({
+      restaurant_id: restaurant.id, username: f.username, platform: f.platform,
+      promo_code: code, budget: r.budget, projected_visits: r.roi.real.visits, projected_roi: r.roi.real.roi, status: "active",
+    });
+    if (error) return toast(error.message, "error");
+    toast(`Partenariat suivi · code promo ${code}`, "success");
+    loadCampaigns();
+  };
+  const saveActual = async (c, visits) => {
+    const v = Math.max(0, Number(visits) || 0);
+    const revenue = Math.round(v * 0.65 * effectiveTicket);
+    const roi = c.budget > 0 ? Math.round(((revenue - c.budget) / c.budget) * 100) : 0;
+    if (!hasSupabase || store.demoMode) { toast("(Démo) suivi non persisté", "info"); return; }
+    const { error } = await supabase.from("influencer_campaigns").update({ actual_visits: v, status: "done" }).eq("id", c.id);
+    if (error) return toast(error.message, "error");
+    toast(`Réel enregistré : ${v} visites · ROI ${roi >= 0 ? "+" : ""}${roi}%`, "success");
+    loadCampaigns();
+  };
+  const reopen = (h) => {
+    const inputs = h.inputs || {};
+    const next = { ...f, ...inputs };
+    setF(next);
+    setContent(inputs.ai || null);
+    setMeta({ real: true, platform: h.platform || "tiktok", fields: inputs.likesReal ? ["avgLikes"] : [], reopened: true });
+    analyze(next, inputs.ai || null);
+    setShowHistory(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const analyze = (data, ai = content) => {
     const withTicket = { ...data, avgTicket: data.avgTicketTouched ? data.avgTicket : String(effectiveTicket) };
     const r = analyzeInfluencer(withTicket, ai);
@@ -2075,7 +2141,9 @@ function InfluencerTab({ restaurant, store }) {
         const merged = {
           ...f, username: d.nickname || handle, platform: d.platform || platform,
           followers: String(followers), avgLikes: String(avgLikes), avgComments: String(avgComments),
-          posts30: f.posts30 || "", partnerships: f.partnerships || "0", localPct: f.localPct || "",
+          posts30: d.posts30 != null ? String(d.posts30) : (f.posts30 || ""),
+          partnerships: f.partnerships || "0", localPct: f.localPct || "",
+          followersReal: true, likesReal: (d.fields_real || []).includes("avgLikes"),
         };
         setF(merged);
         setMeta({ real: true, platform: d.platform || platform, fields: d.fields_real || [], region: d.region || "", verified: !!d.verified, bio: d.bio || "" });
@@ -2221,12 +2289,72 @@ function InfluencerTab({ restaurant, store }) {
         </Surface>
       )}
 
-      {report && <InfluencerReport r={report} f={f} content={content} copy={copy} contactTemplate={contactTemplate} restaurant={restaurant} />}
+      {report && <InfluencerReport r={report} f={f} content={content} copy={copy} contactTemplate={contactTemplate} restaurant={restaurant} onLaunch={launch} />}
+
+      {/* Tracked partnerships */}
+      {campaigns.length > 0 && (
+        <Surface style={{ padding: 18, marginTop: 16 }}>
+          <strong style={{ ...FF }}>📌 Partenariats suivis</strong>
+          <p style={{ ...FF, fontSize: 12, color: C.textSecondary, marginTop: 4 }}>Comparez le projeté au réel. Saisissez les visites générées (via votre code promo) pour boucler la boucle.</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
+            {campaigns.map((c) => <CampaignRow key={c.id} c={c} ticket={effectiveTicket} onSave={saveActual} />)}
+          </div>
+        </Surface>
+      )}
+
+      {/* History */}
+      {history.length > 0 && (
+        <Surface style={{ padding: 18, marginTop: 16 }}>
+          <button onClick={() => setShowHistory((v) => !v)} style={{ ...FF, fontWeight: 800, fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+            🕑 Historique des analyses ({history.length}) <span style={{ color: C.textTertiary, fontSize: 13 }}>{showHistory ? "▲" : "▼"}</span>
+          </button>
+          {showHistory && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
+              {history.map((h) => {
+                const vv = VERDICTS[h.verdict] || VERDICTS.NEGOTIATE;
+                return (
+                  <div key={h.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, background: C.surfaceAlt, ...FF, fontSize: 13 }}>
+                    <span style={{ fontSize: 16 }}>{vv.emoji}</span>
+                    <div style={{ flex: 1 }}>
+                      <strong>{h.username || "—"}</strong> <span style={{ color: C.textTertiary }}>· {h.platform}</span>
+                      <div style={{ color: C.textSecondary, fontSize: 12 }}>{Number(h.followers || 0).toLocaleString("fr-FR")} fol · {h.engagement_rate}% eng · cible {h.price_target}€ · ROI {h.roi_realistic >= 0 ? "+" : ""}{h.roi_realistic}%</div>
+                    </div>
+                    <Tag color={vv.color}>{vv.label}</Tag>
+                    {h.inputs && <Btn variant="subtle" size="sm" onClick={() => reopen(h)}>Rouvrir</Btn>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Surface>
+      )}
     </div>
   );
 }
 
-function InfluencerReport({ r, f, content, copy, contactTemplate, restaurant }) {
+function CampaignRow({ c, ticket, onSave }) {
+  const [actual, setActual] = useState(c.actual_visits != null ? String(c.actual_visits) : "");
+  const v = Number(actual) || 0;
+  const realRoi = c.budget > 0 ? Math.round(((Math.round(v * 0.65 * ticket) - c.budget) / c.budget) * 100) : 0;
+  const done = c.actual_visits != null;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, background: C.surfaceAlt, ...FF, fontSize: 13, flexWrap: "wrap" }}>
+      <div style={{ flex: "1 1 180px" }}>
+        <strong>{c.username || "—"}</strong> <span style={{ color: C.textTertiary }}>· {c.platform}</span>
+        <div style={{ color: C.textSecondary, fontSize: 12 }}>Code <b>{c.promo_code}</b> · budget {c.budget}€ · projeté {c.projected_visits} visites / ROI {c.projected_roi >= 0 ? "+" : ""}{c.projected_roi}%</div>
+      </div>
+      <input type="number" min={0} placeholder="visites réelles" value={actual} onChange={(e) => setActual(e.target.value)} style={{ ...FF, width: 120, padding: "8px 10px", borderRadius: 10, border: `1px solid ${C.borderStrong}` }} />
+      {actual !== "" && (
+        <span style={{ ...FF, fontWeight: 800, color: realRoi >= 0 ? C.accentGreen : C.accent, width: 96, textAlign: "right" }}>
+          réel {realRoi >= 0 ? "+" : ""}{realRoi}%
+        </span>
+      )}
+      <Btn variant={done ? "subtle" : "primary"} size="sm" onClick={() => onSave(c, actual)}>{done ? "Mettre à jour" : "Enregistrer"}</Btn>
+    </div>
+  );
+}
+
+function InfluencerReport({ r, f, content, copy, contactTemplate, restaurant, onLaunch }) {
   const v = VERDICTS[r.verdict];
   const QUALITY = { high: { label: "Qualité élevée", color: C.accentGreen }, medium: { label: "Qualité moyenne", color: C.accentOrange }, low: { label: "Qualité faible", color: C.accent } };
   const mrows = [
@@ -2256,6 +2384,7 @@ function InfluencerReport({ r, f, content, copy, contactTemplate, restaurant }) 
           <div style={{ marginLeft: "auto", textAlign: "right" }}>
             <Tag color={C.textTertiary}>{r.tier.label}</Tag>
             <div style={{ ...FF, fontSize: 12, color: C.textSecondary, marginTop: 4 }}>{r.followers.toLocaleString("fr-FR")} followers · {f.platform}</div>
+            <div style={{ ...FF, fontSize: 11, color: r.confidencePct >= 50 ? C.accentGreen : C.accentOrange, marginTop: 2 }}>Fiabilité données : {r.confidencePct}%</div>
           </div>
         </div>
         <p style={{ ...FF, fontSize: 14, color: C.textSecondary, marginTop: 10 }}>{v.note}</p>
@@ -2341,6 +2470,34 @@ function InfluencerReport({ r, f, content, copy, contactTemplate, restaurant }) 
         </div>
       </Surface>
 
+      {/* Negotiation & profitability */}
+      <Surface style={{ padding: 18 }}>
+        <strong style={{ ...FF }}>🤝 Négociation & rentabilité</strong>
+        <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+          <div style={{ flex: "1 1 160px", background: "#EAF7EE", borderRadius: 12, padding: 14 }}>
+            <div style={{ ...FF, fontSize: 12, color: C.textTertiary }}>Prix plafond (rentable au pire)</div>
+            <div style={{ ...FF, fontSize: 22, fontWeight: 900, color: C.accentGreen }}>{r.breakEven}€</div>
+            <div style={{ ...FF, fontSize: 11.5, color: C.textSecondary, marginTop: 2 }}>Au-delà, le scénario pessimiste devient perdant.</div>
+          </div>
+          <div style={{ flex: "1 1 160px", background: C.surfaceAlt, borderRadius: 12, padding: 14 }}>
+            <div style={{ ...FF, fontSize: 12, color: C.textTertiary }}>Valeur ajoutée estimée</div>
+            <div style={{ ...FF, fontSize: 22, fontWeight: 900 }}>+{r.valueAdded}€</div>
+            <div style={{ ...FF, fontSize: 11.5, color: C.textSecondary, marginTop: 2 }}>UGC réutilisable (~{r.ugcValue}€) + fidélisation (~{r.repeatValue}€).</div>
+          </div>
+          <div style={{ flex: "1 1 160px", background: v.color + "12", borderRadius: 12, padding: 14 }}>
+            <div style={{ ...FF, fontSize: 12, color: C.textTertiary }}>ROI total potentiel</div>
+            <div style={{ ...FF, fontSize: 22, fontWeight: 900, color: v.color }}>{r.totalRoi >= 0 ? "+" : ""}{r.totalRoi}%</div>
+            <div style={{ ...FF, fontSize: 11.5, color: C.textSecondary, marginTop: 2 }}>Revenu direct + valeur ajoutée.</div>
+          </div>
+        </div>
+        <div style={{ marginTop: 12, padding: 12, borderRadius: 12, background: C.surfaceAlt, ...FF, fontSize: 13 }}>
+          <b>Influenceur vs publicité payante</b> — pour {r.budget}€ : ~<b>{r.roi.real.visits}</b> visites via l'influenceur contre ~<b>{r.adVisits}</b> via de la pub (estimation Paris). {" "}
+          <span style={{ color: r.betterChannel === "influencer" ? C.accentGreen : C.accentOrange, fontWeight: 700 }}>
+            {r.betterChannel === "influencer" ? "→ L'influenceur est plus rentable ici." : "→ La pub payante serait plus efficace ici."}
+          </span>
+        </div>
+      </Surface>
+
       {/* Scoring */}
       <Surface style={{ padding: 18 }}>
         <strong style={{ ...FF }}>📊 Scoring</strong>
@@ -2369,7 +2526,10 @@ function InfluencerReport({ r, f, content, copy, contactTemplate, restaurant }) 
           </ol>
           <div style={{ marginTop: 12, position: "relative" }}>
             <pre style={{ ...FF, whiteSpace: "pre-wrap", fontSize: 13, background: C.surfaceAlt, borderRadius: 12, padding: 14, margin: 0 }}>{contactTemplate(r)}</pre>
-            <Btn variant="subtle" size="sm" style={{ marginTop: 8 }} onClick={() => copy(contactTemplate(r))}>📋 Copier le message</Btn>
+            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+              <Btn variant="subtle" size="sm" onClick={() => copy(contactTemplate(r))}>📋 Copier le message</Btn>
+              <Btn variant="primary" size="sm" onClick={() => onLaunch?.(r)}>🚀 Lancer le suivi du partenariat</Btn>
+            </div>
           </div>
         </Surface>
       )}
