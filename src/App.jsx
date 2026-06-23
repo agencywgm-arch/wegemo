@@ -1907,21 +1907,24 @@ function saturationMult(p) {
   return 0.4;
 }
 
-function analyzeInfluencer(d) {
+function analyzeInfluencer(d, content) {
   const followers = Math.max(0, Number(d.followers) || 0);
   const avgLikes = Math.max(0, Number(d.avgLikes) || 0);
   const avgComments = Math.max(0, Number(d.avgComments) || 0);
   const posts30 = Math.max(0, Number(d.posts30) || 0);
   const partnerships = Math.max(0, Number(d.partnerships) || 0);
-  const localPct = Math.min(100, Math.max(0, Number(d.localPct) || 0));
   const avgTicket = Math.max(0, Number(d.avgTicket) || 0);
   const month = Number(d.month) || new Date().getMonth() + 1;
+  // Audience locality can't be measured from a public profile — it's an explicit
+  // assumption (default 50%), never presented as fetched data.
+  const localAssumed = d.localPct ? Math.min(100, Math.max(0, Number(d.localPct))) : 50;
 
   const engagement = followers > 0 ? ((avgLikes + avgComments) / followers) * 100 : 0;
   const perWeek = posts30 / 4.3;
   const tier = infTier(followers);
   const trackOpt = TRACK_OPTS.find((t) => t.id === d.track) || TRACK_OPTS[0];
 
+  // Price is driven only by real/observable market metrics — not by the AI read.
   const mults = {
     engagement: engagementMult(engagement),
     frequency: frequencyMult(perWeek),
@@ -1936,29 +1939,35 @@ function analyzeInfluencer(d) {
   const high = Math.max(low + 50, round50(raw * 0.9));
   const target = Math.max(120, round50(raw * 0.8));
 
+  const fit = content && Number.isFinite(Number(content.fitScore)) ? Number(content.fitScore) : null;
+  const quality = content?.quality || null;
+
   const flags = { skip: [], caution: [], green: [] };
   if (followers > 0 && engagement < 2) flags.skip.push(`Engagement ${engagement.toFixed(2)}% < 2% — audience morte ou fake`);
   if (partnerships >= 7) flags.skip.push(`${partnerships} partenariats restos récents — audience saturée`);
   if (d.botComments) flags.skip.push("Commentaires majoritairement bots / emoji génériques");
   if (d.unnaturalGrowth) flags.skip.push("Croissance anormale — followers probablement achetés");
   if (d.refusesData) flags.skip.push("Refuse de partager ses analytics — cache ses chiffres");
+  if (fit !== null && fit <= 2) flags.skip.push("Contenu sans rapport avec votre restaurant (lecture IA)");
 
   if (engagement >= 2 && engagement < 4) flags.caution.push(`Engagement faible (${engagement.toFixed(2)}%)`);
   if (posts30 > 0 && perWeek < 1) flags.caution.push(`Publie peu (${perWeek.toFixed(1)} post/semaine)`);
   if (partnerships >= 4 && partnerships <= 6) flags.caution.push(`${partnerships} partenariats restos — saturation qui commence`);
-  if (localPct > 0 && localPct < 50) flags.caution.push(`Seulement ${localPct}% d'audience locale`);
   if (d.newAccount) flags.caution.push("Compte récent (< 3 mois) — pas d'historique");
   if (d.track === "none") flags.caution.push("Aucun track record vérifiable");
+  if (quality === "low") flags.caution.push("Contenu jugé bas de gamme (lecture IA)");
+  if (fit !== null && fit > 2 && fit < 5) flags.caution.push("Adéquation contenu/restaurant moyenne (lecture IA)");
 
   if (engagement >= 5) flags.green.push(`Engagement réel (${engagement.toFixed(2)}%)`);
   if (perWeek >= 2) flags.green.push(`Publie régulièrement (${perWeek.toFixed(1)}/semaine)`);
   if (partnerships <= 2) flags.green.push("Peu/pas de concurrence resto récente");
-  if (localPct >= 60) flags.green.push(`Audience majoritairement locale (${localPct}%)`);
   if (d.track === "proven" || d.track === "metrics") flags.green.push("Track record démontrable");
+  if (fit !== null && fit >= 8) flags.green.push("Contenu très aligné avec votre restaurant (lecture IA)");
+  if (quality === "high") flags.green.push("Contenu de qualité (lecture IA)");
 
-  // ROI projection from actual per-post engaged users (observable), not followers.
+  // ROI from actual per-post engaged users (real), discounted by the assumed local share.
   const perPostEngaged = avgLikes + avgComments;
-  const localShare = (localPct || 60) / 100;
+  const localShare = localAssumed / 100;
   const visitsReal = Math.round(perPostEngaged * 0.05 * localShare);
   const budget = Number(d.budget) || target;
   const scen = (factor) => {
@@ -1970,7 +1979,6 @@ function analyzeInfluencer(d) {
   const roi = { pess: scen(0.7), real: scen(1.0), opti: scen(1.3) };
 
   const engScore = engagement >= 12 ? 10 : engagement >= 6 ? 7 : engagement >= 3 ? 4 : 1;
-  const audScore = localPct >= 70 ? 9 : localPct >= 50 ? 7 : localPct >= 30 ? 4 : 2;
 
   let verdict;
   if (flags.skip.length) verdict = "SKIP";
@@ -1978,7 +1986,7 @@ function analyzeInfluencer(d) {
   else if (flags.caution.length >= 1) verdict = "NEGOTIATE";
   else verdict = "TRY";
 
-  return { followers, engagement, perWeek, partnerships, tier, mults, raw, low, high, target, flags, roi, visitsReal, budget, engScore, audScore, verdict, month, avgTicket, trackLabel: trackOpt.label };
+  return { followers, engagement, perWeek, partnerships, tier, mults, raw, low, high, target, flags, roi, visitsReal, budget, engScore, fit, quality, localAssumed, localKnown: !!d.localPct, verdict, month, avgTicket, trackLabel: trackOpt.label };
 }
 
 function detectPlatform(input) {
@@ -2007,24 +2015,47 @@ function InfluencerTab({ restaurant, store }) {
   const [url, setUrl] = useState("");
   const [f, setF] = useState({
     username: "", platform: "instagram", followers: "", avgLikes: "", avgComments: "",
-    posts30: "", partnerships: "0", localPct: "", avgTicket: "35", budget: "",
+    posts30: "", partnerships: "0", localPct: "", avgTicket: "", avgTicketTouched: false, budget: "",
     track: "none", month: String(new Date().getMonth() + 1),
     botComments: false, unnaturalGrowth: false, refusesData: false, newAccount: false,
   });
   const [report, setReport] = useState(null);
-  const [meta, setMeta] = useState(null);     // { confidence, note }
+  const [content, setContent] = useState(null);  // AI content read
+  const [meta, setMeta] = useState(null);
   const [busy, setBusy] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
 
-  const analyze = (data) => {
-    const r = analyzeInfluencer(data);
+  // Average ticket comes from the restaurant's REAL order history — the SaaS
+  // already knows it; we never ask the user to type it.
+  const allOrders = [...(store.orders || []), ...(store.doneOrders || [])];
+  const ticketSamples = allOrders.map((o) => Number(o.total) || 0).filter((n) => n > 0);
+  let realTicket = 0, ticketSource = "none";
+  if (ticketSamples.length) {
+    realTicket = Math.round(ticketSamples.reduce((a, b) => a + b, 0) / ticketSamples.length);
+    ticketSource = "orders";
+  } else {
+    const cust = store.customers || [];
+    const spent = cust.reduce((a, c) => a + (Number(c.total_spent) || 0), 0);
+    const cnt = cust.reduce((a, c) => a + (Number(c.order_count) || 0), 0);
+    if (cnt) { realTicket = Math.round(spent / cnt); ticketSource = "customers"; }
+  }
+  const effectiveTicket = realTicket || 25;
+
+  useEffect(() => {
+    setF((p) => (p.avgTicketTouched ? p : { ...p, avgTicket: String(effectiveTicket) }));
+  }, [effectiveTicket]);
+
+  const analyze = (data, ai = content) => {
+    const withTicket = { ...data, avgTicket: data.avgTicketTouched ? data.avgTicket : String(effectiveTicket) };
+    const r = analyzeInfluencer(withTicket, ai);
     setReport(r);
     if (hasSupabase && !store.demoMode) {
       supabase.from("influencer_analyses").insert({
-        restaurant_id: restaurant.id, username: data.username, platform: data.platform,
+        restaurant_id: restaurant.id, username: withTicket.username, platform: withTicket.platform,
         followers: r.followers, engagement_rate: Number(r.engagement.toFixed(2)),
-        verdict: r.verdict, price_target: r.target, roi_realistic: r.roi.real.roi, inputs: data,
+        verdict: r.verdict, price_target: r.target, roi_realistic: r.roi.real.roi,
+        inputs: { ...withTicket, ai: ai || null },
       }).then(({ error }) => { if (error) console.warn("analysis not saved:", error.message); });
     }
   };
@@ -2033,27 +2064,37 @@ function InfluencerTab({ restaurant, store }) {
     const handle = url.trim();
     if (!handle) return toast("Colle l'URL ou le @username de l'influenceur", "error");
     const platform = detectPlatform(handle);
-    setBusy(true); setReport(null); setMeta(null);
+    setBusy(true); setReport(null); setMeta(null); setContent(null);
     try {
       if (hasSupabase && !store.demoMode) {
         const d = await callFunction("chat-agent", { mode: "influencer-fetch", text: handle, context: platform });
         if (!d || !d.real || !d.followers) throw new Error(d?.error || "blocked");
         const followers = Number(d.followers) || 0;
-        // avgLikes is real on TikTok; Instagram only gives followers, so derive a
-        // neutral proxy the user can correct in Détails.
         const avgLikes = d.avgLikes != null ? Number(d.avgLikes) : Math.round(followers * 0.04);
+        const avgComments = d.avgComments != null ? Number(d.avgComments) : Math.round(avgLikes * 0.08);
         const merged = {
           ...f, username: d.nickname || handle, platform: d.platform || platform,
-          followers: String(followers),
-          avgLikes: String(avgLikes),
-          avgComments: String(d.avgComments != null ? d.avgComments : Math.round(avgLikes * 0.08)),
-          posts30: f.posts30 || "8",        // neutral assumption (≈2/sem) — adjustable
-          partnerships: f.partnerships || "0",
-          localPct: f.localPct || "60",     // neutral assumption — adjustable
+          followers: String(followers), avgLikes: String(avgLikes), avgComments: String(avgComments),
+          posts30: f.posts30 || "", partnerships: f.partnerships || "0", localPct: f.localPct || "",
         };
         setF(merged);
-        setMeta({ real: true, platform: d.platform || platform, fields: d.fields_real || [] });
-        analyze(merged);
+        setMeta({ real: true, platform: d.platform || platform, fields: d.fields_real || [], region: d.region || "", verified: !!d.verified, bio: d.bio || "" });
+
+        // AI content read (qualitative) — non-fatal if it fails.
+        let ai = null;
+        const eng = followers > 0 ? (((avgLikes + avgComments) / followers) * 100).toFixed(1) : "0";
+        try {
+          ai = await callFunction("chat-agent", {
+            mode: "influencer-content",
+            text: `Restaurant: ${restaurant.name}${restaurant.address ? ` (${restaurant.address})` : ""}. ` +
+              `Créateur: "${d.nickname || handle}" sur ${d.platform || platform}. ` +
+              `Bio: ${d.bio ? `"${d.bio}"` : "(vide)"}. Followers: ${followers}. Engagement: ${eng}%. ` +
+              `${d.region ? `Région du créateur: ${d.region}. ` : ""}${d.verified ? "Compte vérifié. " : ""}`,
+          });
+          if (ai && (ai.fitScore || ai.summary)) setContent(ai); else ai = null;
+        } catch { ai = null; }
+
+        analyze(merged, ai);
       } else {
         const est = localDemoEstimate(handle);
         const merged = {
@@ -2062,9 +2103,11 @@ function InfluencerTab({ restaurant, store }) {
           avgComments: String(est.avgComments), posts30: String(est.posts30),
           partnerships: String(est.partnerships), localPct: String(est.localPct),
         };
+        const ai = { niche: "Food / lifestyle", contentType: "Démo", quality: "medium", fitScore: 7, fitReason: "Exemple de démonstration.", summary: "Lecture IA simulée (mode démo).", confidence: "low" };
         setF(merged);
+        setContent(ai);
         setMeta({ real: false, demo: true, note: est.note });
-        analyze(merged);
+        analyze(merged, ai);
       }
     } catch {
       toast("Récupération bloquée par la plateforme — saisis les chiffres puis « Recalculer ».", "error");
@@ -2102,20 +2145,20 @@ function InfluencerTab({ restaurant, store }) {
     <div>
       <h2 style={{ ...FF, fontSize: 22, fontWeight: 800, marginBottom: 4 }}>📣 Matching influenceurs</h2>
       <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginBottom: 16 }}>
-        Colle l'URL ou le <b>@username</b> — l'IA estime le profil et l'analyse calcule un prix équitable, vérifie les red flags et projette un ROI honnête.
+        Colle l'URL ou le <b>@username</b> — on récupère les vrais chiffres du profil, l'IA lit le contenu, et l'analyse calcule un prix équitable + un ROI honnête.
       </p>
 
       <Surface style={{ padding: 18, marginBottom: 16 }}>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
           <div style={{ flex: "1 1 260px" }}>
-            <InputField label="Lien du profil ou @username" placeholder="https://instagram.com/sarah_lifestyle  ·  @sarah_lifestyle" value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") run(); }} />
+            <InputField label="Lien du profil ou @username" placeholder="https://tiktok.com/@mams.edo  ·  @sarah_lifestyle" value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") run(); }} />
           </div>
           <Btn variant="primary" size="lg" style={{ flex: "0 0 auto" }} onClick={run} disabled={busy}>
             {busy ? "Analyse…" : "Analyser ✨"}
           </Btn>
         </div>
         <p style={{ ...FF, fontSize: 12, color: C.textTertiary, marginTop: 8 }}>
-          Ticket moyen utilisé pour le ROI : {f.avgTicket}€ — modifiable dans « Détails ».
+          Panier moyen pour le ROI : <b>{effectiveTicket}€</b> {ticketSource === "none" ? "(pas encore de commandes — défaut)" : "— issu de vos commandes encaissées"}.
         </p>
       </Surface>
 
@@ -2123,7 +2166,7 @@ function InfluencerTab({ restaurant, store }) {
         <Surface style={{ padding: 14, marginBottom: 14, background: meta.real ? "#EAF7EE" : "#FFF6E5", border: `1px solid ${(meta.real ? C.accentGreen : "#F2C94C")}44` }}>
           <div style={{ ...FF, fontSize: 13 }}>
             {meta.real ? (
-              <>✅ <b>Chiffres réels récupérés</b> via {meta.platform} : followers{meta.fields?.includes("avgLikes") ? " + likes moyens (engagement réel)" : ""}. Fréquence, partenariats et % d'audience locale sont des <b>hypothèses neutres</b> — ajuste-les pour affiner.</>
+              <>✅ <b>Chiffres réels récupérés</b> via {meta.platform} : followers{meta.fields?.includes("avgLikes") ? " + likes moyens (engagement réel)" : ""}{meta.region ? ` · créateur basé en ${meta.region}` : ""}{meta.verified ? " · vérifié" : ""}. Fréquence, partenariats et % d'audience locale ne sont <b>pas mesurables</b> depuis le profil → hypothèses ajustables.</>
             ) : (
               <>⚠️ <b>Mode démo</b> — chiffres d'exemple non réels.{meta.note ? ` ${meta.note}` : ""}</>
             )}
@@ -2137,17 +2180,17 @@ function InfluencerTab({ restaurant, store }) {
 
       {showDetails && (
         <Surface style={{ padding: 18, marginBottom: 16 }}>
-          <strong style={{ ...FF }}>Chiffres utilisés (ajustables)</strong>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
+          <div style={{ ...FF, fontSize: 13, fontWeight: 700, color: C.accentGreen, marginBottom: 8 }}>● Données récupérées (corrige si erreur)</div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             {numField("followers", "Followers", "180000")}
             {numField("avgLikes", "Likes moyens / post", "2100")}
             {numField("avgComments", "Commentaires moyens", "450")}
-            {numField("posts30", "Posts (30 derniers jours)", "12")}
-            {numField("partnerships", "Partenariats restos (3 mois)", "1")}
-            {numField("localPct", "% audience locale", "70")}
           </div>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4 }}>
-            {numField("avgTicket", "Ticket moyen resto (€)", "35")}
+          <div style={{ ...FF, fontSize: 13, fontWeight: 700, color: C.accentOrange, margin: "16px 0 8px" }}>● Hypothèses à confirmer (non mesurables automatiquement)</div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            {numField("posts30", "Posts (30 derniers jours)", "8")}
+            {numField("partnerships", "Partenariats restos (3 mois)", "0")}
+            {numField("localPct", "% audience locale (si connu)", "50")}
             {numField("budget", "Budget envisagé (€, optionnel)", "auto")}
             <div style={{ flex: "1 1 150px" }}>
               <label style={{ ...FF, display: "block", fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Mois de publication</label>
@@ -2160,6 +2203,9 @@ function InfluencerTab({ restaurant, store }) {
               <select value={f.track} onChange={(e) => set("track", e.target.value)} style={{ ...FF, width: "100%", padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.borderStrong}` }}>
                 {TRACK_OPTS.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
               </select>
+            </div>
+            <div style={{ flex: "1 1 150px" }}>
+              <InputField label="Panier moyen (auto, €)" type="number" min={0} value={f.avgTicket} onChange={(e) => setF((p) => ({ ...p, avgTicket: e.target.value, avgTicketTouched: true }))} />
             </div>
           </div>
           <div style={{ marginTop: 12 }}>
@@ -2175,13 +2221,14 @@ function InfluencerTab({ restaurant, store }) {
         </Surface>
       )}
 
-      {report && <InfluencerReport r={report} f={f} copy={copy} contactTemplate={contactTemplate} restaurant={restaurant} />}
+      {report && <InfluencerReport r={report} f={f} content={content} copy={copy} contactTemplate={contactTemplate} restaurant={restaurant} />}
     </div>
   );
 }
 
-function InfluencerReport({ r, f, copy, contactTemplate, restaurant }) {
+function InfluencerReport({ r, f, content, copy, contactTemplate, restaurant }) {
   const v = VERDICTS[r.verdict];
+  const QUALITY = { high: { label: "Qualité élevée", color: C.accentGreen }, medium: { label: "Qualité moyenne", color: C.accentOrange }, low: { label: "Qualité faible", color: C.accent } };
   const mrows = [
     ["Engagement", `${r.engagement.toFixed(2)}%`, r.mults.engagement],
     ["Fréquence", `${r.perWeek.toFixed(1)}/sem`, r.mults.frequency],
@@ -2239,6 +2286,25 @@ function InfluencerReport({ r, f, copy, contactTemplate, restaurant }) {
         </div>
       </Surface>
 
+      {/* AI content read */}
+      {content && (
+        <Surface style={{ padding: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <strong style={{ ...FF }}>🎨 Lecture IA du contenu</strong>
+            {content.quality && QUALITY[content.quality] && <Tag color={QUALITY[content.quality].color}>{QUALITY[content.quality].label}</Tag>}
+            {content.confidence && <Tag color={C.textTertiary}>confiance {content.confidence}</Tag>}
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+            {content.niche && <div style={{ flex: "1 1 140px", background: C.surfaceAlt, borderRadius: 12, padding: 12 }}><div style={{ ...FF, fontSize: 12, color: C.textTertiary }}>Niche</div><div style={{ ...FF, fontSize: 15, fontWeight: 700 }}>{content.niche}</div></div>}
+            {content.contentType && <div style={{ flex: "1 1 140px", background: C.surfaceAlt, borderRadius: 12, padding: 12 }}><div style={{ ...FF, fontSize: 12, color: C.textTertiary }}>Type de contenu</div><div style={{ ...FF, fontSize: 15, fontWeight: 700 }}>{content.contentType}</div></div>}
+            {content.audienceGuess && <div style={{ flex: "1 1 140px", background: C.surfaceAlt, borderRadius: 12, padding: 12 }}><div style={{ ...FF, fontSize: 12, color: C.textTertiary }}>Audience probable</div><div style={{ ...FF, fontSize: 14, fontWeight: 600 }}>{content.audienceGuess}</div></div>}
+          </div>
+          {content.summary && <p style={{ ...FF, fontSize: 13.5, color: C.text, marginTop: 10 }}>{content.summary}</p>}
+          {content.fitReason && <p style={{ ...FF, fontSize: 12.5, color: C.textSecondary, marginTop: 4 }}>Adéquation : {content.fitReason}</p>}
+          <p style={{ ...FF, fontSize: 11.5, color: C.textTertiary, marginTop: 8 }}>Lecture IA à partir de la bio et des stats réelles — indicative, à confirmer en regardant le profil.</p>
+        </Surface>
+      )}
+
       {/* Red flags */}
       <Surface style={{ padding: 18 }}>
         <strong style={{ ...FF }}>🚦 Red flags</strong>
@@ -2253,7 +2319,10 @@ function InfluencerReport({ r, f, copy, contactTemplate, restaurant }) {
       {/* ROI */}
       <Surface style={{ padding: 18 }}>
         <strong style={{ ...FF }}>📈 Projection ROI</strong>
-        <div style={{ ...FF, fontSize: 13, color: C.textSecondary, margin: "6px 0 12px" }}>Budget retenu : {r.budget}€ · ~{r.visitsReal} visites projetées (scénario réaliste)</div>
+        <div style={{ ...FF, fontSize: 13, color: C.textSecondary, margin: "6px 0 12px" }}>
+          Budget : {r.budget}€ · panier moyen {r.avgTicket}€ (vos données) · ~{r.visitsReal} visites (réaliste).
+          {" "}Hypothèse audience locale : <b>{r.localAssumed}%</b>{r.localKnown ? "" : " (par défaut — ajuste si tu connais)"}.
+        </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {roiRows.map(([lbl, s, col]) => (
             <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 10, ...FF, fontSize: 14, padding: "8px 12px", borderRadius: 10, background: C.surfaceAlt }}>
@@ -2276,14 +2345,16 @@ function InfluencerReport({ r, f, copy, contactTemplate, restaurant }) {
       <Surface style={{ padding: 18 }}>
         <strong style={{ ...FF }}>📊 Scoring</strong>
         <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-          {[["Engagement", r.engScore], ["Audience (local)", r.audScore]].map(([lbl, sc]) => (
-            <div key={lbl} style={{ flex: "1 1 140px", background: C.surfaceAlt, borderRadius: 12, padding: 14 }}>
-              <div style={{ ...FF, fontSize: 12, color: C.textTertiary }}>{lbl}</div>
-              <div style={{ ...FF, fontSize: 22, fontWeight: 900 }}>{sc}<span style={{ fontSize: 13, color: C.textTertiary }}>/10</span></div>
-            </div>
-          ))}
+          <div style={{ flex: "1 1 140px", background: C.surfaceAlt, borderRadius: 12, padding: 14 }}>
+            <div style={{ ...FF, fontSize: 12, color: C.textTertiary }}>Engagement (réel)</div>
+            <div style={{ ...FF, fontSize: 22, fontWeight: 900 }}>{r.engScore}<span style={{ fontSize: 13, color: C.textTertiary }}>/10</span></div>
+          </div>
+          <div style={{ flex: "1 1 140px", background: C.surfaceAlt, borderRadius: 12, padding: 14 }}>
+            <div style={{ ...FF, fontSize: 12, color: C.textTertiary }}>Adéquation contenu (IA)</div>
+            <div style={{ ...FF, fontSize: 22, fontWeight: 900 }}>{r.fit != null ? <>{r.fit}<span style={{ fontSize: 13, color: C.textTertiary }}>/10</span></> : <span style={{ fontSize: 14, color: C.textTertiary }}>n/a</span>}</div>
+          </div>
         </div>
-        <p style={{ ...FF, fontSize: 12, color: C.textTertiary, marginTop: 8 }}>Aesthetic et content-fit s'évaluent à l'œil sur le profil — non scorés automatiquement pour éviter d'inventer.</p>
+        <p style={{ ...FF, fontSize: 12, color: C.textTertiary, marginTop: 8 }}>Engagement = mesuré sur les vrais chiffres. Adéquation contenu = lecture IA de la bio/du profil (indicative).</p>
       </Surface>
 
       {/* Next steps */}

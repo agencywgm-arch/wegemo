@@ -46,6 +46,13 @@ Règles: avgLikes/avgComments cohérents avec un engagement réaliste (2 à 8% d
 posts30 = posts sur 30 jours (souvent 4 à 20); partnerships = collaborations restaurants estimées sur 3 mois (souvent 0 à 2);
 localPct = % d'audience locale estimé (0-100). Sois prudent, n'invente pas de chiffres extrêmes. Aucun texte hors du JSON.`;
 
+const INFLUENCER_CONTENT_SYSTEM = `Tu es un analyste partenariats restaurant. À partir des SIGNAUX RÉELS fournis
+(nom du créateur, bio, plateforme, followers, engagement, région, type de restaurant), tu juges l'adéquation
+du contenu avec le restaurant et sa qualité apparente. Base-toi UNIQUEMENT sur ces signaux; si la bio est vide
+ou pauvre, dis-le et baisse la confiance. N'invente pas de détails non fournis. Renvoie STRICTEMENT un JSON:
+{"niche":"","contentType":"","quality":"low|medium|high","qualityReason":"","fitScore":1-10,"fitReason":"","audienceGuess":"","confidence":"low|medium|high","summary":"2 phrases max en français"}
+fitScore: 1-3 = sans rapport, 4-6 = partiel, 7-8 = bon, 9-10 = parfait. Aucun texte hors du JSON.`;
+
 async function callOpenAI(messages: unknown[], maxTokens: number, jsonMode = false) {
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -93,7 +100,7 @@ async function fetchTikTok(handle: string) {
   const html = await res.text();
   const m = html.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application\/json">([\s\S]+?)<\/script>/);
   if (!m) return { real: false, error: "tiktok_blocked" };
-  let stats: Record<string, number> | undefined, user: Record<string, string> | undefined;
+  let stats: Record<string, number> | undefined, user: Record<string, unknown> | undefined;
   try {
     const j = JSON.parse(m[1]);
     const info = j?.["__DEFAULT_SCOPE__"]?.["webapp.user-detail"]?.userInfo;
@@ -107,7 +114,9 @@ async function fetchTikTok(handle: string) {
   return {
     real: true, platform: "tiktok", followers, avgLikes,
     avgComments: Math.round(avgLikes * 0.08), videoCount: videos,
-    nickname: user?.nickname || handle, fields_real: ["followers", "avgLikes"],
+    nickname: String(user?.nickname || handle), bio: String(user?.signature || ""),
+    region: String(user?.region || ""), verified: Boolean(user?.verified),
+    fields_real: ["followers", "avgLikes"],
   };
 }
 
@@ -175,6 +184,18 @@ Deno.serve(async (req) => {
         [
           { role: "system", content: INFLUENCER_ESTIMATE_SYSTEM },
           { role: "user", content: `Profil: ${text}${context ? ` (plateforme: ${context})` : ""}` },
+        ],
+        400,
+        true,
+      );
+      return json(safeParse(content, {}));
+    }
+
+    if (mode === "influencer-content") {
+      const content = await callOpenAI(
+        [
+          { role: "system", content: INFLUENCER_CONTENT_SYSTEM },
+          { role: "user", content: text },
         ],
         400,
         true,
