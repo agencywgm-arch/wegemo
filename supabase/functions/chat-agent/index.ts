@@ -1,5 +1,5 @@
 // chat-agent — single multi-mode endpoint backed by OpenAI gpt-4o-mini.
-// Modes: dashboard | customer | setup-menu | setup-inventory
+// Modes: dashboard | customer | setup-menu | setup-inventory | influencer-estimate
 import { corsHeaders, json } from "../_shared/cors.ts";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
@@ -36,6 +36,15 @@ const SETUP_INVENTORY_SYSTEM = `À partir d'une liste de plats, déduis une list
 une matrice de recettes (quantité par portion). Renvoie STRICTEMENT un JSON de la forme:
 {"ingredients":[{"name":"","unit":"kg","emoji":"📦","stock":0}],"recipes":{"Nom du plat":{"Nom ingrédient":0.2}}}
 Pas de texte hors du JSON.`;
+
+const INFLUENCER_ESTIMATE_SYSTEM = `Tu estimes les métriques publiques plausibles d'un profil de créateur
+(Instagram/TikTok/YouTube) à partir de son URL ou @handle, pour une pré-analyse de partenariat restaurant.
+Tu n'as PAS d'accès direct au profil : produis une ESTIMATION prudente et cohérente d'après les conventions
+du handle et de la plateforme. Renvoie STRICTEMENT un JSON:
+{"followers":int,"avgLikes":int,"avgComments":int,"posts30":int,"partnerships":int,"localPct":int,"niche":"","confidence":"low|medium|high","note":"phrase courte en français"}
+Règles: avgLikes/avgComments cohérents avec un engagement réaliste (2 à 8% des followers, commentaires ~5-15% des likes);
+posts30 = posts sur 30 jours (souvent 4 à 20); partnerships = collaborations restaurants estimées sur 3 mois (souvent 0 à 2);
+localPct = % d'audience locale estimé (0-100). Sois prudent, n'invente pas de chiffres extrêmes. Aucun texte hors du JSON.`;
 
 async function callOpenAI(messages: unknown[], maxTokens: number, jsonMode = false) {
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -92,6 +101,18 @@ Deno.serve(async (req) => {
         true,
       );
       return json(safeParse(content, { ingredients: [], recipes: {} }));
+    }
+
+    if (mode === "influencer-estimate") {
+      const content = await callOpenAI(
+        [
+          { role: "system", content: INFLUENCER_ESTIMATE_SYSTEM },
+          { role: "user", content: `Profil: ${text}${context ? ` (plateforme: ${context})` : ""}` },
+        ],
+        400,
+        true,
+      );
+      return json(safeParse(content, {}));
     }
 
     const system = mode === "customer" ? CUSTOMER_SYSTEM : DASHBOARD_SYSTEM;

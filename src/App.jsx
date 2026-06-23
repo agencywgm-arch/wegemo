@@ -1989,8 +1989,22 @@ function detectPlatform(input) {
   return "instagram";
 }
 
+// Deterministic placeholder used only in demo mode (no edge function available).
+function localDemoEstimate(handle) {
+  const seed = (handle || "demo").replace(/\W/g, "").length || 5;
+  const followers = 15000 + ((seed * 9173) % 165000);
+  const engPct = 3 + (seed % 6);
+  const avgLikes = Math.round((followers * engPct) / 100 * 0.9);
+  return {
+    followers, avgLikes, avgComments: Math.round(avgLikes * 0.12),
+    posts30: 5 + (seed % 12), partnerships: seed % 3, localPct: 50 + (seed % 40),
+    confidence: "low", note: "Échantillon de démonstration — connecte l'IA (fonction chat-agent) pour de vraies estimations.",
+  };
+}
+
 function InfluencerTab({ restaurant, store }) {
   const toast = useToast();
+  const [url, setUrl] = useState("");
   const [f, setF] = useState({
     username: "", platform: "instagram", followers: "", avgLikes: "", avgComments: "",
     posts30: "", partnerships: "0", localPct: "", avgTicket: "35", budget: "",
@@ -1998,18 +2012,51 @@ function InfluencerTab({ restaurant, store }) {
     botComments: false, unnaturalGrowth: false, refusesData: false, newAccount: false,
   });
   const [report, setReport] = useState(null);
+  const [meta, setMeta] = useState(null);     // { confidence, note }
+  const [busy, setBusy] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
 
-  const run = () => {
-    if (!f.followers || !f.avgLikes) return toast("Followers et likes moyens requis", "error");
-    const r = analyzeInfluencer(f);
+  const analyze = (data) => {
+    const r = analyzeInfluencer(data);
     setReport(r);
     if (hasSupabase && !store.demoMode) {
       supabase.from("influencer_analyses").insert({
-        restaurant_id: restaurant.id, username: f.username, platform: f.platform,
+        restaurant_id: restaurant.id, username: data.username, platform: data.platform,
         followers: r.followers, engagement_rate: Number(r.engagement.toFixed(2)),
-        verdict: r.verdict, price_target: r.target, roi_realistic: r.roi.real.roi, inputs: f,
+        verdict: r.verdict, price_target: r.target, roi_realistic: r.roi.real.roi, inputs: data,
       }).then(({ error }) => { if (error) console.warn("analysis not saved:", error.message); });
+    }
+  };
+
+  const run = async () => {
+    const handle = url.trim();
+    if (!handle) return toast("Colle l'URL ou le @username de l'influenceur", "error");
+    const platform = detectPlatform(handle);
+    setBusy(true); setReport(null); setMeta(null);
+    try {
+      let est;
+      if (hasSupabase && !store.demoMode) {
+        est = await callFunction("chat-agent", { mode: "influencer-estimate", text: handle, context: platform });
+        if (!est || !est.followers) throw new Error("empty");
+      } else {
+        est = localDemoEstimate(handle);
+      }
+      const merged = {
+        ...f, username: handle, platform,
+        followers: String(est.followers || ""), avgLikes: String(est.avgLikes || ""),
+        avgComments: String(est.avgComments || ""), posts30: String(est.posts30 ?? ""),
+        partnerships: String(est.partnerships ?? "0"), localPct: String(est.localPct ?? ""),
+      };
+      setF(merged);
+      setMeta({ confidence: est.confidence || "low", note: est.note || "" });
+      analyze(merged);
+    } catch {
+      toast("Estimation IA indisponible — saisis les chiffres à la main puis « Recalculer ».", "error");
+      setF((p) => ({ ...p, username: handle, platform }));
+      setShowDetails(true);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -2040,58 +2087,74 @@ function InfluencerTab({ restaurant, store }) {
     <div>
       <h2 style={{ ...FF, fontSize: 22, fontWeight: 800, marginBottom: 4 }}>📣 Matching influenceurs</h2>
       <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginBottom: 16 }}>
-        Analyse <b>data-driven</b> : entrez uniquement les chiffres <b>observables</b> sur le profil. Aucune donnée n'est inventée — l'outil calcule un prix équitable, vérifie les red flags et projette un ROI honnête.
+        Colle l'URL ou le <b>@username</b> — l'IA estime le profil et l'analyse calcule un prix équitable, vérifie les red flags et projette un ROI honnête.
       </p>
 
       <Surface style={{ padding: 18, marginBottom: 16 }}>
-        <strong style={{ ...FF }}>1 · Profil & métriques observables</strong>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
-          <div style={{ flex: "1 1 180px" }}>
-            <InputField label="Username / lien" placeholder="@sarah_lifestyle" value={f.username} onChange={(e) => { set("username", e.target.value); set("platform", detectPlatform(e.target.value)); }} />
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div style={{ flex: "1 1 260px" }}>
+            <InputField label="Lien du profil ou @username" placeholder="https://instagram.com/sarah_lifestyle  ·  @sarah_lifestyle" value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") run(); }} />
           </div>
-          <div style={{ flex: "1 1 130px" }}>
-            <label style={{ ...FF, display: "block", fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Plateforme</label>
-            <select value={f.platform} onChange={(e) => set("platform", e.target.value)} style={{ ...FF, width: "100%", padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.borderStrong}` }}>
-              <option value="instagram">Instagram</option><option value="tiktok">TikTok</option>
-              <option value="youtube">YouTube</option><option value="linkedin">LinkedIn</option>
-            </select>
-          </div>
+          <Btn variant="primary" size="lg" style={{ flex: "0 0 auto" }} onClick={run} disabled={busy}>
+            {busy ? "Analyse…" : "Analyser ✨"}
+          </Btn>
         </div>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4 }}>
-          {numField("followers", "Followers", "180000")}
-          {numField("avgLikes", "Likes moyens / post", "2100")}
-          {numField("avgComments", "Commentaires moyens", "450")}
-          {numField("posts30", "Posts (30 derniers jours)", "12")}
-          {numField("partnerships", "Partenariats restos (3 mois)", "1")}
-          {numField("localPct", "% audience locale", "70")}
-        </div>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4 }}>
-          {numField("avgTicket", "Ticket moyen resto (€)", "35")}
-          {numField("budget", "Budget envisagé (€, optionnel)", "auto")}
-          <div style={{ flex: "1 1 150px" }}>
-            <label style={{ ...FF, display: "block", fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Mois de publication</label>
-            <select value={f.month} onChange={(e) => set("month", e.target.value)} style={{ ...FF, width: "100%", padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.borderStrong}` }}>
-              {MONTH_NAMES.slice(1).map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-            </select>
-          </div>
-          <div style={{ flex: "1 1 150px" }}>
-            <label style={{ ...FF, display: "block", fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Track record</label>
-            <select value={f.track} onChange={(e) => set("track", e.target.value)} style={{ ...FF, width: "100%", padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.borderStrong}` }}>
-              {TRACK_OPTS.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
-            </select>
-          </div>
-        </div>
-        <div style={{ marginTop: 12 }}>
-          <div style={{ ...FF, fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 8 }}>Signaux d'alerte observés (cochez si présents) :</div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            {check("botComments", "Commentaires bots / emoji génériques")}
-            {check("unnaturalGrowth", "Croissance anormale (followers achetés)")}
-            {check("refusesData", "Refuse de partager ses analytics")}
-            {check("newAccount", "Compte récent (< 3 mois)")}
-          </div>
-        </div>
-        <Btn variant="primary" size="lg" style={{ marginTop: 16 }} onClick={run}>Analyser →</Btn>
+        <p style={{ ...FF, fontSize: 12, color: C.textTertiary, marginTop: 8 }}>
+          Ticket moyen utilisé pour le ROI : {f.avgTicket}€ — modifiable dans « Détails ».
+        </p>
       </Surface>
+
+      {meta && (
+        <Surface style={{ padding: 14, marginBottom: 14, background: "#EEF4FF", border: `1px solid ${C.accentBlue}33` }}>
+          <div style={{ ...FF, fontSize: 13 }}>
+            ✨ <b>Données estimées par IA</b> (confiance : {meta.confidence}).{meta.note ? ` ${meta.note}` : ""}
+            {" "}À <b>vérifier</b> avant tout paiement.{" "}
+            <button onClick={() => setShowDetails((v) => !v)} style={{ ...FF, color: C.accentBlue, fontWeight: 700, fontSize: 13, textDecoration: "underline" }}>
+              {showDetails ? "Masquer les détails" : "Voir / ajuster les chiffres"}
+            </button>
+          </div>
+        </Surface>
+      )}
+
+      {showDetails && (
+        <Surface style={{ padding: 18, marginBottom: 16 }}>
+          <strong style={{ ...FF }}>Chiffres utilisés (ajustables)</strong>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
+            {numField("followers", "Followers", "180000")}
+            {numField("avgLikes", "Likes moyens / post", "2100")}
+            {numField("avgComments", "Commentaires moyens", "450")}
+            {numField("posts30", "Posts (30 derniers jours)", "12")}
+            {numField("partnerships", "Partenariats restos (3 mois)", "1")}
+            {numField("localPct", "% audience locale", "70")}
+          </div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4 }}>
+            {numField("avgTicket", "Ticket moyen resto (€)", "35")}
+            {numField("budget", "Budget envisagé (€, optionnel)", "auto")}
+            <div style={{ flex: "1 1 150px" }}>
+              <label style={{ ...FF, display: "block", fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Mois de publication</label>
+              <select value={f.month} onChange={(e) => set("month", e.target.value)} style={{ ...FF, width: "100%", padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.borderStrong}` }}>
+                {MONTH_NAMES.slice(1).map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: "1 1 150px" }}>
+              <label style={{ ...FF, display: "block", fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Track record</label>
+              <select value={f.track} onChange={(e) => set("track", e.target.value)} style={{ ...FF, width: "100%", padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.borderStrong}` }}>
+                {TRACK_OPTS.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <div style={{ ...FF, fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 8 }}>Signaux d'alerte observés :</div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {check("botComments", "Commentaires bots / emoji génériques")}
+              {check("unnaturalGrowth", "Croissance anormale (followers achetés)")}
+              {check("refusesData", "Refuse de partager ses analytics")}
+              {check("newAccount", "Compte récent (< 3 mois)")}
+            </div>
+          </div>
+          <Btn variant="primary" style={{ marginTop: 16 }} onClick={() => analyze(f)}>Recalculer</Btn>
+        </Surface>
+      )}
 
       {report && <InfluencerReport r={report} f={f} copy={copy} contactTemplate={contactTemplate} restaurant={restaurant} />}
     </div>
