@@ -47,6 +47,7 @@ Run these in the Supabase SQL editor **in order**:
 6. `supabase/migration_promotions.sql`
 7. `supabase/migration_settings.sql`
 8. `supabase/migration_security_fixes.sql`
+9. `supabase/migration_modules.sql`
 
 Then create a **public** Storage bucket named `assets` and run
 `supabase/storage_policies.sql`. Finally enable Realtime replication for the

@@ -587,6 +587,45 @@ const PLAN_OS = {
   features: ["Wegemo Menu", "Paiement Mobile", "Growth", "Voice", "Manager", "Franchise"],
 };
 
+/* Canonical module catalog — what each subscription module unlocks in the app.
+ * `base` is the 199€ socle and is always active; the rest gate features. */
+const MODULE_CATALOG = [
+  { id: "base", name: "Wegemo Menu", emoji: "🍽️", price: 199, color: C.dark,
+    desc: "Le socle : QR codes, menu, commandes, caisse, inventaire, vue cuisine." },
+  { id: "mobile_pay", name: "Paiement Mobile", emoji: "📲", price: 49, color: C.accentBlue,
+    desc: "Paiement en ligne (Stripe, Apple Pay, Google Pay) depuis le téléphone du client." },
+  { id: "growth", name: "Wegemo Growth", emoji: "📈", price: 99, color: C.accentGreen,
+    desc: "CRM, promotions et campagnes IA pour faire revenir vos clients." },
+  { id: "voice", name: "Wegemo Voice", emoji: "📞", price: 99, color: C.accentPurple,
+    desc: "Assistant téléphonique IA 24/7 : réservations, FAQ, prise de commandes." },
+  { id: "manager", name: "Wegemo Manager", emoji: "🧑‍💼", price: 149, color: C.accentOrange,
+    desc: "Statistiques avancées, contrôle à distance et multi-utilisateurs." },
+  { id: "franchise", name: "Wegemo Franchise", emoji: "🏢", price: 299, color: C.accent,
+    desc: "Dashboard groupe multi-restaurants et comparaison des établissements." },
+];
+const ALL_MODULES = MODULE_CATALOG.map((m) => m.id);
+const moduleInfo = (id) => MODULE_CATALOG.find((m) => m.id === id) || { id, name: id, emoji: "🔒", color: C.textTertiary, desc: "", price: 0 };
+
+// Map a chosen pricing plan id to the set of modules it activates.
+function planToModules(planId) {
+  switch (planId) {
+    case "mobile-pay": return ["base", "mobile_pay"];
+    case "growth": return ["base", "growth"];
+    case "voice": return ["base", "voice"];
+    case "manager": return ["base", "manager"];
+    case "franchise": return ["base", "franchise"];
+    case "os": return [...ALL_MODULES];
+    case "menu":
+    default: return ["base"];
+  }
+}
+
+// Normalise whatever is stored into a clean module list that always includes base.
+function normalizeModules(raw) {
+  const list = Array.isArray(raw) ? raw.filter((m) => ALL_MODULES.includes(m)) : [];
+  return list.includes("base") ? list : ["base", ...list];
+}
+
 function PlanCard({ plan, featured, onChoose, ctaLabel = "Choisir" }) {
   return (
     <Surface
@@ -631,6 +670,7 @@ function PlanCard({ plan, featured, onChoose, ctaLabel = "Choisir" }) {
 function PricingPage({ onBack, onSignup }) {
   const toast = useToast();
   const choose = (plan) => {
+    try { localStorage.setItem("wegemo_signup_plan", plan.id); } catch { /* storage unavailable */ }
     toast(`Offre « ${plan.name} » sélectionnée`, "success");
     onSignup?.(plan);
   };
@@ -829,6 +869,13 @@ function RestaurantsPage({ onOpen, onSignOut }) {
     // generate the tables
     const tablesRows = Array.from({ length: Number(form.tables_count) }, (_, i) => ({ restaurant_id: data.id, number: i + 1 }));
     await supabase.from("tables").insert(tablesRows);
+    // seed the restaurant's active modules from the plan chosen at signup
+    let initialModules = ["base"];
+    try {
+      const planId = localStorage.getItem("wegemo_signup_plan");
+      if (planId) initialModules = planToModules(planId);
+    } catch { /* storage unavailable */ }
+    await supabase.from("restaurant_settings").upsert({ restaurant_id: data.id, active_modules: initialModules }, { onConflict: "restaurant_id" });
     toast("Restaurant créé !", "success");
     setCreating(false);
     setForm({ name: "", address: "", logo_emoji: "🍽️", tables_count: 4 });
@@ -894,24 +941,58 @@ function RestaurantsPage({ onOpen, onSignOut }) {
  * DASHBOARD
  * ==========================================================================*/
 const DASH_TABS = [
-  { id: "setup", label: "Setup", icon: "⚡" },
-  { id: "overview", label: "Overview", icon: "📊" },
-  { id: "orders", label: "Commandes", icon: "🧾" },
-  { id: "register", label: "Caisse", icon: "💶" },
-  { id: "qr", label: "QR Codes", icon: "🔳" },
-  { id: "inventory", label: "Inventaire", icon: "📦" },
-  { id: "promos", label: "Promos", icon: "🎁" },
-  { id: "menu", label: "Carte", icon: "🍽️" },
-  { id: "crm", label: "CRM", icon: "👥" },
-  { id: "settings", label: "Paramètres", icon: "⚙️" },
+  { id: "setup", label: "Setup", icon: "⚡", module: "base" },
+  { id: "overview", label: "Overview", icon: "📊", module: "base" },
+  { id: "orders", label: "Commandes", icon: "🧾", module: "base" },
+  { id: "register", label: "Caisse", icon: "💶", module: "base" },
+  { id: "qr", label: "QR Codes", icon: "🔳", module: "base" },
+  { id: "inventory", label: "Inventaire", icon: "📦", module: "base" },
+  { id: "promos", label: "Promos", icon: "🎁", module: "growth" },
+  { id: "menu", label: "Carte", icon: "🍽️", module: "base" },
+  { id: "crm", label: "CRM", icon: "👥", module: "growth" },
+  { id: "settings", label: "Paramètres", icon: "⚙️", module: "base" },
 ];
+
+// Loads the active module set for a restaurant (all modules in demo mode).
+function useModules(restaurantId, demoMode) {
+  const [modules, setModules] = useState(() => (demoMode ? [...ALL_MODULES] : ["base"]));
+  useEffect(() => {
+    if (demoMode || !hasSupabase) { setModules([...ALL_MODULES]); return; }
+    let active = true;
+    supabase.from("restaurant_settings").select("active_modules").eq("restaurant_id", restaurantId).maybeSingle()
+      .then(({ data }) => { if (active) setModules(normalizeModules(data?.active_modules)); });
+    return () => { active = false; };
+  }, [restaurantId, demoMode]);
+  return [modules, setModules];
+}
+
+// Upsell panel shown in place of a feature whose module isn't active.
+function LockedFeature({ module, onManage }) {
+  const info = moduleInfo(module);
+  return (
+    <div style={{ maxWidth: 520, margin: "40px auto" }}>
+      <Surface style={{ padding: 32, textAlign: "center" }}>
+        <div style={{ fontSize: 46 }}>{info.emoji}</div>
+        <div style={{ marginTop: 8 }}><Tag color={info.color}>🔒 Module non activé</Tag></div>
+        <h2 style={{ ...FF, fontSize: 24, fontWeight: 800, margin: "12px 0 6px" }}>{info.name}</h2>
+        <p style={{ ...FF, color: C.textSecondary, fontSize: 14, maxWidth: 360, margin: "0 auto" }}>{info.desc}</p>
+        <div style={{ ...FF, margin: "16px 0" }}>
+          <span style={{ fontSize: 30, fontWeight: 900, color: info.color }}>+{info.price}€</span>
+          <span style={{ color: C.textTertiary, fontSize: 13 }}> /mois</span>
+        </div>
+        <Btn variant="primary" size="lg" style={{ background: info.color }} onClick={onManage}>Activer ce module →</Btn>
+      </Surface>
+    </div>
+  );
+}
 
 function DashboardPage({ restaurant, onBack, onKitchen, onCustomerView, onFranchise }) {
   const isMobile = useIsMobile();
   const store = useStore(restaurant.id);
+  const [modules, setModules] = useModules(restaurant.id, store.demoMode);
   const [tab, setTab] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const showFranchise = onFranchise && (store.demoMode || restaurant.group_id);
+  const showFranchise = onFranchise && modules.includes("franchise") && (store.demoMode || restaurant.group_id);
 
   const sidebar = (
     <div style={{ width: 220, background: C.surface, borderRight: `1px solid ${C.border}`, padding: 16, display: "flex", flexDirection: "column", gap: 4, height: "100%", overflow: "auto" }}>
@@ -919,11 +1000,15 @@ function DashboardPage({ restaurant, onBack, onKitchen, onCustomerView, onFranch
         <span style={{ fontSize: 24 }}>{restaurant.logo_emoji}</span>
         <strong style={{ ...FF, fontSize: 15 }}>{restaurant.name}</strong>
       </div>
-      {DASH_TABS.map((tt) => (
-        <button key={tt.id} onClick={() => { setTab(tt.id); setSidebarOpen(false); }} style={{ ...FF, display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 11, fontWeight: 600, fontSize: 14, textAlign: "left", background: tab === tt.id ? C.surfaceAlt : "transparent", color: tab === tt.id ? C.text : C.textSecondary }}>
-          <span>{tt.icon}</span> {tt.label}
-        </button>
-      ))}
+      {DASH_TABS.map((tt) => {
+        const locked = tt.module !== "base" && !modules.includes(tt.module);
+        return (
+          <button key={tt.id} onClick={() => { setTab(tt.id); setSidebarOpen(false); }} style={{ ...FF, display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 11, fontWeight: 600, fontSize: 14, textAlign: "left", background: tab === tt.id ? C.surfaceAlt : "transparent", color: tab === tt.id ? C.text : C.textSecondary }}>
+            <span>{tt.icon}</span> <span style={{ flex: 1 }}>{tt.label}</span>
+            {locked && <span style={{ fontSize: 12, opacity: 0.7 }}>🔒</span>}
+          </button>
+        );
+      })}
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 6, paddingTop: 12 }}>
         <Btn variant="subtle" size="sm" onClick={onKitchen}>👨‍🍳 Cuisine</Btn>
         <Btn variant="subtle" size="sm" onClick={onCustomerView}>📱 Vue client</Btn>
@@ -954,7 +1039,7 @@ function DashboardPage({ restaurant, onBack, onKitchen, onCustomerView, onFranch
           {store.loading ? (
             <p style={{ ...FF, color: C.textSecondary }}>Chargement…</p>
           ) : (
-            <DashTabContent tab={tab} setTab={setTab} restaurant={restaurant} store={store} onKitchen={onKitchen} onCustomerView={onCustomerView} />
+            <DashTabContent tab={tab} setTab={setTab} restaurant={restaurant} store={store} onKitchen={onKitchen} onCustomerView={onCustomerView} modules={modules} setModules={setModules} />
           )}
         </div>
       </div>
@@ -962,7 +1047,11 @@ function DashboardPage({ restaurant, onBack, onKitchen, onCustomerView, onFranch
   );
 }
 
-function DashTabContent({ tab, setTab, restaurant, store, onKitchen, onCustomerView }) {
+function DashTabContent({ tab, setTab, restaurant, store, onKitchen, onCustomerView, modules, setModules }) {
+  const tabDef = DASH_TABS.find((t) => t.id === tab);
+  if (tabDef && tabDef.module !== "base" && !modules.includes(tabDef.module)) {
+    return <LockedFeature module={tabDef.module} onManage={() => setTab("settings")} />;
+  }
   switch (tab) {
     case "setup": return <SetupTab restaurant={restaurant} store={store} setTab={setTab} />;
     case "overview": return <OverviewTab restaurant={restaurant} store={store} onKitchen={onKitchen} onCustomerView={onCustomerView} />;
@@ -973,7 +1062,7 @@ function DashTabContent({ tab, setTab, restaurant, store, onKitchen, onCustomerV
     case "promos": return <PromosTab restaurant={restaurant} store={store} />;
     case "menu": return <MenuTab restaurant={restaurant} store={store} />;
     case "crm": return <CRMTab restaurant={restaurant} store={store} />;
-    case "settings": return <SettingsTab restaurant={restaurant} store={store} />;
+    case "settings": return <SettingsTab restaurant={restaurant} store={store} modules={modules} onModulesChange={setModules} />;
     default: return null;
   }
 }
@@ -1754,9 +1843,20 @@ function CRMTab({ restaurant, store }) {
 }
 
 /* ---- Settings ---- */
-function SettingsTab({ restaurant, store }) {
+function SettingsTab({ restaurant, store, modules = ["base"], onModulesChange }) {
   const toast = useToast();
   const [settings, setSettings] = useState({ stripe_publishable_key: "", stripe_secret_key: "", openai_api_key: "", resend_api_key: "", resend_from: "", google_review_url: "", google_review_enabled: false });
+
+  const toggleModule = async (id) => {
+    if (id === "base") return; // socle always active
+    const has = modules.includes(id);
+    const next = has ? modules.filter((m) => m !== id) : normalizeModules([...modules, id]);
+    onModulesChange?.(next);
+    if (store.demoMode || !hasSupabase) { toast("(Démo) Abonnement non persisté", "info"); return; }
+    const { error } = await supabase.from("restaurant_settings").upsert({ restaurant_id: restaurant.id, active_modules: next }, { onConflict: "restaurant_id" });
+    if (error) { onModulesChange?.(modules); return toast(error.message, "error"); }
+    toast(has ? "Module désactivé" : "Module activé", "success");
+  };
 
   useEffect(() => {
     if (store.demoMode || !hasSupabase) return;
@@ -1778,6 +1878,38 @@ function SettingsTab({ restaurant, store }) {
   return (
     <div>
       <h2 style={{ ...FF, fontSize: 22, fontWeight: 800, marginBottom: 16 }}>⚙️ Paramètres</h2>
+
+      <Surface style={{ padding: 18, marginBottom: 16 }}>
+        <strong style={{ ...FF }}>💎 Abonnement & modules</strong>
+        <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginTop: 6 }}>Activez ou désactivez les modules de ce restaurant. Le socle <b>Wegemo Menu</b> est toujours inclus.</p>
+        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+          {MODULE_CATALOG.map((m) => {
+            const active = modules.includes(m.id);
+            const isBase = m.id === "base";
+            return (
+              <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 12, border: `1px solid ${active ? m.color + "55" : C.border}`, background: active ? m.color + "0c" : C.surface }}>
+                <span style={{ fontSize: 26 }}>{m.emoji}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ ...FF, fontWeight: 700, fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+                    {m.name}
+                    {isBase && <Tag color={C.textTertiary}>Inclus</Tag>}
+                    {active && !isBase && <Tag color={m.color}>Actif</Tag>}
+                  </div>
+                  <div style={{ ...FF, fontSize: 12, color: C.textSecondary, marginTop: 2 }}>{m.desc}</div>
+                </div>
+                <div style={{ ...FF, fontWeight: 800, fontSize: 14, color: m.color, whiteSpace: "nowrap" }}>{isBase ? "" : "+"}{m.price}€</div>
+                {isBase ? (
+                  <span style={{ ...FF, fontSize: 12, color: C.textTertiary, width: 92, textAlign: "right" }}>—</span>
+                ) : (
+                  <Btn variant={active ? "subtle" : "primary"} size="sm" style={active ? { width: 92 } : { width: 92, background: m.color }} onClick={() => toggleModule(m.id)}>
+                    {active ? "Désactiver" : "Activer"}
+                  </Btn>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Surface>
 
       <Surface style={{ padding: 18, marginBottom: 16 }}>
         <strong style={{ ...FF }}>🔑 Clés API</strong>
