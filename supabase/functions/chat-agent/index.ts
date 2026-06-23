@@ -69,15 +69,82 @@ async function callOpenAI(messages: unknown[], maxTokens: number, jsonMode = fal
   return data.choices?.[0]?.message?.content ?? "";
 }
 
+// --- Real public-profile fetch (no API key) --------------------------------
+const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+function cleanHandle(input: string): string {
+  let s = (input || "").trim();
+  s = s.replace(/^https?:\/\/(www\.)?(tiktok\.com|instagram\.com)\//i, "");
+  s = s.replace(/[?#].*$/, "");
+  s = s.replace(/^@/, "").replace(/\/+$/, "");
+  return s.replace(/^@/, "");
+}
+function expandNum(s: string): number {
+  const t = (s || "").replace(/[, ]/g, "").toUpperCase();
+  const mult = t.endsWith("K") ? 1e3 : t.endsWith("M") ? 1e6 : t.endsWith("B") ? 1e9 : 1;
+  const n = parseFloat(t);
+  return Math.round((isNaN(n) ? 0 : n) * mult);
+}
+
+async function fetchTikTok(handle: string) {
+  const res = await fetch(`https://www.tiktok.com/@${handle}`, {
+    headers: { "User-Agent": BROWSER_UA, "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8" },
+  });
+  const html = await res.text();
+  const m = html.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application\/json">([\s\S]+?)<\/script>/);
+  if (!m) return { real: false, error: "tiktok_blocked" };
+  let stats: Record<string, number> | undefined, user: Record<string, string> | undefined;
+  try {
+    const j = JSON.parse(m[1]);
+    const info = j?.["__DEFAULT_SCOPE__"]?.["webapp.user-detail"]?.userInfo;
+    stats = info?.stats; user = info?.user;
+  } catch { /* fallthrough */ }
+  if (!stats?.followerCount) return { real: false, error: "tiktok_no_stats" };
+  const followers = stats.followerCount || 0;
+  const hearts = stats.heartCount || stats.heart || 0;
+  const videos = stats.videoCount || 0;
+  const avgLikes = videos > 0 ? Math.round(hearts / videos) : 0;
+  return {
+    real: true, platform: "tiktok", followers, avgLikes,
+    avgComments: Math.round(avgLikes * 0.08), videoCount: videos,
+    nickname: user?.nickname || handle, fields_real: ["followers", "avgLikes"],
+  };
+}
+
+async function fetchInstagram(handle: string) {
+  const res = await fetch(`https://www.instagram.com/${handle}/`, {
+    headers: { "User-Agent": BROWSER_UA, "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8" },
+  });
+  const html = await res.text();
+  const m = html.match(/<meta property="og:description" content="([^"]+)"/);
+  if (!m) return { real: false, error: "instagram_blocked" };
+  const fm = m[1].match(/([\d.,]+\s?[KMB]?)\s+Followers/i);
+  const followers = fm ? expandNum(fm[1]) : 0;
+  if (!followers) return { real: false, error: "instagram_no_followers" };
+  return { real: true, platform: "instagram", followers, fields_real: ["followers"] };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    if (!OPENAI_API_KEY) return json({ error: "openai_not_configured" }, 500);
-
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anon";
     if (rateLimited(ip)) return json({ error: "rate_limited" }, 429);
 
     const { messages = [], mode = "dashboard", text = "", context = "" } = await req.json();
+
+    // Real public-profile scraping needs no OpenAI key.
+    if (mode === "influencer-fetch") {
+      const handle = cleanHandle(text);
+      const isIG = context === "instagram" || /instagram/i.test(text);
+      try {
+        const data = isIG ? await fetchInstagram(handle) : await fetchTikTok(handle);
+        return json(data);
+      } catch (e) {
+        return json({ real: false, error: String(e?.message ?? e) });
+      }
+    }
+
+    if (!OPENAI_API_KEY) return json({ error: "openai_not_configured" }, 500);
 
     if (mode === "setup-menu") {
       const content = await callOpenAI(

@@ -2035,24 +2035,39 @@ function InfluencerTab({ restaurant, store }) {
     const platform = detectPlatform(handle);
     setBusy(true); setReport(null); setMeta(null);
     try {
-      let est;
       if (hasSupabase && !store.demoMode) {
-        est = await callFunction("chat-agent", { mode: "influencer-estimate", text: handle, context: platform });
-        if (!est || !est.followers) throw new Error("empty");
+        const d = await callFunction("chat-agent", { mode: "influencer-fetch", text: handle, context: platform });
+        if (!d || !d.real || !d.followers) throw new Error(d?.error || "blocked");
+        const followers = Number(d.followers) || 0;
+        // avgLikes is real on TikTok; Instagram only gives followers, so derive a
+        // neutral proxy the user can correct in Détails.
+        const avgLikes = d.avgLikes != null ? Number(d.avgLikes) : Math.round(followers * 0.04);
+        const merged = {
+          ...f, username: d.nickname || handle, platform: d.platform || platform,
+          followers: String(followers),
+          avgLikes: String(avgLikes),
+          avgComments: String(d.avgComments != null ? d.avgComments : Math.round(avgLikes * 0.08)),
+          posts30: f.posts30 || "8",        // neutral assumption (≈2/sem) — adjustable
+          partnerships: f.partnerships || "0",
+          localPct: f.localPct || "60",     // neutral assumption — adjustable
+        };
+        setF(merged);
+        setMeta({ real: true, platform: d.platform || platform, fields: d.fields_real || [] });
+        analyze(merged);
       } else {
-        est = localDemoEstimate(handle);
+        const est = localDemoEstimate(handle);
+        const merged = {
+          ...f, username: handle, platform,
+          followers: String(est.followers), avgLikes: String(est.avgLikes),
+          avgComments: String(est.avgComments), posts30: String(est.posts30),
+          partnerships: String(est.partnerships), localPct: String(est.localPct),
+        };
+        setF(merged);
+        setMeta({ real: false, demo: true, note: est.note });
+        analyze(merged);
       }
-      const merged = {
-        ...f, username: handle, platform,
-        followers: String(est.followers || ""), avgLikes: String(est.avgLikes || ""),
-        avgComments: String(est.avgComments || ""), posts30: String(est.posts30 ?? ""),
-        partnerships: String(est.partnerships ?? "0"), localPct: String(est.localPct ?? ""),
-      };
-      setF(merged);
-      setMeta({ confidence: est.confidence || "low", note: est.note || "" });
-      analyze(merged);
     } catch {
-      toast("Estimation IA indisponible — saisis les chiffres à la main puis « Recalculer ».", "error");
+      toast("Récupération bloquée par la plateforme — saisis les chiffres puis « Recalculer ».", "error");
       setF((p) => ({ ...p, username: handle, platform }));
       setShowDetails(true);
     } finally {
@@ -2105,10 +2120,14 @@ function InfluencerTab({ restaurant, store }) {
       </Surface>
 
       {meta && (
-        <Surface style={{ padding: 14, marginBottom: 14, background: "#EEF4FF", border: `1px solid ${C.accentBlue}33` }}>
+        <Surface style={{ padding: 14, marginBottom: 14, background: meta.real ? "#EAF7EE" : "#FFF6E5", border: `1px solid ${(meta.real ? C.accentGreen : "#F2C94C")}44` }}>
           <div style={{ ...FF, fontSize: 13 }}>
-            ✨ <b>Données estimées par IA</b> (confiance : {meta.confidence}).{meta.note ? ` ${meta.note}` : ""}
-            {" "}À <b>vérifier</b> avant tout paiement.{" "}
+            {meta.real ? (
+              <>✅ <b>Chiffres réels récupérés</b> via {meta.platform} : followers{meta.fields?.includes("avgLikes") ? " + likes moyens (engagement réel)" : ""}. Fréquence, partenariats et % d'audience locale sont des <b>hypothèses neutres</b> — ajuste-les pour affiner.</>
+            ) : (
+              <>⚠️ <b>Mode démo</b> — chiffres d'exemple non réels.{meta.note ? ` ${meta.note}` : ""}</>
+            )}
+            {" "}
             <button onClick={() => setShowDetails((v) => !v)} style={{ ...FF, color: C.accentBlue, fontWeight: 700, fontSize: 13, textDecoration: "underline" }}>
               {showDetails ? "Masquer les détails" : "Voir / ajuster les chiffres"}
             </button>
