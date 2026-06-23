@@ -606,6 +606,11 @@ const MODULE_CATALOG = [
 const ALL_MODULES = MODULE_CATALOG.map((m) => m.id);
 const moduleInfo = (id) => MODULE_CATALOG.find((m) => m.id === id) || { id, name: id, emoji: "🔒", color: C.textTertiary, desc: "", price: 0 };
 
+// Billing isn't wired yet, so every account runs with all modules unlocked.
+// Flip to false to enforce per-plan gating (seed modules from the chosen plan).
+const SEED_ALL_MODULES = true;
+const defaultModules = () => (SEED_ALL_MODULES ? [...ALL_MODULES] : ["base"]);
+
 // Map a chosen pricing plan id to the set of modules it activates.
 function planToModules(planId) {
   switch (planId) {
@@ -869,12 +874,15 @@ function RestaurantsPage({ onOpen, onSignOut }) {
     // generate the tables
     const tablesRows = Array.from({ length: Number(form.tables_count) }, (_, i) => ({ restaurant_id: data.id, number: i + 1 }));
     await supabase.from("tables").insert(tablesRows);
-    // seed the restaurant's active modules from the plan chosen at signup
-    let initialModules = ["base"];
-    try {
-      const planId = localStorage.getItem("wegemo_signup_plan");
-      if (planId) initialModules = planToModules(planId);
-    } catch { /* storage unavailable */ }
+    // seed the restaurant's active modules — everything for now (SEED_ALL_MODULES),
+    // or from the plan chosen at signup once per-plan gating is enforced.
+    let initialModules = defaultModules();
+    if (!SEED_ALL_MODULES) {
+      try {
+        const planId = localStorage.getItem("wegemo_signup_plan");
+        if (planId) initialModules = planToModules(planId);
+      } catch { /* storage unavailable */ }
+    }
     await supabase.from("restaurant_settings").upsert({ restaurant_id: data.id, active_modules: initialModules }, { onConflict: "restaurant_id" });
     toast("Restaurant créé !", "success");
     setCreating(false);
@@ -953,14 +961,15 @@ const DASH_TABS = [
   { id: "settings", label: "Paramètres", icon: "⚙️", module: "base" },
 ];
 
-// Loads the active module set for a restaurant (all modules in demo mode).
+// Loads the active module set for a restaurant. Demo mode and accounts without
+// an explicit selection default to every module unlocked (see SEED_ALL_MODULES).
 function useModules(restaurantId, demoMode) {
-  const [modules, setModules] = useState(() => (demoMode ? [...ALL_MODULES] : ["base"]));
+  const [modules, setModules] = useState(() => (demoMode ? [...ALL_MODULES] : defaultModules()));
   useEffect(() => {
     if (demoMode || !hasSupabase) { setModules([...ALL_MODULES]); return; }
     let active = true;
     supabase.from("restaurant_settings").select("active_modules").eq("restaurant_id", restaurantId).maybeSingle()
-      .then(({ data }) => { if (active) setModules(normalizeModules(data?.active_modules)); });
+      .then(({ data }) => { if (active) setModules(data?.active_modules ? normalizeModules(data.active_modules) : defaultModules()); });
     return () => { active = false; };
   }, [restaurantId, demoMode]);
   return [modules, setModules];
