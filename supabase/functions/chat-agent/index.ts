@@ -93,6 +93,34 @@ function expandNum(s: string): number {
   return Math.round((isNaN(n) ? 0 : n) * mult);
 }
 
+async function fetchTikTokItems(secUid: string) {
+  if (!secUid) return null;
+  const url = `https://www.tiktok.com/api/post/item_list/?aid=1988&count=30&cursor=0&secUid=${encodeURIComponent(secUid)}&coverFormat=2`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": BROWSER_UA, "Referer": "https://www.tiktok.com/", "Accept": "application/json" },
+  });
+  const j = await res.json().catch(() => null);
+  const items = j?.itemList;
+  if (!Array.isArray(items) || !items.length) return null;
+  const now = Date.now() / 1000;
+  const within30 = items.filter((it: { createTime?: number }) => now - (it.createTime || 0) <= 30 * 86400).length;
+  const last = items.slice(0, 12);
+  const avg = (a: number[]) => (a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : 0);
+  const likes = last.map((it: { stats?: { diggCount?: number } }) => it.stats?.diggCount || 0);
+  const comments = last.map((it: { stats?: { commentCount?: number } }) => it.stats?.commentCount || 0);
+  const descs: string[] = last.map((it: { desc?: string }) => it.desc || "");
+  const adRe = /#ad\b|#sponsor|sponsoris|#pub\b|partenariat|collab|paid partnership/i;
+  const foodRe = /restaurant|resto|brunch|\bfood\b|burger|pizza|sushi|chef|menu|gastro|cuisine|\beat\b|foodie/i;
+  const foodCollabs = descs.filter((t) => adRe.test(t) && foodRe.test(t)).length;
+  return {
+    posts30: within30,
+    recentAvgLikes: avg(likes),
+    recentAvgComments: avg(comments),
+    captions: descs.filter(Boolean).slice(0, 8),
+    foodCollabsRecent: foodCollabs,
+  };
+}
+
 async function fetchTikTok(handle: string) {
   const res = await fetch(`https://www.tiktok.com/@${handle}`, {
     headers: { "User-Agent": BROWSER_UA, "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8" },
@@ -110,13 +138,25 @@ async function fetchTikTok(handle: string) {
   const followers = stats.followerCount || 0;
   const hearts = stats.heartCount || stats.heart || 0;
   const videos = stats.videoCount || 0;
-  const avgLikes = videos > 0 ? Math.round(hearts / videos) : 0;
+  const lifetimeAvgLikes = videos > 0 ? Math.round(hearts / videos) : 0;
+
+  // Recent posts (real) via the public item list — best-effort, may be blocked.
+  let recent: Awaited<ReturnType<typeof fetchTikTokItems>> = null;
+  try { recent = await fetchTikTokItems(String(user?.secUid || "")); } catch { recent = null; }
+
+  const avgLikes = recent?.recentAvgLikes || lifetimeAvgLikes;
+  const avgComments = recent?.recentAvgComments || Math.round(avgLikes * 0.08);
   return {
-    real: true, platform: "tiktok", followers, avgLikes,
-    avgComments: Math.round(avgLikes * 0.08), videoCount: videos,
+    real: true, platform: "tiktok", followers, avgLikes, avgComments, videoCount: videos,
+    posts30: recent ? recent.posts30 : null,
+    partnerships: recent ? recent.foodCollabsRecent : null,
+    captions: recent?.captions || [],
+    recent: !!recent,
     nickname: String(user?.nickname || handle), bio: String(user?.signature || ""),
     region: String(user?.region || ""), verified: Boolean(user?.verified),
-    fields_real: ["followers", "avgLikes"],
+    fields_real: recent
+      ? ["followers", "avgLikes", "avgComments", "posts30", "partnerships"]
+      : ["followers", "avgLikes"],
   };
 }
 

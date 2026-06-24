@@ -1992,8 +1992,8 @@ function analyzeInfluencer(d, content) {
   const adVisits = budget > 0 ? Math.round((budget / 0.8) * 0.08) : 0;
   const betterChannel = roi.real.visits >= adVisits ? "influencer" : "ads";
   // Analysis confidence: how much rests on real data vs assumptions.
-  const realInputs = (d.followersReal ? 1 : 0) + (d.likesReal ? 1 : 0);
-  const confidencePct = Math.round(((realInputs + (d.localPct ? 1 : 0) + (Number(d.posts30) ? 1 : 0)) / 4) * 100);
+  const realInputs = [d.followersReal, d.likesReal, d.commentsReal, d.posts30Real, d.partnershipsReal].filter(Boolean).length;
+  const confidencePct = Math.round((realInputs / 5) * 100);
 
   const engScore = engagement >= 12 ? 10 : engagement >= 6 ? 7 : engagement >= 3 ? 4 : 1;
 
@@ -2138,26 +2138,31 @@ function InfluencerTab({ restaurant, store }) {
         const followers = Number(d.followers) || 0;
         const avgLikes = d.avgLikes != null ? Number(d.avgLikes) : Math.round(followers * 0.04);
         const avgComments = d.avgComments != null ? Number(d.avgComments) : Math.round(avgLikes * 0.08);
+        const fields = d.fields_real || [];
         const merged = {
           ...f, username: d.nickname || handle, platform: d.platform || platform,
           followers: String(followers), avgLikes: String(avgLikes), avgComments: String(avgComments),
           posts30: d.posts30 != null ? String(d.posts30) : (f.posts30 || ""),
-          partnerships: f.partnerships || "0", localPct: f.localPct || "",
-          followersReal: true, likesReal: (d.fields_real || []).includes("avgLikes"),
+          partnerships: d.partnerships != null ? String(d.partnerships) : (f.partnerships || "0"),
+          localPct: f.localPct || "",
+          followersReal: true, likesReal: fields.includes("avgLikes"), commentsReal: fields.includes("avgComments"),
+          posts30Real: d.posts30 != null, partnershipsReal: d.partnerships != null,
         };
         setF(merged);
-        setMeta({ real: true, platform: d.platform || platform, fields: d.fields_real || [], region: d.region || "", verified: !!d.verified, bio: d.bio || "" });
+        setMeta({ real: true, recent: !!d.recent, platform: d.platform || platform, fields, region: d.region || "", verified: !!d.verified, bio: d.bio || "" });
 
-        // AI content read (qualitative) — non-fatal if it fails.
+        // AI content read (qualitative) — grounded on the real bio + recent captions.
         let ai = null;
         const eng = followers > 0 ? (((avgLikes + avgComments) / followers) * 100).toFixed(1) : "0";
+        const caps = Array.isArray(d.captions) ? d.captions.slice(0, 6) : [];
         try {
           ai = await callFunction("chat-agent", {
             mode: "influencer-content",
             text: `Restaurant: ${restaurant.name}${restaurant.address ? ` (${restaurant.address})` : ""}. ` +
               `Créateur: "${d.nickname || handle}" sur ${d.platform || platform}. ` +
               `Bio: ${d.bio ? `"${d.bio}"` : "(vide)"}. Followers: ${followers}. Engagement: ${eng}%. ` +
-              `${d.region ? `Région du créateur: ${d.region}. ` : ""}${d.verified ? "Compte vérifié. " : ""}`,
+              `${d.region ? `Région du créateur: ${d.region}. ` : ""}${d.verified ? "Compte vérifié. " : ""}` +
+              `${caps.length ? `Dernières légendes: ${caps.map((c) => `"${c}"`).join(" ; ")}.` : "Légendes récentes indisponibles."}`,
           });
           if (ai && (ai.fitScore || ai.summary)) setContent(ai); else ai = null;
         } catch { ai = null; }
@@ -2234,7 +2239,11 @@ function InfluencerTab({ restaurant, store }) {
         <Surface style={{ padding: 14, marginBottom: 14, background: meta.real ? "#EAF7EE" : "#FFF6E5", border: `1px solid ${(meta.real ? C.accentGreen : "#F2C94C")}44` }}>
           <div style={{ ...FF, fontSize: 13 }}>
             {meta.real ? (
-              <>✅ <b>Chiffres réels récupérés</b> via {meta.platform} : followers{meta.fields?.includes("avgLikes") ? " + likes moyens (engagement réel)" : ""}{meta.region ? ` · créateur basé en ${meta.region}` : ""}{meta.verified ? " · vérifié" : ""}. Fréquence, partenariats et % d'audience locale ne sont <b>pas mesurables</b> depuis le profil → hypothèses ajustables.</>
+              meta.recent ? (
+                <>✅ <b>Tout en réel</b> via {meta.platform} : followers, engagement récent, fréquence de post (30 j) et partenariats food détectés{meta.region ? ` · créateur basé en ${meta.region}` : ""}{meta.verified ? " · vérifié" : ""}. Seul le % d'audience locale reste une hypothèse (non exposé par {meta.platform}).</>
+              ) : (
+                <>✅ <b>Chiffres réels</b> via {meta.platform} : followers + engagement{meta.region ? ` · créateur basé en ${meta.region}` : ""}{meta.verified ? " · vérifié" : ""}. Posts récents non accessibles → fréquence/partenariats en hypothèse (ajustables).</>
+              )
             ) : (
               <>⚠️ <b>Mode démo</b> — chiffres d'exemple non réels.{meta.note ? ` ${meta.note}` : ""}</>
             )}
