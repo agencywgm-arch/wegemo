@@ -10,7 +10,7 @@ create table if not exists marketing_trackers (
   source text not null default 'other',        -- influencer | staff | other
   channel text not null default 'other',         -- instagram | tiktok | youtube | other
   influencer_username text,
-  analysis_id uuid references influencer_analyses(id) on delete set null,
+  analysis_id uuid,                              -- optional link to an influencer analysis
   offer text,
   promo_code text,
   slug text not null unique,
