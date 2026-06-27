@@ -959,6 +959,7 @@ const DASH_TABS = [
   { id: "menu", label: "Carte", icon: "🍽️", module: "base" },
   { id: "crm", label: "CRM", icon: "👥", module: "growth" },
   { id: "influencers", label: "Influenceurs", icon: "📣", module: "growth" },
+  { id: "tracking", label: "Tracking", icon: "🔗", module: "growth" },
   { id: "settings", label: "Paramètres", icon: "⚙️", module: "base" },
 ];
 
@@ -1073,6 +1074,7 @@ function DashTabContent({ tab, setTab, restaurant, store, onKitchen, onCustomerV
     case "menu": return <MenuTab restaurant={restaurant} store={store} />;
     case "crm": return <CRMTab restaurant={restaurant} store={store} />;
     case "influencers": return <InfluencerTab restaurant={restaurant} store={store} />;
+    case "tracking": return <TrackingTab restaurant={restaurant} store={store} />;
     case "settings": return <SettingsTab restaurant={restaurant} store={store} modules={modules} onModulesChange={setModules} />;
     default: return null;
   }
@@ -2063,43 +2065,38 @@ function InfluencerTab({ restaurant, store }) {
     setF((p) => (p.avgTicketTouched ? p : { ...p, avgTicket: String(effectiveTicket) }));
   }, [effectiveTicket]);
 
-  // History of past analyses + tracked partnerships
+  // History of past analyses + tracked partnerships (marketing_trackers)
   const [history, setHistory] = useState([]);
-  const [campaigns, setCampaigns] = useState([]);
+  const [trackers, setTrackers] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const loadHistory = useCallback(async () => {
     if (!hasSupabase || store.demoMode) return;
     const { data } = await supabase.from("influencer_analyses").select("*").eq("restaurant_id", restaurant.id).order("created_at", { ascending: false }).limit(12);
     setHistory(data || []);
   }, [restaurant.id, store.demoMode]);
-  const loadCampaigns = useCallback(async () => {
+  const loadTrackers = useCallback(async () => {
     if (!hasSupabase || store.demoMode) return;
-    const { data } = await supabase.from("influencer_campaigns").select("*").eq("restaurant_id", restaurant.id).order("created_at", { ascending: false });
-    setCampaigns(data || []);
+    const { data } = await supabase.from("marketing_trackers").select("*").eq("restaurant_id", restaurant.id).eq("source", "influencer").order("created_at", { ascending: false });
+    setTrackers(data || []);
   }, [restaurant.id, store.demoMode]);
-  useEffect(() => { loadHistory(); loadCampaigns(); }, [loadHistory, loadCampaigns]);
+  useEffect(() => { loadHistory(); loadTrackers(); }, [loadHistory, loadTrackers]);
 
-  const launch = async (r) => {
+  // Launch a tracked partnership: real link + promo code, auto-tracked.
+  const launch = async (r, who) => {
+    const username = who || f.username;
     const base = (restaurant.name || "RESTO").replace(/\W/g, "").slice(0, 6).toUpperCase() || "RESTO";
     const code = `${base}${Math.floor(Math.random() * 90 + 10)}`;
-    if (!hasSupabase || store.demoMode) { toast(`(Démo) Partenariat lancé · code ${code}`, "success"); return; }
-    const { error } = await supabase.from("influencer_campaigns").insert({
-      restaurant_id: restaurant.id, username: f.username, platform: f.platform,
-      promo_code: code, budget: r.budget, projected_visits: r.roi.real.visits, projected_roi: r.roi.real.roi, status: "active",
+    const slug = `${(restaurant.slug || "r").slice(0, 4)}${Math.random().toString(36).slice(2, 8)}`;
+    if (!hasSupabase || store.demoMode) { toast(`(Démo) Tracker créé · code ${code}`, "success"); return; }
+    const { error } = await supabase.from("marketing_trackers").insert({
+      restaurant_id: restaurant.id, label: `Partenariat ${username || "influenceur"}`,
+      source: "influencer", channel: f.platform || "tiktok", influencer_username: username,
+      promo_code: code, slug, budget: r ? r.budget : 0,
     });
     if (error) return toast(error.message, "error");
-    toast(`Partenariat suivi · code promo ${code}`, "success");
-    loadCampaigns();
-  };
-  const saveActual = async (c, visits) => {
-    const v = Math.max(0, Number(visits) || 0);
-    const revenue = Math.round(v * 0.65 * effectiveTicket);
-    const roi = c.budget > 0 ? Math.round(((revenue - c.budget) / c.budget) * 100) : 0;
-    if (!hasSupabase || store.demoMode) { toast("(Démo) suivi non persisté", "info"); return; }
-    const { error } = await supabase.from("influencer_campaigns").update({ actual_visits: v, status: "done" }).eq("id", c.id);
-    if (error) return toast(error.message, "error");
-    toast(`Réel enregistré : ${v} visites · ROI ${roi >= 0 ? "+" : ""}${roi}%`, "success");
-    loadCampaigns();
+    copy(`${siteBase()}/go/${slug}`);
+    toast(`Suivi créé · code ${code} · lien copié`, "success");
+    loadTrackers();
   };
   const reopen = (h) => {
     const inputs = h.inputs || {};
@@ -2300,13 +2297,13 @@ function InfluencerTab({ restaurant, store }) {
 
       {report && <InfluencerReport r={report} f={f} content={content} copy={copy} contactTemplate={contactTemplate} restaurant={restaurant} onLaunch={launch} />}
 
-      {/* Tracked partnerships */}
-      {campaigns.length > 0 && (
+      {/* Tracked partnerships (auto: clicks + code redemptions + revenue) */}
+      {trackers.length > 0 && (
         <Surface style={{ padding: 18, marginTop: 16 }}>
           <strong style={{ ...FF }}>📌 Partenariats suivis</strong>
-          <p style={{ ...FF, fontSize: 12, color: C.textSecondary, marginTop: 4 }}>Comparez le projeté au réel. Saisissez les visites générées (via votre code promo) pour boucler la boucle.</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
-            {campaigns.map((c) => <CampaignRow key={c.id} c={c} ticket={effectiveTicket} onSave={saveActual} />)}
+          <p style={{ ...FF, fontSize: 12, color: C.textSecondary, marginTop: 4 }}>Clics du lien, utilisations du code et CA réel attribués automatiquement. Gérez-les aussi dans l'onglet <b>Tracking</b>.</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+            {trackers.map((tr) => <TrackerRow key={tr.id} t={tr} onCopy={copy} />)}
           </div>
         </Surface>
       )}
@@ -2341,27 +2338,6 @@ function InfluencerTab({ restaurant, store }) {
   );
 }
 
-function CampaignRow({ c, ticket, onSave }) {
-  const [actual, setActual] = useState(c.actual_visits != null ? String(c.actual_visits) : "");
-  const v = Number(actual) || 0;
-  const realRoi = c.budget > 0 ? Math.round(((Math.round(v * 0.65 * ticket) - c.budget) / c.budget) * 100) : 0;
-  const done = c.actual_visits != null;
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, background: C.surfaceAlt, ...FF, fontSize: 13, flexWrap: "wrap" }}>
-      <div style={{ flex: "1 1 180px" }}>
-        <strong>{c.username || "—"}</strong> <span style={{ color: C.textTertiary }}>· {c.platform}</span>
-        <div style={{ color: C.textSecondary, fontSize: 12 }}>Code <b>{c.promo_code}</b> · budget {c.budget}€ · projeté {c.projected_visits} visites / ROI {c.projected_roi >= 0 ? "+" : ""}{c.projected_roi}%</div>
-      </div>
-      <input type="number" min={0} placeholder="visites réelles" value={actual} onChange={(e) => setActual(e.target.value)} style={{ ...FF, width: 120, padding: "8px 10px", borderRadius: 10, border: `1px solid ${C.borderStrong}` }} />
-      {actual !== "" && (
-        <span style={{ ...FF, fontWeight: 800, color: realRoi >= 0 ? C.accentGreen : C.accent, width: 96, textAlign: "right" }}>
-          réel {realRoi >= 0 ? "+" : ""}{realRoi}%
-        </span>
-      )}
-      <Btn variant={done ? "subtle" : "primary"} size="sm" onClick={() => onSave(c, actual)}>{done ? "Mettre à jour" : "Enregistrer"}</Btn>
-    </div>
-  );
-}
 
 function InfluencerReport({ r, f, content, copy, contactTemplate, restaurant, onLaunch }) {
   const v = VERDICTS[r.verdict];
@@ -2541,6 +2517,161 @@ function InfluencerReport({ r, f, content, copy, contactTemplate, restaurant, on
             </div>
           </div>
         </Surface>
+      )}
+    </div>
+  );
+}
+
+/* ---- Marketing tracking (links + promo codes) ---- */
+function TrackerRow({ t: tr, onCopy, onDelete }) {
+  const link = `${siteBase()}/go/${tr.slug}`;
+  const conv = tr.clicks > 0 ? Math.round((tr.redemptions / tr.clicks) * 100) : 0;
+  const roi = Number(tr.budget) > 0 ? Math.round(((Number(tr.revenue) - Number(tr.budget)) / Number(tr.budget)) * 100) : null;
+  const srcEmoji = tr.source === "influencer" ? "📣" : tr.source === "staff" ? "🧑‍🍳" : "🔗";
+  const stats = [["Clics", tr.clicks], ["Utilisations", tr.redemptions], ["Conversion", `${conv}%`], ["CA généré", eur(tr.revenue)], ["Budget", eur(tr.budget)], ["ROI", roi == null ? "—" : `${roi >= 0 ? "+" : ""}${roi}%`]];
+  return (
+    <div style={{ padding: 14, borderRadius: 12, background: C.surfaceAlt, ...FF, fontSize: 13 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 18 }}>{srcEmoji}</span>
+        <strong style={{ fontSize: 14 }}>{tr.label || tr.influencer_username || "Opération"}</strong>
+        {tr.channel && <Tag color={C.accentBlue}>{tr.channel}</Tag>}
+        {tr.promo_code && <Tag color={C.accentGreen}>{tr.promo_code}</Tag>}
+        {onDelete && <button onClick={() => onDelete(tr.id)} style={{ ...FF, marginLeft: "auto", color: C.accent, fontSize: 16 }}>✕</button>}
+      </div>
+      {tr.offer && <div style={{ ...FF, fontSize: 12.5, color: C.textSecondary, marginTop: 4 }}>{tr.offer}</div>}
+      <div style={{ display: "flex", gap: 16, marginTop: 10, flexWrap: "wrap" }}>
+        {stats.map(([k, val]) => (
+          <div key={k} style={{ minWidth: 76 }}>
+            <div style={{ fontSize: 11, color: C.textTertiary }}>{k}</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: k === "ROI" && roi != null ? (roi >= 0 ? C.accentGreen : C.accent) : C.text }}>{val}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+        <Btn variant="subtle" size="sm" onClick={() => onCopy(link)}>🔗 Copier le lien</Btn>
+        {tr.promo_code && <Btn variant="subtle" size="sm" onClick={() => onCopy(tr.promo_code)}>🏷️ Copier le code</Btn>}
+      </div>
+    </div>
+  );
+}
+
+function TrackingTab({ restaurant, store }) {
+  const toast = useToast();
+  const [list, setList] = useState([]);
+  const [influencers, setInfluencers] = useState([]);
+  const [form, setForm] = useState({ label: "", source: "staff", channel: "instagram", influencer_username: "", offer: "", promo_code: "", budget: "" });
+  const setF = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  const load = useCallback(async () => {
+    if (!hasSupabase || store.demoMode) return;
+    const { data } = await supabase.from("marketing_trackers").select("*").eq("restaurant_id", restaurant.id).order("created_at", { ascending: false });
+    setList(data || []);
+    const { data: an } = await supabase.from("influencer_analyses").select("username,platform").eq("restaurant_id", restaurant.id).order("created_at", { ascending: false }).limit(50);
+    const seen = new Set(); const infl = [];
+    (an || []).forEach((a) => { if (a.username && !seen.has(a.username)) { seen.add(a.username); infl.push(a); } });
+    setInfluencers(infl);
+  }, [restaurant.id, store.demoMode]);
+  useEffect(() => { load(); }, [load]);
+
+  const copy = (txt) => { try { navigator.clipboard.writeText(txt); toast("Copié !", "success"); } catch { toast("Copie impossible", "error"); } };
+
+  const create = async () => {
+    if (!form.label.trim()) return toast("Donne un nom à l'opération", "error");
+    if (!hasSupabase || store.demoMode) return toast("(Démo) création indisponible", "info");
+    const slug = `${(restaurant.slug || "r").slice(0, 4)}${Math.random().toString(36).slice(2, 8)}`;
+    const { error } = await supabase.from("marketing_trackers").insert({
+      restaurant_id: restaurant.id, label: form.label.trim(), source: form.source, channel: form.channel,
+      influencer_username: form.source === "influencer" ? (form.influencer_username || null) : null,
+      offer: form.offer || null, promo_code: form.promo_code ? form.promo_code.toUpperCase().trim() : null,
+      slug, budget: Number(form.budget) || 0,
+    });
+    if (error) return toast(error.message, "error");
+    toast("Opération de tracking créée", "success");
+    setForm({ label: "", source: form.source, channel: "instagram", influencer_username: "", offer: "", promo_code: "", budget: "" });
+    load();
+  };
+  const remove = async (id) => {
+    if (!hasSupabase || store.demoMode) return;
+    await supabase.from("marketing_trackers").delete().eq("id", id);
+    load();
+  };
+
+  const totalRevenue = list.reduce((s, x) => s + Number(x.revenue || 0), 0);
+  const totalBudget = list.reduce((s, x) => s + Number(x.budget || 0), 0);
+  const totalClicks = list.reduce((s, x) => s + Number(x.clicks || 0), 0);
+  const totalRedemptions = list.reduce((s, x) => s + Number(x.redemptions || 0), 0);
+  const globalRoi = totalBudget > 0 ? Math.round(((totalRevenue - totalBudget) / totalBudget) * 100) : null;
+  const sel = (k, opts) => (
+    <select value={form[k]} onChange={(e) => setF(k, e.target.value)} style={{ ...FF, width: "100%", padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.borderStrong}` }}>
+      {opts.map(([val, lbl]) => <option key={val} value={val}>{lbl}</option>)}
+    </select>
+  );
+
+  return (
+    <div>
+      <h2 style={{ ...FF, fontSize: 22, fontWeight: 800, marginBottom: 4 }}>🔗 Tracking marketing</h2>
+      <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginBottom: 16 }}>
+        Créez un <b>lien traçable</b> et/ou un <b>code promo</b> pour chaque opération — partenariat influenceur ou post de votre équipe — et mesurez clics, utilisations et CA généré en temps réel.
+      </p>
+
+      {list.length > 0 && (
+        <Surface style={{ padding: 16, marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
+            {[["Clics", totalClicks], ["Utilisations code", totalRedemptions], ["CA total généré", eur(totalRevenue)], ["Budget total", eur(totalBudget)], ["ROI global", globalRoi == null ? "—" : `${globalRoi >= 0 ? "+" : ""}${globalRoi}%`]].map(([k, val]) => (
+              <div key={k}>
+                <div style={{ ...FF, fontSize: 11, color: C.textTertiary }}>{k}</div>
+                <div style={{ ...FF, fontSize: 20, fontWeight: 900, color: k === "ROI global" && globalRoi != null ? (globalRoi >= 0 ? C.accentGreen : C.accent) : C.text }}>{val}</div>
+              </div>
+            ))}
+          </div>
+        </Surface>
+      )}
+
+      <Surface style={{ padding: 18, marginBottom: 16 }}>
+        <strong style={{ ...FF }}>➕ Nouvelle opération</strong>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
+          <div style={{ flex: "1 1 200px" }}><InputField label="Nom de l'opération" placeholder="Story Léa — menu de printemps" value={form.label} onChange={(e) => setF("label", e.target.value)} /></div>
+          <div style={{ flex: "1 1 130px" }}>
+            <label style={{ ...FF, display: "block", fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Source</label>
+            {sel("source", [["staff", "🧑‍🍳 Post équipe"], ["influencer", "📣 Influenceur"], ["other", "🔗 Autre"]])}
+          </div>
+          <div style={{ flex: "1 1 130px" }}>
+            <label style={{ ...FF, display: "block", fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Canal</label>
+            {sel("channel", [["instagram", "Instagram"], ["tiktok", "TikTok"], ["youtube", "YouTube"], ["other", "Autre"]])}
+          </div>
+        </div>
+        {form.source === "influencer" && (
+          <div style={{ marginTop: 4 }}>
+            <label style={{ ...FF, display: "block", fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Influenceur sauvegardé</label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <select value={form.influencer_username} onChange={(e) => setF("influencer_username", e.target.value)} style={{ ...FF, flex: "1 1 200px", padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.borderStrong}` }}>
+                <option value="">— Choisir / saisir —</option>
+                {influencers.map((i) => <option key={i.username} value={i.username}>{i.username} ({i.platform})</option>)}
+              </select>
+              <div style={{ flex: "1 1 160px" }}><InputField placeholder="ou @username" value={form.influencer_username} onChange={(e) => setF("influencer_username", e.target.value)} /></div>
+            </div>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4 }}>
+          <div style={{ flex: "1 1 200px" }}><InputField label="Offre promue (optionnel)" placeholder="-15% sur le menu midi" value={form.offer} onChange={(e) => setF("offer", e.target.value)} /></div>
+          <div style={{ flex: "1 1 140px" }}><InputField label="Code promo (optionnel)" placeholder="LEA15" value={form.promo_code} onChange={(e) => setF("promo_code", e.target.value)} /></div>
+          <div style={{ flex: "1 1 120px" }}><InputField label="Budget (€)" type="number" min={0} placeholder="0" value={form.budget} onChange={(e) => setF("budget", e.target.value)} /></div>
+        </div>
+        <p style={{ ...FF, fontSize: 12, color: C.textTertiary, marginTop: 8 }}>
+          💡 Le code promo doit aussi exister dans l'onglet <b>Promos</b> pour appliquer une vraie réduction au client. Ici, il sert à attribuer le CA. Un lien traçable est généré automatiquement.
+        </p>
+        <Btn variant="primary" size="lg" style={{ marginTop: 14 }} onClick={create}>Créer le lien de suivi</Btn>
+      </Surface>
+
+      {list.length === 0 ? (
+        <Surface style={{ padding: 28, textAlign: "center" }}>
+          <div style={{ fontSize: 36 }}>🔗</div>
+          <p style={{ ...FF, color: C.textSecondary, marginTop: 8 }}>Aucune opération suivie. Créez la première — ou lancez-en une depuis l'onglet Influenceurs.</p>
+        </Surface>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {list.map((tr) => <TrackerRow key={tr.id} t={tr} onCopy={copy} onDelete={remove} />)}
+        </div>
       )}
     </div>
   );
@@ -3121,6 +3252,26 @@ function CenterMsg({ emoji, text }) {
   );
 }
 
+// Public base URL of the deployed app (handles GitHub Pages subpaths).
+const siteBase = () => `${window.location.origin}${(import.meta.env.VITE_BASE_PATH || "/").replace(/\/+$/, "")}`;
+
+// Trackable short link: /go/{slug} → logs a click then sends the guest to the
+// restaurant's ordering page with the promo code pre-applied.
+function GoRedirect({ slug }) {
+  useEffect(() => {
+    const home = `${siteBase()}/`;
+    if (!hasSupabase) { window.location.replace(home); return; }
+    supabase.rpc("track_click", { p_slug: slug }).then(({ data }) => {
+      const row = Array.isArray(data) ? data[0] : data;
+      if (row?.restaurant_slug) {
+        const q = row.promo_code ? `?promo=${encodeURIComponent(row.promo_code)}` : "";
+        window.location.replace(`${siteBase()}/r/${row.restaurant_slug}/t/0${q}`);
+      } else window.location.replace(home);
+    }).catch(() => window.location.replace(home));
+  }, [slug]);
+  return <CenterMsg emoji="🔗" text="Redirection…" />;
+}
+
 function CustomerMenu({ restaurant, menu, settings, lang, setLang, cart, onCompose, onAdd, onCart, tableLabel, tableNum }) {
   const [cat, setCat] = useState("ALL");
   const [search, setSearch] = useState("");
@@ -3211,19 +3362,27 @@ function ComposeModal({ item, lang, onClose, onAdd }) {
 function CustomerCart({ cart, setCart, lang, subtotal, discount, total, promo, setPromo, restaurant, onBack, onNext }) {
   const toast = useToast();
   const [code, setCode] = useState("");
-  const applyPromo = async () => {
-    if (!code.trim()) return;
+  const applyPromo = async (raw) => {
+    const c = (typeof raw === "string" ? raw : code).trim();
+    if (!c) return;
     if (!hasSupabase || restaurant.id === "demo") {
-      if (code.toUpperCase() === "BIENVENUE10") setPromo({ code, discount_percent: 10 });
+      if (c.toUpperCase() === "BIENVENUE10") setPromo({ code: c, discount_percent: 10 });
       else toast("Code invalide", "error");
       return;
     }
-    const { data } = await supabase.from("promo_codes").select("*").eq("restaurant_id", restaurant.id).ilike("code", code).eq("active", true).maybeSingle();
+    const { data } = await supabase.from("promo_codes").select("*").eq("restaurant_id", restaurant.id).ilike("code", c).eq("active", true).maybeSingle();
     if (data) {
       setPromo(data);
       toast("Code appliqué !", "success");
     } else toast("Code invalide", "error");
   };
+
+  // Pre-apply a promo arriving via a tracked link (?promo=CODE).
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get("promo");
+    if (p && !promo) { setCode(p.toUpperCase()); applyPromo(p); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div style={{ padding: 16, minHeight: "100vh" }}>
@@ -3250,7 +3409,7 @@ function CustomerCart({ cart, setCart, lang, subtotal, discount, total, promo, s
           <Surface style={{ padding: 14, marginTop: 8 }}>
             <div style={{ display: "flex", gap: 8 }}>
               <input value={code} onChange={(e) => setCode(e.target.value)} placeholder={t(lang, "promoCode")} style={{ ...FF, flex: 1, padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, textTransform: "uppercase" }} />
-              <Btn variant="subtle" onClick={applyPromo}>{t(lang, "apply")}</Btn>
+              <Btn variant="subtle" onClick={() => applyPromo()}>{t(lang, "apply")}</Btn>
             </div>
             <div style={{ marginTop: 14, ...FF, fontSize: 14 }}>
               <Row label="Sous-total" value={eur(subtotal)} />
@@ -3386,7 +3545,11 @@ function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, p
       if (error) throw error;
       const items = cart.map((c) => ({ order_id: order.id, menu_item_id: c.item.id, quantity: c.qty, detail: c.supplements.map((s) => s.name).join(", ") }));
       await supabase.from("order_items").insert(items);
-      if (promo?.code) await supabase.rpc("increment_promo_use", { p_code: promo.code });
+      if (promo?.code) {
+        await supabase.rpc("increment_promo_use", { p_code: promo.code });
+        // Attribute the order to any marketing tracker carrying this code.
+        supabase.rpc("track_redemption", { p_restaurant: restaurant.id, p_code: promo.code, p_revenue: total }).then(() => {}, () => {});
+      }
       // Fire-and-forget receipt email when the customer left an address.
       if (profile.email) {
         const rows = cart.map((c) => `<tr><td>${c.qty}× ${c.item.name}</td><td align="right">${eur(c.lineTotal)}</td></tr>`).join("");
@@ -3555,6 +3718,7 @@ function AppInner() {
 
   // Customer route: /r/{slug}/t/{tableNum}
   const customerMatch = path.match(/\/r\/([^/]+)\/t\/(\d+)/);
+  const goMatch = path.match(/\/go\/([^/?#]+)/);
   const [view, setView] = useState({ page: "landing", restaurant: null });
 
   useEffect(() => {
@@ -3562,6 +3726,7 @@ function AppInner() {
   }, [user]);
 
   if (path.includes("/oauth/gmail")) return <GmailCallback />;
+  if (goMatch) return <GoRedirect slug={decodeURIComponent(goMatch[1])} />;
   if (customerMatch) return <CustomerPage slug={decodeURIComponent(customerMatch[1])} tableNum={customerMatch[2]} />;
   if (loading) return <CenterMsg emoji="⏳" text="…" />;
 
