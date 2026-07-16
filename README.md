@@ -51,6 +51,7 @@ Run these in the Supabase SQL editor **in order**:
 10. `supabase/migration_influencers.sql`
 11. `supabase/migration_influencer_campaigns.sql`
 12. `supabase/migration_marketing.sql`
+13. `supabase/migration_hotel.sql`
 
 Then create a **public** Storage bucket named `assets` and run
 `supabase/storage_policies.sql`. Finally enable Realtime replication for the

@@ -189,6 +189,56 @@ const DEMO_REVIEWS = [
   { id: "rv2", rating: 4, comment: "Service rapide", created_at: minsAgo(900) },
 ];
 
+/* ---- HOTEL vertical demo data ---- */
+const DEMO_HOTEL = {
+  id: "demo-hotel", name: "Hôtel Démo", address: "5 avenue des Rêves, Paris",
+  logo_emoji: "🏨", tables_count: 12, slug: "demo-hotel", owner_id: "demo", vertical: "hotel",
+};
+const DEMO_HOTEL_MENU = [
+  { id: "h1", restaurant_id: "demo-hotel", name: "Club Sandwich", description: "Poulet, bacon, œuf, frites", price: 18, category: "Plats", emoji: "🥪", is_popular: true, available: true, stock: null, supplements: [{ name: "Extra frites", price: 4 }], extras: [] },
+  { id: "h2", restaurant_id: "demo-hotel", name: "Burger Signature", description: "Bœuf Angus, cheddar affiné", price: 24, category: "Plats", emoji: "🍔", is_popular: true, available: true, stock: null, supplements: [], extras: [] },
+  { id: "h3", restaurant_id: "demo-hotel", name: "Petit-déjeuner continental", description: "Viennoiseries, jus, boisson chaude", price: 22, category: "Petit-déjeuner", emoji: "🥐", is_popular: false, available: true, stock: null, supplements: [], extras: [] },
+  { id: "h4", restaurant_id: "demo-hotel", name: "Plateau de fruits frais", description: "Sélection de saison", price: 14, category: "En-cas", emoji: "🍓", is_popular: false, available: true, stock: null, supplements: [], extras: [] },
+  { id: "h5", restaurant_id: "demo-hotel", name: "Bouteille de Champagne", description: "Brut, 75cl", price: 65, category: "Boissons", emoji: "🍾", is_popular: false, available: true, stock: 6, supplements: [], extras: [] },
+  { id: "h6", restaurant_id: "demo-hotel", name: "Café / Thé", description: "Sélection premium", price: 6, category: "Boissons", emoji: "☕", is_popular: true, available: true, stock: null, supplements: [], extras: [] },
+];
+const DEMO_HOTEL_ORDERS = [
+  { id: "ho1", restaurant_id: "demo-hotel", table_id: "r204", status: "PENDING", note: "Sans gluten", total: 30, payment_method: "room", customer_name: "Ch. 204", order_type: "room_service", cash_collected: false, created_at: minsAgo(4), table: { number: 204 }, items: [{ name: "Club Sandwich", emoji: "🥪", quantity: 1 }, { name: "Café / Thé", emoji: "☕", quantity: 2 }] },
+  { id: "ho2", restaurant_id: "demo-hotel", table_id: "r512", status: "PREPARING", note: "", total: 65, payment_method: "room", customer_name: "Ch. 512", order_type: "room_service", cash_collected: false, created_at: minsAgo(9), table: { number: 512 }, items: [{ name: "Bouteille de Champagne", emoji: "🍾", quantity: 1 }] },
+  { id: "ho3", restaurant_id: "demo-hotel", table_id: "r108", status: "READY", note: "Livraison 8h", total: 22, payment_method: "room", customer_name: "Ch. 108", order_type: "room_service", cash_collected: false, created_at: minsAgo(15), table: { number: 108 }, items: [{ name: "Petit-déjeuner continental", emoji: "🥐", quantity: 1 }] },
+];
+const DEMO_HOTEL_DONE = [
+  { id: "hd1", restaurant_id: "demo-hotel", status: "DONE", total: 42, payment_method: "room", created_at: minsAgo(90), table: { number: 301 } },
+  { id: "hd2", restaurant_id: "demo-hotel", status: "DONE", total: 18, payment_method: "card", created_at: minsAgo(180), table: { number: 210 } },
+];
+const DEMO_CHECKINS = [
+  { id: "ck1", restaurant_id: "demo-hotel", guest_name: "Léa Martin", email: "lea@example.com", room: 204, guests: 2, checkin_date: "2026-07-16", checkout_date: "2026-07-19", status: "in_house" },
+  { id: "ck2", restaurant_id: "demo-hotel", guest_name: "Tom Bernard", email: "", room: 108, guests: 1, checkin_date: "2026-07-16", checkout_date: "2026-07-17", status: "arriving" },
+  { id: "ck3", restaurant_id: "demo-hotel", guest_name: "Sarah Cohen", email: "sarah@example.com", room: 301, guests: 2, checkin_date: "2026-07-12", checkout_date: "2026-07-16", status: "departing" },
+];
+
+/* Vertical config — Wegemo (restaurant) vs Wegemo Hôtel. Same tooling, adapted
+ * wording, demo dataset and extra tabs. */
+const VERTICALS = {
+  resto: {
+    id: "resto", name: "Wegemo", switchLabel: "🍽️ Restaurant", accent: C.accent,
+    hero: "Le restaurant, réinventé par le QR code.",
+    sub: "Vos clients scannent, commandent et paient. Vous gérez tout depuis un seul tableau de bord.",
+    features: ["Commande par QR code", "Cuisine en temps réel", "Paiement Stripe intégré", "CRM & campagnes email", "Support 7j/7"],
+    demo: DEMO_RESTAURANT, unit: "Table", tabLabels: {}, extraTabs: [],
+  },
+  hotel: {
+    id: "hotel", name: "Wegemo Hôtel", switchLabel: "🏨 Hôtel", accent: C.accentBlue,
+    hero: "L'hôtel, réinventé par le QR code.",
+    sub: "Vos clients commandent leur room service et gèrent leur check-in depuis la chambre. Vous pilotez tout depuis un seul tableau de bord.",
+    features: ["Room service par QR code", "Check-in interne", "Facturation sur la chambre", "CRM clients", "Support 7j/7"],
+    demo: DEMO_HOTEL, unit: "Chambre",
+    tabLabels: { overview: "Vue d'ensemble", orders: "Room service", menu: "Carte room service", qr: "QR Chambres", register: "Facturation" },
+    extraTabs: [{ id: "checkin", label: "Check-in", icon: "🛎️", module: "base", afterId: "orders" }],
+  },
+};
+const verticalOf = (id) => VERTICALS[id] || VERTICALS.resto;
+
 /* ============================================================================
  * SMALL HELPERS
  * ==========================================================================*/
@@ -287,7 +337,8 @@ function AuthProvider({ children }) {
  * STORE — switches between demo data and live Supabase data
  * ==========================================================================*/
 function useStore(restaurantId) {
-  const demoMode = restaurantId === "demo" || !hasSupabase;
+  const isHotelDemo = restaurantId === "demo-hotel";
+  const demoMode = restaurantId === "demo" || isHotelDemo || !hasSupabase;
   const [menu, setMenu] = useState([]);
   const [orders, setOrders] = useState([]);
   const [doneOrders, setDoneOrders] = useState([]);
@@ -300,10 +351,11 @@ function useStore(restaurantId) {
 
   const reload = useCallback(async () => {
     if (demoMode) {
-      setMenu(DEMO_MENU);
-      setOrders(DEMO_ORDERS);
-      setDoneOrders(DEMO_DONE_ORDERS);
-      setTables(Array.from({ length: DEMO_RESTAURANT.tables_count }, (_, i) => ({ id: `t${i + 1}`, number: i + 1 })));
+      setMenu(isHotelDemo ? DEMO_HOTEL_MENU : DEMO_MENU);
+      setOrders(isHotelDemo ? DEMO_HOTEL_ORDERS : DEMO_ORDERS);
+      setDoneOrders(isHotelDemo ? DEMO_HOTEL_DONE : DEMO_DONE_ORDERS);
+      const roomCount = (isHotelDemo ? DEMO_HOTEL : DEMO_RESTAURANT).tables_count;
+      setTables(Array.from({ length: roomCount }, (_, i) => ({ id: `t${i + 1}`, number: i + 1 })));
       setIngredients(DEMO_INGREDIENTS);
       setPromos(DEMO_PROMOS);
       setCustomers(DEMO_CUSTOMERS);
@@ -733,19 +785,28 @@ function PricingPage({ onBack, onSignup }) {
 /* ============================================================================
  * LANDING
  * ==========================================================================*/
-function LandingPage({ onDemo, onLogin, onSignup, onPricing }) {
-  const features = ["Commande par QR code", "Cuisine en temps réel", "Paiement Stripe intégré", "CRM & campagnes email", "Support 7j/7"];
+function LandingPage({ onDemo, onLogin, onSignup, onPricing, vertical, setVertical }) {
+  const V = verticalOf(vertical);
+  const heroWord = V.hero.split("réinventé");
   return (
     <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center" }}>
+      {/* Vertical selector */}
+      <div style={{ display: "flex", gap: 6, background: C.surfaceAlt, padding: 5, borderRadius: 999, marginBottom: 22 }}>
+        {["resto", "hotel"].map((id) => (
+          <button key={id} onClick={() => setVertical(id)} style={{ ...FF, padding: "9px 18px", borderRadius: 999, fontWeight: 800, fontSize: 14, border: "none", cursor: "pointer", background: vertical === id ? C.surface : "transparent", color: vertical === id ? C.text : C.textSecondary, boxShadow: vertical === id ? "0 1px 4px rgba(0,0,0,.12)" : "none" }}>
+            {verticalOf(id).switchLabel}
+          </button>
+        ))}
+      </div>
+
       <Logo size={48} />
-      <h1 style={{ ...FF, fontSize: 40, fontWeight: 900, margin: "24px 0 12px", maxWidth: 640, lineHeight: 1.1 }}>
-        Le restaurant, <span style={{ color: C.accent }}>réinventé</span> par le QR code.
+      <div style={{ ...FF, fontSize: 13, fontWeight: 800, color: V.accent, marginTop: 8, letterSpacing: 0.4, textTransform: "uppercase" }}>{V.name}</div>
+      <h1 style={{ ...FF, fontSize: 40, fontWeight: 900, margin: "16px 0 12px", maxWidth: 640, lineHeight: 1.1 }}>
+        {heroWord[0]}<span style={{ color: V.accent }}>réinventé</span>{heroWord[1]}
       </h1>
-      <p style={{ ...FF, fontSize: 18, color: C.textSecondary, maxWidth: 520, marginBottom: 28 }}>
-        Vos clients scannent, commandent et paient. Vous gérez tout depuis un seul tableau de bord.
-      </p>
+      <p style={{ ...FF, fontSize: 18, color: C.textSecondary, maxWidth: 540, marginBottom: 28 }}>{V.sub}</p>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center", marginBottom: 18 }}>
-        <Btn variant="primary" size="lg" onClick={onDemo}>🚀 Voir la démo</Btn>
+        <Btn variant="primary" size="lg" style={{ background: V.accent }} onClick={onDemo}>🚀 Voir la démo {vertical === "hotel" ? "hôtel" : ""}</Btn>
         <Btn variant="subtle" size="lg" onClick={onLogin}>Se connecter</Btn>
         <Btn variant="red" size="lg" onClick={onSignup}>Créer un compte</Btn>
       </div>
@@ -753,7 +814,7 @@ function LandingPage({ onDemo, onLogin, onSignup, onPricing }) {
         💎 Voir les offres & tarifs →
       </button>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", maxWidth: 640 }}>
-        {features.map((f) => (
+        {V.features.map((f) => (
           <Tag key={f} color={C.accentGreen}>✓ {f}</Tag>
         ))}
       </div>
@@ -997,12 +1058,24 @@ function LockedFeature({ module, onManage }) {
   );
 }
 
-function DashboardPage({ restaurant, onBack, onKitchen, onCustomerView, onFranchise }) {
+// Build the tab list for a vertical: relabel + insert extra tabs (e.g. Check-in).
+function dashTabsFor(V) {
+  const tabs = DASH_TABS.map((t) => ({ ...t, label: V.tabLabels[t.id] || t.label }));
+  (V.extraTabs || []).forEach((et) => {
+    const i = tabs.findIndex((b) => b.id === et.afterId);
+    tabs.splice(i >= 0 ? i + 1 : tabs.length, 0, et);
+  });
+  return tabs;
+}
+
+function DashboardPage({ restaurant, onBack, onKitchen, onCustomerView, onFranchise, vertical }) {
   const isMobile = useIsMobile();
   const store = useStore(restaurant.id);
   const [modules, setModules] = useModules(restaurant.id, store.demoMode);
   const [tab, setTab] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const V = verticalOf(vertical || restaurant.vertical || "resto");
+  const tabs = dashTabsFor(V);
   const showFranchise = onFranchise && modules.includes("franchise") && (store.demoMode || restaurant.group_id);
 
   const sidebar = (
@@ -1011,7 +1084,7 @@ function DashboardPage({ restaurant, onBack, onKitchen, onCustomerView, onFranch
         <span style={{ fontSize: 24 }}>{restaurant.logo_emoji}</span>
         <strong style={{ ...FF, fontSize: 15 }}>{restaurant.name}</strong>
       </div>
-      {DASH_TABS.map((tt) => {
+      {tabs.map((tt) => {
         const locked = tt.module !== "base" && !modules.includes(tt.module);
         return (
           <button key={tt.id} onClick={() => { setTab(tt.id); setSidebarOpen(false); }} style={{ ...FF, display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 11, fontWeight: 600, fontSize: 14, textAlign: "left", background: tab === tt.id ? C.surfaceAlt : "transparent", color: tab === tt.id ? C.text : C.textSecondary }}>
@@ -1021,7 +1094,7 @@ function DashboardPage({ restaurant, onBack, onKitchen, onCustomerView, onFranch
         );
       })}
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 6, paddingTop: 12 }}>
-        <Btn variant="subtle" size="sm" onClick={onKitchen}>👨‍🍳 Cuisine</Btn>
+        <Btn variant="subtle" size="sm" onClick={onKitchen}>{V.id === "hotel" ? "🍳 Office" : "👨‍🍳 Cuisine"}</Btn>
         <Btn variant="subtle" size="sm" onClick={onCustomerView}>📱 Vue client</Btn>
         {showFranchise && <Btn variant="subtle" size="sm" onClick={onFranchise}>🏢 Groupe</Btn>}
         <Btn variant="ghost" size="sm" onClick={onBack}>← Restaurants</Btn>
@@ -1042,7 +1115,7 @@ function DashboardPage({ restaurant, onBack, onKitchen, onCustomerView, onFranch
         {isMobile && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 14, background: C.surface, borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, zIndex: 10 }}>
             <Btn variant="subtle" size="sm" onClick={() => setSidebarOpen(true)}>☰</Btn>
-            <strong style={{ ...FF }}>{DASH_TABS.find((x) => x.id === tab)?.label}</strong>
+            <strong style={{ ...FF }}>{tabs.find((x) => x.id === tab)?.label}</strong>
             <span style={{ fontSize: 20 }}>{restaurant.logo_emoji}</span>
           </div>
         )}
@@ -1050,7 +1123,7 @@ function DashboardPage({ restaurant, onBack, onKitchen, onCustomerView, onFranch
           {store.loading ? (
             <p style={{ ...FF, color: C.textSecondary }}>Chargement…</p>
           ) : (
-            <DashTabContent tab={tab} setTab={setTab} restaurant={restaurant} store={store} onKitchen={onKitchen} onCustomerView={onCustomerView} modules={modules} setModules={setModules} />
+            <DashTabContent tab={tab} setTab={setTab} restaurant={restaurant} store={store} onKitchen={onKitchen} onCustomerView={onCustomerView} modules={modules} setModules={setModules} vertical={V.id} />
           )}
         </div>
       </div>
@@ -1058,11 +1131,12 @@ function DashboardPage({ restaurant, onBack, onKitchen, onCustomerView, onFranch
   );
 }
 
-function DashTabContent({ tab, setTab, restaurant, store, onKitchen, onCustomerView, modules, setModules }) {
+function DashTabContent({ tab, setTab, restaurant, store, onKitchen, onCustomerView, modules, setModules, vertical }) {
   const tabDef = DASH_TABS.find((t) => t.id === tab);
   if (tabDef && tabDef.module !== "base" && !modules.includes(tabDef.module)) {
     return <LockedFeature module={tabDef.module} onManage={() => setTab("settings")} />;
   }
+  if (tab === "checkin") return <CheckinTab restaurant={restaurant} store={store} />;
   switch (tab) {
     case "setup": return <SetupTab restaurant={restaurant} store={store} setTab={setTab} />;
     case "overview": return <OverviewTab restaurant={restaurant} store={store} onKitchen={onKitchen} onCustomerView={onCustomerView} />;
@@ -2677,6 +2751,115 @@ function TrackingTab({ restaurant, store }) {
   );
 }
 
+/* ---- Check-in (hotel vertical) ---- */
+const CHECKIN_STATUS = {
+  arriving: { label: "Arrive", color: C.accentBlue },
+  in_house: { label: "En séjour", color: C.accentGreen },
+  departing: { label: "Départ", color: C.accentOrange },
+  checked_out: { label: "Parti", color: C.textTertiary },
+};
+function CheckinTab({ restaurant, store }) {
+  const toast = useToast();
+  const [list, setList] = useState([]);
+  const [filter, setFilter] = useState("all");
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ guest_name: "", email: "", room: "", guests: 1, checkin_date: "", checkout_date: "" });
+  const setF = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  const load = useCallback(async () => {
+    if (store.demoMode || !hasSupabase) { setList(DEMO_CHECKINS); return; }
+    const { data } = await supabase.from("checkins").select("*").eq("restaurant_id", restaurant.id).order("checkin_date", { ascending: true });
+    setList(data || []);
+  }, [restaurant.id, store.demoMode]);
+  useEffect(() => { load(); }, [load]);
+
+  const add = async () => {
+    if (!form.guest_name.trim() || !form.room) return toast("Nom et chambre requis", "error");
+    const row = { restaurant_id: restaurant.id, guest_name: form.guest_name.trim(), email: form.email || null, room: Number(form.room), guests: Number(form.guests) || 1, checkin_date: form.checkin_date || null, checkout_date: form.checkout_date || null, status: "arriving" };
+    if (store.demoMode || !hasSupabase) {
+      setList((p) => [...p, { ...row, id: uid() }]);
+      toast("(Démo) Réservation ajoutée", "success");
+    } else {
+      const { error } = await supabase.from("checkins").insert(row);
+      if (error) return toast(error.message, "error");
+      toast("Réservation ajoutée", "success");
+      load();
+    }
+    setAdding(false);
+    setForm({ guest_name: "", email: "", room: "", guests: 1, checkin_date: "", checkout_date: "" });
+  };
+  const setStatus = async (c, status) => {
+    if (store.demoMode || !hasSupabase) { setList((p) => p.map((x) => (x.id === c.id ? { ...x, status } : x))); return; }
+    const { error } = await supabase.from("checkins").update({ status }).eq("id", c.id);
+    if (error) return toast(error.message, "error");
+    load();
+  };
+
+  const counts = { arriving: 0, in_house: 0, departing: 0, checked_out: 0 };
+  list.forEach((c) => { counts[c.status] = (counts[c.status] || 0) + 1; });
+  const filtered = filter === "all" ? list : list.filter((c) => c.status === filter);
+
+  return (
+    <div>
+      <h2 style={{ ...FF, fontSize: 22, fontWeight: 800, marginBottom: 4 }}>🛎️ Check-in</h2>
+      <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginBottom: 16 }}>Gérez les arrivées, séjours et départs de vos clients — check-in et check-out en un clic.</p>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+        {[["all", "Tous", C.text], ["arriving", "Arrivées", C.accentBlue], ["in_house", "En séjour", C.accentGreen], ["departing", "Départs", C.accentOrange]].map(([id, lbl, col]) => (
+          <button key={id} onClick={() => setFilter(id)} style={{ ...FF, padding: "8px 14px", borderRadius: 999, fontWeight: 700, fontSize: 13, border: `1px solid ${filter === id ? col : C.border}`, background: filter === id ? col : C.surface, color: filter === id ? C.white : C.text }}>
+            {lbl}{id !== "all" ? ` (${counts[id] || 0})` : ""}
+          </button>
+        ))}
+        <Btn variant="primary" size="sm" style={{ marginLeft: "auto" }} onClick={() => setAdding((v) => !v)}>+ Réservation</Btn>
+      </div>
+
+      {adding && (
+        <Surface style={{ padding: 18, marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 180px" }}><InputField label="Nom du client" value={form.guest_name} onChange={(e) => setF("guest_name", e.target.value)} /></div>
+            <div style={{ flex: "1 1 100px" }}><InputField label="Chambre" type="number" min={1} value={form.room} onChange={(e) => setF("room", e.target.value)} /></div>
+            <div style={{ flex: "1 1 90px" }}><InputField label="Pers." type="number" min={1} value={form.guests} onChange={(e) => setF("guests", e.target.value)} /></div>
+            <div style={{ flex: "1 1 160px" }}><InputField label="Email (optionnel)" type="email" value={form.email} onChange={(e) => setF("email", e.target.value)} /></div>
+            <div style={{ flex: "1 1 140px" }}><InputField label="Arrivée" type="date" value={form.checkin_date} onChange={(e) => setF("checkin_date", e.target.value)} /></div>
+            <div style={{ flex: "1 1 140px" }}><InputField label="Départ" type="date" value={form.checkout_date} onChange={(e) => setF("checkout_date", e.target.value)} /></div>
+          </div>
+          <Btn variant="primary" onClick={add}>Ajouter</Btn>
+        </Surface>
+      )}
+
+      {filtered.length === 0 ? (
+        <Surface style={{ padding: 28, textAlign: "center" }}>
+          <div style={{ fontSize: 36 }}>🛎️</div>
+          <p style={{ ...FF, color: C.textSecondary, marginTop: 8 }}>Aucune réservation ici.</p>
+        </Surface>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {filtered.map((c) => {
+            const st = CHECKIN_STATUS[c.status] || CHECKIN_STATUS.arriving;
+            return (
+              <Surface key={c.id} style={{ padding: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: C.surfaceAlt, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", ...FF }}>
+                  <span style={{ fontSize: 10, color: C.textTertiary }}>Ch.</span>
+                  <strong style={{ fontSize: 16 }}>{c.room}</strong>
+                </div>
+                <div style={{ flex: "1 1 180px" }}>
+                  <strong style={{ ...FF }}>{c.guest_name}</strong>
+                  <div style={{ ...FF, fontSize: 12, color: C.textSecondary }}>{c.guests} pers.{c.checkin_date ? ` · ${c.checkin_date} → ${c.checkout_date || "?"}` : ""}{c.email ? ` · ${c.email}` : ""}</div>
+                </div>
+                <Tag color={st.color}>{st.label}</Tag>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {c.status === "arriving" && <Btn variant="primary" size="sm" onClick={() => setStatus(c, "in_house")}>Check-in ✓</Btn>}
+                  {(c.status === "in_house" || c.status === "departing") && <Btn variant="subtle" size="sm" onClick={() => setStatus(c, "checked_out")}>Check-out</Btn>}
+                </div>
+              </Surface>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---- Settings ---- */
 function SettingsTab({ restaurant, store, modules = ["base"], onModulesChange }) {
   const toast = useToast();
@@ -3143,9 +3326,10 @@ function CustomerPage({ slug, tableNum }) {
   useEffect(() => {
     (async () => {
       // Demo / offline
-      if (slug === "demo" || !hasSupabase) {
-        setRestaurant(DEMO_RESTAURANT);
-        setMenu(DEMO_MENU);
+      if (slug === "demo" || slug === "demo-hotel" || !hasSupabase) {
+        const hotel = slug === "demo-hotel";
+        setRestaurant(hotel ? DEMO_HOTEL : DEMO_RESTAURANT);
+        setMenu(hotel ? DEMO_HOTEL_MENU : DEMO_MENU);
         setTableId("t" + tableNum);
         setStep("ordertype");
         return;
@@ -3720,6 +3904,7 @@ function AppInner() {
   const customerMatch = path.match(/\/r\/([^/]+)\/t\/(\d+)/);
   const goMatch = path.match(/\/go\/([^/?#]+)/);
   const [view, setView] = useState({ page: "landing", restaurant: null });
+  const [vertical, setVertical] = useState("resto");
 
   useEffect(() => {
     if (user && view.page === "landing") setView({ page: "restaurants", restaurant: null });
@@ -3732,10 +3917,11 @@ function AppInner() {
 
   // Demo mode
   if (demoUser) {
-    if (view.page === "kitchen") return <KitchenView restaurant={DEMO_RESTAURANT} onExit={() => setView({ page: "dashboard", restaurant: DEMO_RESTAURANT })} />;
-    if (view.page === "customer") return <CustomerPage slug="demo" tableNum="1" />;
-    if (view.page === "franchise") return <FranchiseDashboard group={DEMO_GROUP} demoMode onExit={() => setView({ page: "dashboard", restaurant: DEMO_RESTAURANT })} />;
-    return <DashboardPage restaurant={DEMO_RESTAURANT} onBack={() => { setDemoUser(false); setView({ page: "landing" }); }} onKitchen={() => setView({ page: "kitchen" })} onCustomerView={() => setView({ page: "customer" })} onFranchise={() => setView({ page: "franchise" })} />;
+    const demoR = verticalOf(vertical).demo;
+    if (view.page === "kitchen") return <KitchenView restaurant={demoR} vertical={vertical} onExit={() => setView({ page: "dashboard", restaurant: demoR })} />;
+    if (view.page === "customer") return <CustomerPage slug={demoR.slug} tableNum="1" />;
+    if (view.page === "franchise") return <FranchiseDashboard group={DEMO_GROUP} demoMode onExit={() => setView({ page: "dashboard", restaurant: demoR })} />;
+    return <DashboardPage restaurant={demoR} vertical={vertical} onBack={() => { setDemoUser(false); setView({ page: "landing" }); }} onKitchen={() => setView({ page: "kitchen" })} onCustomerView={() => setView({ page: "customer" })} onFranchise={vertical === "resto" ? () => setView({ page: "franchise" }) : undefined} />;
   }
 
   // Authenticated
@@ -3763,7 +3949,7 @@ function AppInner() {
   if (view.page === "pricing") return <PricingPage onBack={() => setView({ page: "landing" })} onSignup={() => setView({ page: "signup" })} />;
   if (view.page === "login") return <SignupPage initialMode="login" onBack={() => setView({ page: "landing" })} onSuccess={() => setView({ page: "restaurants" })} />;
   if (view.page === "signup") return <SignupPage initialMode="signup" onBack={() => setView({ page: "landing" })} onSuccess={() => setView({ page: "restaurants" })} />;
-  return <LandingPage onDemo={() => setDemoUser(true)} onLogin={() => setView({ page: "login" })} onSignup={() => setView({ page: "signup" })} onPricing={() => setView({ page: "pricing" })} />;
+  return <LandingPage vertical={vertical} setVertical={setVertical} onDemo={() => setDemoUser(true)} onLogin={() => setView({ page: "login" })} onSignup={() => setView({ page: "signup" })} onPricing={() => setView({ page: "pricing" })} />;
 }
 
 export default function App() {
