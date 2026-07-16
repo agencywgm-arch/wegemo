@@ -202,20 +202,50 @@ const DEMO_HOTEL_MENU = [
   { id: "h5", restaurant_id: "demo-hotel", name: "Bouteille de Champagne", description: "Brut, 75cl", price: 65, category: "Boissons", emoji: "🍾", is_popular: false, available: true, stock: 6, supplements: [], extras: [] },
   { id: "h6", restaurant_id: "demo-hotel", name: "Café / Thé", description: "Sélection premium", price: 6, category: "Boissons", emoji: "☕", is_popular: true, available: true, stock: null, supplements: [], extras: [] },
 ];
+// Real hotel room numbers, by floor (rooms replace tables in the hotel vertical).
+const DEMO_HOTEL_ROOMS = [101, 102, 103, 104, 201, 202, 203, 204, 301, 302, 303, 304];
 const DEMO_HOTEL_ORDERS = [
   { id: "ho1", restaurant_id: "demo-hotel", table_id: "r204", status: "PENDING", note: "Sans gluten", total: 30, payment_method: "room", customer_name: "Ch. 204", order_type: "room_service", cash_collected: false, created_at: minsAgo(4), table: { number: 204 }, items: [{ name: "Club Sandwich", emoji: "🥪", quantity: 1 }, { name: "Café / Thé", emoji: "☕", quantity: 2 }] },
-  { id: "ho2", restaurant_id: "demo-hotel", table_id: "r512", status: "PREPARING", note: "", total: 65, payment_method: "room", customer_name: "Ch. 512", order_type: "room_service", cash_collected: false, created_at: minsAgo(9), table: { number: 512 }, items: [{ name: "Bouteille de Champagne", emoji: "🍾", quantity: 1 }] },
-  { id: "ho3", restaurant_id: "demo-hotel", table_id: "r108", status: "READY", note: "Livraison 8h", total: 22, payment_method: "room", customer_name: "Ch. 108", order_type: "room_service", cash_collected: false, created_at: minsAgo(15), table: { number: 108 }, items: [{ name: "Petit-déjeuner continental", emoji: "🥐", quantity: 1 }] },
+  { id: "ho2", restaurant_id: "demo-hotel", table_id: "r302", status: "PREPARING", note: "", total: 65, payment_method: "room", customer_name: "Ch. 302", order_type: "room_service", cash_collected: false, created_at: minsAgo(9), table: { number: 302 }, items: [{ name: "Bouteille de Champagne", emoji: "🍾", quantity: 1 }] },
+  { id: "ho3", restaurant_id: "demo-hotel", table_id: "r103", status: "READY", note: "Livraison 8h", total: 22, payment_method: "room", customer_name: "Ch. 103", order_type: "room_service", cash_collected: false, created_at: minsAgo(15), table: { number: 103 }, items: [{ name: "Petit-déjeuner continental", emoji: "🥐", quantity: 1 }] },
 ];
 const DEMO_HOTEL_DONE = [
   { id: "hd1", restaurant_id: "demo-hotel", status: "DONE", total: 42, payment_method: "room", created_at: minsAgo(90), table: { number: 301 } },
-  { id: "hd2", restaurant_id: "demo-hotel", status: "DONE", total: 18, payment_method: "card", created_at: minsAgo(180), table: { number: 210 } },
+  { id: "hd2", restaurant_id: "demo-hotel", status: "DONE", total: 18, payment_method: "card", created_at: minsAgo(180), table: { number: 202 } },
 ];
 const DEMO_CHECKINS = [
   { id: "ck1", restaurant_id: "demo-hotel", guest_name: "Léa Martin", email: "lea@example.com", room: 204, guests: 2, checkin_date: "2026-07-16", checkout_date: "2026-07-19", status: "in_house" },
-  { id: "ck2", restaurant_id: "demo-hotel", guest_name: "Tom Bernard", email: "", room: 108, guests: 1, checkin_date: "2026-07-16", checkout_date: "2026-07-17", status: "arriving" },
+  { id: "ck2", restaurant_id: "demo-hotel", guest_name: "Tom Bernard", email: "", room: 103, guests: 1, checkin_date: "2026-07-16", checkout_date: "2026-07-17", status: "arriving" },
   { id: "ck3", restaurant_id: "demo-hotel", guest_name: "Sarah Cohen", email: "sarah@example.com", room: 301, guests: 2, checkin_date: "2026-07-12", checkout_date: "2026-07-16", status: "departing" },
 ];
+
+/* Guest-portal content (what a guest sees after scanning the room QR). */
+const HOTEL_SERVICES = [
+  { id: "spa", emoji: "🧖", name: "Spa & Massage", desc: "Massage 60 min en cabine ou en chambre", price: 90, cta: "Réserver un créneau" },
+  { id: "pool", emoji: "🏊", name: "Piscine & Sauna", desc: "Accès inclus · 7h – 22h", price: 0, cta: "Voir les horaires" },
+  { id: "pressing", emoji: "👔", name: "Pressing", desc: "Déposé avant 9h, rendu le soir même", price: 15, cta: "Demander un retrait" },
+  { id: "menage", emoji: "🧹", name: "Ménage supplémentaire", desc: "Passage de l'équipe dans l'heure", price: 0, cta: "Demander" },
+  { id: "serviettes", emoji: "🛁", name: "Serviettes & oreillers", desc: "Livrés à votre porte", price: 0, cta: "Demander" },
+  { id: "reveil", emoji: "⏰", name: "Réveil téléphonique", desc: "Choisissez votre horaire", price: 0, cta: "Programmer" },
+  { id: "taxi", emoji: "🚕", name: "Taxi / Transfert", desc: "Réservation par la réception", price: 0, cta: "Commander un taxi" },
+  { id: "late", emoji: "🕐", name: "Late check-out", desc: "Départ jusqu'à 15h (selon dispo)", price: 25, cta: "Demander" },
+];
+const HOTEL_EVENTS = [
+  { id: "ev1", emoji: "🎷", title: "Jazz au Caveau", when: "Ce soir · 20h30", dist: "400 m", tag: "Concert", desc: "Quartet live, entrée libre pour nos clients." },
+  { id: "ev2", emoji: "🖼️", title: "Expo Monet — Musée d'Orsay", when: "Jusqu'au 30 juil.", dist: "1,2 km", tag: "Expo", desc: "Coupe-file offert sur présentation de la clé." },
+  { id: "ev3", emoji: "🥐", title: "Marché couvert Saint-Germain", when: "Demain · 8h – 13h", dist: "600 m", tag: "Marché", desc: "Producteurs locaux, idéal pour un brunch." },
+  { id: "ev4", emoji: "🍷", title: "La Cave d'Auguste — partenaire", when: "Tous les jours", dist: "250 m", tag: "-10%", desc: "10% pour les clients de l'hôtel sur le menu dégustation." },
+  { id: "ev5", emoji: "🚲", title: "Balade guidée à vélo", when: "Sam. · 10h", dist: "Départ hall", tag: "Activité", desc: "2h le long de la Seine, casques fournis — 18€." },
+];
+const HOTEL_INFO = [
+  { emoji: "📶", label: "Wi-Fi", value: "Réseau « HotelDemo » · code SEJOUR2026" },
+  { emoji: "🥐", label: "Petit-déjeuner", value: "7h – 10h30 · Salle Verrière (RDC)" },
+  { emoji: "🕛", label: "Check-out", value: "Jusqu'à 12h · late check-out sur demande" },
+  { emoji: "☎️", label: "Réception", value: "24h/24 · composez le 9 depuis la chambre" },
+  { emoji: "🅿️", label: "Parking", value: "Souterrain · 28€/nuit · hauteur max 1,90 m" },
+  { emoji: "🏋️", label: "Salle de sport", value: "Niveau -1 · 6h – 23h · accès avec la clé" },
+];
+const ID_TYPES = ["Carte d'identité", "Passeport", "Permis de conduire", "Titre de séjour"];
 
 /* Vertical config — Wegemo (restaurant) vs Wegemo Hôtel. Same tooling, adapted
  * wording, demo dataset and extra tabs. */
@@ -354,8 +384,11 @@ function useStore(restaurantId) {
       setMenu(isHotelDemo ? DEMO_HOTEL_MENU : DEMO_MENU);
       setOrders(isHotelDemo ? DEMO_HOTEL_ORDERS : DEMO_ORDERS);
       setDoneOrders(isHotelDemo ? DEMO_HOTEL_DONE : DEMO_DONE_ORDERS);
-      const roomCount = (isHotelDemo ? DEMO_HOTEL : DEMO_RESTAURANT).tables_count;
-      setTables(Array.from({ length: roomCount }, (_, i) => ({ id: `t${i + 1}`, number: i + 1 })));
+      setTables(
+        isHotelDemo
+          ? DEMO_HOTEL_ROOMS.map((n) => ({ id: `r${n}`, number: n }))
+          : Array.from({ length: DEMO_RESTAURANT.tables_count }, (_, i) => ({ id: `t${i + 1}`, number: i + 1 }))
+      );
       setIngredients(DEMO_INGREDIENTS);
       setPromos(DEMO_PROMOS);
       setCustomers(DEMO_CUSTOMERS);
@@ -1456,6 +1489,8 @@ function RegisterTab({ restaurant, store }) {
 /* ---- QR Codes ---- */
 function QRTab({ restaurant, store }) {
   const toast = useToast();
+  const isHotel = restaurant.vertical === "hotel" || restaurant.id === "demo-hotel";
+  const unit = isHotel ? "Chambre" : "Table";
   const origin = window.location.origin + (import.meta.env.VITE_BASE_PATH && import.meta.env.VITE_BASE_PATH !== "/" ? import.meta.env.VITE_BASE_PATH.replace(/\/$/, "") : "");
   const [fg, setFg] = useState("#1D1D1F");
   const [bg, setBg] = useState("#FFFFFF");
@@ -1467,7 +1502,7 @@ function QRTab({ restaurant, store }) {
     if (!canvas) return;
     const a = document.createElement("a");
     a.href = canvas.toDataURL("image/png");
-    a.download = `qr-${restaurant.slug}-table-${num}.png`;
+    a.download = `qr-${restaurant.slug}-${isHotel ? "chambre" : "table"}-${num}.png`;
     a.click();
     toast("QR téléchargé", "success");
   };
@@ -1476,7 +1511,12 @@ function QRTab({ restaurant, store }) {
 
   return (
     <div>
-      <h2 style={{ ...FF, fontSize: 22, fontWeight: 800, marginBottom: 14 }}>🔳 QR Codes par table</h2>
+      <h2 style={{ ...FF, fontSize: 22, fontWeight: 800, marginBottom: 14 }}>🔳 QR Codes par {unit.toLowerCase()}</h2>
+      {isHotel && (
+        <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginBottom: 14 }}>
+          Collez le QR sur la porte ou le bureau de chaque chambre : le client accède au <b>portail chambre</b> — check-in en ligne, room service, services de l'hôtel et bons plans autour.
+        </p>
+      )}
       <Surface style={{ padding: 16, marginBottom: 16, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
         <label style={{ ...FF, fontSize: 13 }}>Couleur <input type="color" value={fg} onChange={(e) => setFg(e.target.value)} /></label>
         <label style={{ ...FF, fontSize: 13 }}>Fond <input type="color" value={bg} onChange={(e) => setBg(e.target.value)} /></label>
@@ -1486,7 +1526,7 @@ function QRTab({ restaurant, store }) {
           const url = `${origin}/r/${restaurant.slug}/t/${tb.number}`;
           return (
             <Surface key={tb.id} style={{ padding: 16, textAlign: "center" }}>
-              <strong style={{ ...FF }}>{tb.label || `Table ${tb.number}`}</strong>
+              <strong style={{ ...FF }}>{tb.label || `${unit} ${tb.number}`}</strong>
               <div style={{ display: "flex", justifyContent: "center", margin: "10px 0" }}>
                 <QRCanvas value={url} size={150} fg={fg} bg={bg} onReady={(c) => (canvasRefs.current[tb.number] = c)} />
               </div>
@@ -2767,7 +2807,11 @@ function CheckinTab({ restaurant, store }) {
   const setF = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
   const load = useCallback(async () => {
-    if (store.demoMode || !hasSupabase) { setList(DEMO_CHECKINS); return; }
+    if (store.demoMode || !hasSupabase) {
+      // Merge seeded demo stays with self check-ins done from the guest portal.
+      setList([...DEMO_CHECKINS, ...readGuestCheckins()]);
+      return;
+    }
     const { data } = await supabase.from("checkins").select("*").eq("restaurant_id", restaurant.id).order("checkin_date", { ascending: true });
     setList(data || []);
   }, [restaurant.id, store.demoMode]);
@@ -2789,7 +2833,11 @@ function CheckinTab({ restaurant, store }) {
     setForm({ guest_name: "", email: "", room: "", guests: 1, checkin_date: "", checkout_date: "" });
   };
   const setStatus = async (c, status) => {
-    if (store.demoMode || !hasSupabase) { setList((p) => p.map((x) => (x.id === c.id ? { ...x, status } : x))); return; }
+    if (store.demoMode || !hasSupabase) {
+      setList((p) => p.map((x) => (x.id === c.id ? { ...x, status } : x)));
+      writeGuestCheckins(readGuestCheckins().map((x) => (x.id === c.id ? { ...x, status } : x)));
+      return;
+    }
     const { error } = await supabase.from("checkins").update({ status }).eq("id", c.id);
     if (error) return toast(error.message, "error");
     load();
@@ -2845,7 +2893,15 @@ function CheckinTab({ restaurant, store }) {
                 <div style={{ flex: "1 1 180px" }}>
                   <strong style={{ ...FF }}>{c.guest_name}</strong>
                   <div style={{ ...FF, fontSize: 12, color: C.textSecondary }}>{c.guests} pers.{c.checkin_date ? ` · ${c.checkin_date} → ${c.checkout_date || "?"}` : ""}{c.email ? ` · ${c.email}` : ""}</div>
+                  {(c.id_type || c.access_code) && (
+                    <div style={{ ...FF, fontSize: 11.5, color: C.textTertiary, marginTop: 2 }}>
+                      {c.id_type ? `${c.id_type} n° ${c.id_number || "—"}${c.id_provided ? " ✅" : ""}` : ""}
+                      {c.access_code ? ` · code ${c.access_code}` : ""}
+                      {c.arrival_time ? ` · arrivée ${c.arrival_time}` : ""}
+                    </div>
+                  )}
                 </div>
+                {c.access_code && <Tag color={C.accentBlue}>📲 en ligne</Tag>}
                 <Tag color={st.color}>{st.label}</Tag>
                 <div style={{ display: "flex", gap: 6 }}>
                   {c.status === "arriving" && <Btn variant="primary" size="sm" onClick={() => setStatus(c, "in_house")}>Check-in ✓</Btn>}
@@ -3279,6 +3335,460 @@ function FranchiseTeam({ group, demoMode, members, setMembers }) {
             <Tag color={m.role === "cuisine" ? C.accentOrange : C.accentBlue}>{m.role}</Tag>
           </Surface>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================================
+ * HOTEL GUEST PORTAL — scanned from the room QR (fully offline demo).
+ * Not a menu: a hub of large blocks (check-in, room service, hotel services,
+ * around the hotel, infos, concierge). Self check-in mirrors Booking/Airbnb
+ * online check-in and feeds the dashboard Check-in board via localStorage.
+ * ==========================================================================*/
+const DEMO_CHECKIN_LS = "wgm_demo_checkins";
+const readGuestCheckins = () => { try { return JSON.parse(localStorage.getItem(DEMO_CHECKIN_LS) || "[]"); } catch { return []; } };
+const writeGuestCheckins = (list) => { try { localStorage.setItem(DEMO_CHECKIN_LS, JSON.stringify(list)); } catch { /* storage unavailable */ } };
+
+function HotelGuestPortal({ room }) {
+  const toast = useToast();
+  const hotel = DEMO_HOTEL;
+  const today = new Date().toISOString().slice(0, 10);
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+
+  const [view, setView] = useState("home");
+  const [cart, setCart] = useState([]);           // room service cart [{item, qty}]
+  const [orders, setOrders] = useState([]);       // placed room-service orders
+  const [requests, setRequests] = useState([]);   // service/concierge requests
+  const [checkin, setCheckin] = useState(() => readGuestCheckins().find((c) => String(c.room) === String(room)) || null);
+  const [msg, setMsg] = useState("");
+
+  const total = cart.reduce((s, c) => s + c.item.price * c.qty, 0);
+  const addItem = (item) => {
+    setCart((p) => {
+      const ex = p.find((c) => c.item.id === item.id);
+      return ex ? p.map((c) => (c.item.id === item.id ? { ...c, qty: c.qty + 1 } : c)) : [...p, { item, qty: 1 }];
+    });
+  };
+  const decItem = (item) => {
+    setCart((p) => p.map((c) => (c.item.id === item.id ? { ...c, qty: c.qty - 1 } : c)).filter((c) => c.qty > 0));
+  };
+
+  const placeOrder = (method) => {
+    const o = { id: uid(), items: cart, total, method, status: "Reçue ✓", at: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) };
+    setOrders((p) => [o, ...p]);
+    setCart([]);
+    setView("room");
+    toast(method === "room" ? `Commande envoyée — facturée sur la chambre ${room}` : "Commande envoyée — paiement à la livraison", "success");
+    // Simulate the kitchen advancing the order (demo realism).
+    setTimeout(() => setOrders((p) => p.map((x) => (x.id === o.id ? { ...x, status: "En préparation 👨‍🍳" } : x))), 8000);
+    setTimeout(() => setOrders((p) => p.map((x) => (x.id === o.id ? { ...x, status: "En route vers votre chambre 🛎️" } : x))), 22000);
+  };
+
+  const addRequest = (label) => {
+    setRequests((p) => [{ id: uid(), label, status: "Transmis à la réception ✓", at: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) }, ...p]);
+    toast("Demande transmise à la réception", "success");
+  };
+
+  const header = (title, back = "home") => (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+      <Btn variant="subtle" size="sm" onClick={() => setView(back)}>←</Btn>
+      <h2 style={{ ...FF, fontWeight: 800, fontSize: 19 }}>{title}</h2>
+    </div>
+  );
+
+  /* ---------- HOME (hub of large blocks) ---------- */
+  const tiles = [
+    !checkin && { id: "checkin", emoji: "🛎️", title: "Check-in en ligne", sub: "2 min — évitez l'attente à la réception", big: true, color: C.accentBlue },
+    { id: "room", emoji: "🍽️", title: "Room service", sub: "Carte, boissons, petit-déjeuner", badge: orders.length ? `${orders.length} commande${orders.length > 1 ? "s" : ""}` : null },
+    { id: "services", emoji: "🧖", title: "Services de l'hôtel", sub: "Spa, pressing, ménage, réveil…" },
+    { id: "around", emoji: "📍", title: "Autour de vous", sub: "Événements, bons plans, partenaires" },
+    { id: "info", emoji: "ℹ️", title: "Infos pratiques", sub: "Wi-Fi, petit-déj, check-out, parking" },
+    { id: "concierge", emoji: "💬", title: "Conciergerie", sub: "Une demande ? On s'en occupe", badge: requests.length ? `${requests.length}` : null },
+  ].filter(Boolean);
+
+  if (view === "home") {
+    return (
+      <div style={{ minHeight: "100vh", background: C.bg }}>
+        <div style={{ maxWidth: 560, margin: "0 auto", padding: 16 }}>
+          {/* Hero */}
+          <div style={{ background: `linear-gradient(135deg, ${C.dark}, #3A3A3C)`, borderRadius: 20, padding: "26px 20px", color: C.white, marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ fontSize: 34 }}>{hotel.logo_emoji}</div>
+              <span style={{ ...FF, fontSize: 13, fontWeight: 800, background: "rgba(255,255,255,.15)", padding: "6px 14px", borderRadius: 999 }}>Chambre {room}</span>
+            </div>
+            <h1 style={{ ...FF, fontSize: 24, fontWeight: 900, margin: "12px 0 4px" }}>{hotel.name}</h1>
+            <p style={{ ...FF, fontSize: 14, opacity: 0.75 }}>
+              {checkin ? `Bon séjour, ${checkin.guest_name.split(" ")[0]} — vous êtes enregistré ✓` : "Bienvenue ! Toute votre chambre, depuis votre téléphone."}
+            </p>
+          </div>
+
+          {/* Tiles */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {tiles.map((t) => (
+              <button key={t.id} onClick={() => setView(t.id)} style={{
+                ...FF, textAlign: "left", cursor: "pointer", border: `1px solid ${C.border}`,
+                gridColumn: t.big ? "1 / -1" : "auto",
+                background: t.big ? t.color : C.surface, color: t.big ? C.white : C.text,
+                borderRadius: 18, padding: t.big ? "20px 18px" : "18px 14px", position: "relative",
+                boxShadow: "0 2px 8px rgba(0,0,0,.05)",
+              }}>
+                <div style={{ fontSize: t.big ? 32 : 28 }}>{t.emoji}</div>
+                <div style={{ fontWeight: 800, fontSize: t.big ? 18 : 15, marginTop: 8 }}>{t.title}</div>
+                <div style={{ fontSize: 12.5, marginTop: 2, color: t.big ? "rgba(255,255,255,.8)" : C.textSecondary }}>{t.sub}</div>
+                {t.badge && <span style={{ position: "absolute", top: 12, right: 12, background: C.accent, color: C.white, fontSize: 11, fontWeight: 800, padding: "3px 9px", borderRadius: 999 }}>{t.badge}</span>}
+              </button>
+            ))}
+          </div>
+
+          {/* Live activity */}
+          {(orders.length > 0 || requests.length > 0) && (
+            <Surface style={{ padding: 16, marginTop: 14 }}>
+              <strong style={{ ...FF, fontSize: 14 }}>🕑 En cours</strong>
+              {orders.map((o) => (
+                <div key={o.id} style={{ ...FF, fontSize: 13, display: "flex", justifyContent: "space-between", gap: 8, marginTop: 8 }}>
+                  <span>🍽️ {o.items.map((c) => `${c.qty}× ${c.item.name}`).join(", ")}</span>
+                  <span style={{ color: C.accentBlue, fontWeight: 700, whiteSpace: "nowrap" }}>{o.status}</span>
+                </div>
+              ))}
+              {requests.map((r) => (
+                <div key={r.id} style={{ ...FF, fontSize: 13, display: "flex", justifyContent: "space-between", gap: 8, marginTop: 8 }}>
+                  <span>💬 {r.label}</span>
+                  <span style={{ color: C.accentGreen, fontWeight: 700, whiteSpace: "nowrap" }}>{r.status}</span>
+                </div>
+              ))}
+            </Surface>
+          )}
+
+          <p style={{ ...FF, textAlign: "center", fontSize: 12, color: C.textTertiary, margin: "18px 0 6px" }}>
+            Réception 24h/24 — composez le 9 · Propulsé par Wegemo Hôtel
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------- CHECK-IN (Booking/Airbnb-style wizard) ---------- */
+  if (view === "checkin") {
+    return <HotelCheckinWizard room={room} hotel={hotel} today={today} tomorrow={tomorrow} existing={checkin}
+      onDone={(entry) => { setCheckin(entry); }} onBack={() => setView("home")} />;
+  }
+
+  /* ---------- ROOM SERVICE ---------- */
+  if (view === "room") {
+    const cats = [...new Set(DEMO_HOTEL_MENU.map((m) => m.category))];
+    return (
+      <div style={{ minHeight: "100vh", background: C.bg }}>
+        <div style={{ maxWidth: 560, margin: "0 auto", padding: 16, paddingBottom: cart.length ? 120 : 16 }}>
+          {header("🍽️ Room service")}
+          {orders.length > 0 && (
+            <Surface style={{ padding: 14, marginBottom: 14 }}>
+              {orders.map((o) => (
+                <div key={o.id} style={{ ...FF, fontSize: 13, display: "flex", justifyContent: "space-between", gap: 8, padding: "4px 0" }}>
+                  <span>{o.at} · {eur(o.total)} {o.method === "room" ? "· sur la note" : "· à la livraison"}</span>
+                  <span style={{ color: C.accentBlue, fontWeight: 700 }}>{o.status}</span>
+                </div>
+              ))}
+            </Surface>
+          )}
+          {cats.map((cat) => (
+            <div key={cat} style={{ marginBottom: 18 }}>
+              <h3 style={{ ...FF, fontSize: 15, fontWeight: 800, margin: "0 0 8px 4px", color: C.textSecondary }}>{cat}</h3>
+              {DEMO_HOTEL_MENU.filter((m) => m.category === cat).map((m) => {
+                const inCart = cart.find((c) => c.item.id === m.id);
+                return (
+                  <Surface key={m.id} style={{ padding: 14, marginBottom: 8, display: "flex", alignItems: "center", gap: 12 }}>
+                    <span style={{ fontSize: 28 }}>{m.emoji}</span>
+                    <div style={{ flex: 1 }}>
+                      <strong style={{ ...FF, fontSize: 14 }}>{m.name}</strong>
+                      <div style={{ ...FF, fontSize: 12, color: C.textSecondary }}>{m.description}</div>
+                      <div style={{ ...FF, fontSize: 13, fontWeight: 800, marginTop: 2 }}>{eur(m.price)}</div>
+                    </div>
+                    {inCart ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <button onClick={() => decItem(m)} style={{ ...FF, width: 30, height: 30, borderRadius: 999, border: `1px solid ${C.borderStrong}`, background: C.surface, fontWeight: 800 }}>−</button>
+                        <strong style={{ ...FF }}>{inCart.qty}</strong>
+                        <button onClick={() => addItem(m)} style={{ ...FF, width: 30, height: 30, borderRadius: 999, border: "none", background: C.dark, color: C.white, fontWeight: 800 }}>+</button>
+                      </div>
+                    ) : (
+                      <Btn variant="subtle" size="sm" onClick={() => addItem(m)}>+ Ajouter</Btn>
+                    )}
+                  </Surface>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+        {cart.length > 0 && (
+          <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: C.surface, borderTop: `1px solid ${C.border}`, padding: 14 }}>
+            <div style={{ maxWidth: 560, margin: "0 auto" }}>
+              <div style={{ ...FF, display: "flex", justifyContent: "space-between", fontWeight: 800, marginBottom: 10 }}>
+                <span>{cart.reduce((s, c) => s + c.qty, 0)} article(s)</span><span>{eur(total)}</span>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Btn variant="primary" size="md" style={{ flex: 1, opacity: checkin ? 1 : 0.45 }} onClick={() => (checkin ? placeOrder("room") : toast("Faites d'abord votre check-in pour la facturation chambre", "error"))}>
+                  🛏️ Sur la note — Ch. {room}
+                </Btn>
+                <Btn variant="blue" size="md" style={{ flex: 1 }} onClick={() => placeOrder("card")}>💳 À la livraison</Btn>
+              </div>
+              {!checkin && <p style={{ ...FF, fontSize: 11.5, color: C.textTertiary, marginTop: 6, textAlign: "center" }}>« Sur la note » disponible après votre check-in en ligne ✅</p>}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /* ---------- HOTEL SERVICES ---------- */
+  if (view === "services") {
+    return (
+      <div style={{ minHeight: "100vh", background: C.bg }}>
+        <div style={{ maxWidth: 560, margin: "0 auto", padding: 16 }}>
+          {header("🧖 Services de l'hôtel")}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {HOTEL_SERVICES.map((s) => (
+              <Surface key={s.id} style={{ padding: 16, display: "flex", flexDirection: "column" }}>
+                <div style={{ fontSize: 28 }}>{s.emoji}</div>
+                <strong style={{ ...FF, fontSize: 14, marginTop: 6 }}>{s.name}</strong>
+                <div style={{ ...FF, fontSize: 12, color: C.textSecondary, marginTop: 2, flex: 1 }}>{s.desc}</div>
+                <div style={{ ...FF, fontSize: 13, fontWeight: 800, margin: "8px 0" }}>{s.price > 0 ? eur(s.price) : "Inclus"}</div>
+                <Btn variant="subtle" size="sm" onClick={() => addRequest(`${s.emoji} ${s.name}`)}>{s.cta}</Btn>
+              </Surface>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------- AROUND ---------- */
+  if (view === "around") {
+    return (
+      <div style={{ minHeight: "100vh", background: C.bg }}>
+        <div style={{ maxWidth: 560, margin: "0 auto", padding: 16 }}>
+          {header("📍 Autour de vous")}
+          <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginBottom: 14 }}>Sélection de la réception — événements et partenaires du quartier.</p>
+          {HOTEL_EVENTS.map((ev) => (
+            <Surface key={ev.id} style={{ padding: 16, marginBottom: 10 }}>
+              <div style={{ display: "flex", gap: 12 }}>
+                <span style={{ fontSize: 30 }}>{ev.emoji}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <strong style={{ ...FF, fontSize: 15 }}>{ev.title}</strong>
+                    <Tag color={C.accentPurple}>{ev.tag}</Tag>
+                  </div>
+                  <div style={{ ...FF, fontSize: 12.5, color: C.textSecondary, marginTop: 2 }}>{ev.when} · {ev.dist}</div>
+                  <p style={{ ...FF, fontSize: 13, marginTop: 6 }}>{ev.desc}</p>
+                  <Btn variant="subtle" size="sm" style={{ marginTop: 8 }} onClick={() => addRequest(`${ev.emoji} Réservation « ${ev.title} »`)}>Réserver via la réception</Btn>
+                </div>
+              </div>
+            </Surface>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------- INFO ---------- */
+  if (view === "info") {
+    return (
+      <div style={{ minHeight: "100vh", background: C.bg }}>
+        <div style={{ maxWidth: 560, margin: "0 auto", padding: 16 }}>
+          {header("ℹ️ Infos pratiques")}
+          {HOTEL_INFO.map((i) => (
+            <Surface key={i.label} style={{ padding: 14, marginBottom: 8, display: "flex", gap: 12, alignItems: "center" }}>
+              <span style={{ fontSize: 24 }}>{i.emoji}</span>
+              <div>
+                <strong style={{ ...FF, fontSize: 14 }}>{i.label}</strong>
+                <div style={{ ...FF, fontSize: 13, color: C.textSecondary }}>{i.value}</div>
+              </div>
+            </Surface>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------- CONCIERGE ---------- */
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg }}>
+      <div style={{ maxWidth: 560, margin: "0 auto", padding: 16 }}>
+        {header("💬 Conciergerie")}
+        <Surface style={{ padding: 16, marginBottom: 14 }}>
+          <strong style={{ ...FF, fontSize: 14 }}>Demandes rapides</strong>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+            {["🛁 Serviettes", "🛏️ Oreiller supplémentaire", "🧹 Ménage", "⏰ Réveil 7h", "🚕 Taxi pour 9h", "🍼 Lit bébé"].map((q) => (
+              <button key={q} onClick={() => addRequest(q)} style={{ ...FF, padding: "9px 14px", borderRadius: 999, border: `1px solid ${C.borderStrong}`, background: C.surface, fontWeight: 600, fontSize: 13 }}>{q}</button>
+            ))}
+          </div>
+        </Surface>
+        <Surface style={{ padding: 16, marginBottom: 14 }}>
+          <strong style={{ ...FF, fontSize: 14 }}>Message à la réception</strong>
+          <textarea value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="Ex : peut-on dîner tard ce soir ?" style={{ ...FF, width: "100%", minHeight: 80, padding: 12, borderRadius: 12, border: `1px solid ${C.borderStrong}`, outline: "none", marginTop: 10 }} />
+          <Btn variant="primary" style={{ marginTop: 8 }} onClick={() => { if (msg.trim()) { addRequest(`✉️ « ${msg.trim()} »`); setMsg(""); } }}>Envoyer</Btn>
+        </Surface>
+        {requests.length > 0 && (
+          <Surface style={{ padding: 16 }}>
+            <strong style={{ ...FF, fontSize: 14 }}>Vos demandes</strong>
+            {requests.map((r) => (
+              <div key={r.id} style={{ ...FF, fontSize: 13, display: "flex", justifyContent: "space-between", gap: 8, marginTop: 8 }}>
+                <span>{r.at} · {r.label}</span>
+                <span style={{ color: C.accentGreen, fontWeight: 700, whiteSpace: "nowrap" }}>{r.status}</span>
+              </div>
+            ))}
+          </Surface>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* Self check-in wizard — the flow guests know from Booking/Airbnb online
+ * check-in: stay → identity → ID document → consent+signature → access code. */
+function HotelCheckinWizard({ room, hotel, today, tomorrow, existing, onDone, onBack }) {
+  const toast = useToast();
+  const [step, setStep] = useState(existing ? 5 : 1);
+  const [form, setForm] = useState({
+    checkin_date: today, checkout_date: tomorrow, arrival_time: "15h - 17h", guests: 2,
+    guest_name: "", email: "", phone: "", nationality: "Française", birthdate: "",
+    id_type: ID_TYPES[0], id_number: "", id_file: null,
+    notes: "", consent: false, signature: "",
+  });
+  const [entry, setEntry] = useState(existing);
+  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  const submit = () => {
+    const e = {
+      id: uid(), restaurant_id: "demo-hotel", guest_name: form.guest_name.trim(), email: form.email,
+      phone: form.phone, room: Number(room), guests: Number(form.guests) || 1,
+      checkin_date: form.checkin_date, checkout_date: form.checkout_date, arrival_time: form.arrival_time,
+      nationality: form.nationality, birthdate: form.birthdate,
+      id_type: form.id_type, id_number: form.id_number, id_provided: !!form.id_file,
+      notes: form.notes, status: "arriving",
+      access_code: `WGM-${room}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+    };
+    const list = readGuestCheckins().filter((c) => String(c.room) !== String(room));
+    writeGuestCheckins([...list, e]);
+    setEntry(e);
+    onDone(e);
+    setStep(5);
+    toast("Check-in enregistré !", "success");
+  };
+
+  const bar = (
+    <div style={{ display: "flex", gap: 5, margin: "0 0 18px" }}>
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} style={{ flex: 1, height: 5, borderRadius: 99, background: i <= Math.min(step, 4) ? C.accentBlue : C.border }} />
+      ))}
+    </div>
+  );
+  const next = (cond, msgTxt) => () => (cond ? setStep((s) => s + 1) : toast(msgTxt, "error"));
+  const selectStyle = { ...FF, width: "100%", padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.borderStrong}`, background: C.surface };
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg }}>
+      <div style={{ maxWidth: 560, margin: "0 auto", padding: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <Btn variant="subtle" size="sm" onClick={step > 1 && step < 5 ? () => setStep((s) => s - 1) : onBack}>←</Btn>
+          <h2 style={{ ...FF, fontWeight: 800, fontSize: 19 }}>🛎️ Check-in en ligne — Chambre {room}</h2>
+        </div>
+        {step < 5 && bar}
+
+        {step === 1 && (
+          <Surface style={{ padding: 18 }}>
+            <strong style={{ ...FF }}>1 · Votre séjour</strong>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
+              <div style={{ flex: "1 1 140px" }}><InputField label="Arrivée" type="date" value={form.checkin_date} onChange={(e) => set("checkin_date", e.target.value)} /></div>
+              <div style={{ flex: "1 1 140px" }}><InputField label="Départ" type="date" value={form.checkout_date} onChange={(e) => set("checkout_date", e.target.value)} /></div>
+            </div>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 160px" }}>
+                <label style={{ ...FF, display: "block", fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Heure d'arrivée estimée</label>
+                <select value={form.arrival_time} onChange={(e) => set("arrival_time", e.target.value)} style={selectStyle}>
+                  {["Avant 15h", "15h - 17h", "17h - 19h", "19h - 22h", "Après 22h"].map((h) => <option key={h}>{h}</option>)}
+                </select>
+              </div>
+              <div style={{ flex: "1 1 110px" }}><InputField label="Voyageurs" type="number" min={1} value={form.guests} onChange={(e) => set("guests", e.target.value)} /></div>
+            </div>
+            <Btn variant="primary" size="lg" style={{ width: "100%" }} onClick={next(form.checkin_date && form.checkout_date, "Dates requises")}>Continuer</Btn>
+          </Surface>
+        )}
+
+        {step === 2 && (
+          <Surface style={{ padding: 18 }}>
+            <strong style={{ ...FF }}>2 · Vos coordonnées</strong>
+            <div style={{ marginTop: 12 }}>
+              <InputField label="Nom complet (titulaire de la réservation)" placeholder="Léa Martin" value={form.guest_name} onChange={(e) => set("guest_name", e.target.value)} />
+              <InputField label="Email" type="email" placeholder="lea@exemple.com" value={form.email} onChange={(e) => set("email", e.target.value)} />
+              <InputField label="Téléphone" type="tel" placeholder="+33 6 12 34 56 78" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ flex: "1 1 150px" }}><InputField label="Nationalité" value={form.nationality} onChange={(e) => set("nationality", e.target.value)} /></div>
+                <div style={{ flex: "1 1 150px" }}><InputField label="Date de naissance" type="date" value={form.birthdate} onChange={(e) => set("birthdate", e.target.value)} /></div>
+              </div>
+            </div>
+            <Btn variant="primary" size="lg" style={{ width: "100%" }} onClick={next(form.guest_name.trim() && form.email, "Nom et email requis")}>Continuer</Btn>
+          </Surface>
+        )}
+
+        {step === 3 && (
+          <Surface style={{ padding: 18 }}>
+            <strong style={{ ...FF }}>3 · Pièce d'identité</strong>
+            <p style={{ ...FF, fontSize: 12.5, color: C.textSecondary, marginTop: 6 }}>Obligatoire pour la fiche de police (comme sur Booking.com / Airbnb). Vos données restent chez l'hôtelier.</p>
+            <div style={{ marginTop: 12 }}>
+              <label style={{ ...FF, display: "block", fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Type de document</label>
+              <select value={form.id_type} onChange={(e) => set("id_type", e.target.value)} style={{ ...selectStyle, marginBottom: 14 }}>
+                {ID_TYPES.map((t2) => <option key={t2}>{t2}</option>)}
+              </select>
+              <InputField label="Numéro du document" placeholder="ex : 123456789012" value={form.id_number} onChange={(e) => set("id_number", e.target.value)} />
+              <label style={{ ...FF, display: "block", fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Photo du document</label>
+              <label style={{ ...FF, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, border: `2px dashed ${form.id_file ? C.accentGreen : C.borderStrong}`, borderRadius: 14, padding: 22, cursor: "pointer", background: form.id_file ? "#EAF7EE" : C.surfaceAlt }}>
+                <span style={{ fontSize: 28 }}>{form.id_file ? "✅" : "📷"}</span>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>{form.id_file ? form.id_file.name : "Prendre en photo ou importer"}</span>
+                <span style={{ fontSize: 11.5, color: C.textTertiary }}>JPG, PNG ou PDF — recto suffisant</span>
+                <input type="file" accept="image/*,.pdf" capture="environment" style={{ display: "none" }} onChange={(e) => set("id_file", e.target.files?.[0] || null)} />
+              </label>
+            </div>
+            <Btn variant="primary" size="lg" style={{ width: "100%", marginTop: 16 }} onClick={next(form.id_number.trim(), "Numéro de document requis")}>Continuer</Btn>
+          </Surface>
+        )}
+
+        {step === 4 && (
+          <Surface style={{ padding: 18 }}>
+            <strong style={{ ...FF }}>4 · Récapitulatif & signature</strong>
+            <div style={{ background: C.surfaceAlt, borderRadius: 14, padding: 14, margin: "12px 0", ...FF, fontSize: 13.5, lineHeight: 1.8 }}>
+              <div><b>{form.guest_name}</b> · {form.guests} voyageur(s) · Chambre {room}</div>
+              <div>{form.checkin_date} → {form.checkout_date} · arrivée {form.arrival_time}</div>
+              <div>{form.id_type} n° {form.id_number} {form.id_file ? "· document fourni ✅" : "· document à présenter à l'accueil"}</div>
+            </div>
+            <InputField label="Demandes particulières (optionnel)" placeholder="Étage calme, lit bébé…" value={form.notes} onChange={(e) => set("notes", e.target.value)} />
+            <label style={{ ...FF, fontSize: 13, display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 14 }}>
+              <input type="checkbox" checked={form.consent} onChange={(e) => set("consent", e.target.checked)} style={{ marginTop: 3 }} />
+              <span>J'accepte le règlement intérieur de l'hôtel et certifie l'exactitude des informations fournies.</span>
+            </label>
+            <InputField label="Signature (tapez votre nom complet)" placeholder={form.guest_name || "Votre nom"} value={form.signature} onChange={(e) => set("signature", e.target.value)} />
+            <Btn variant="primary" size="lg" style={{ width: "100%", background: C.accentGreen }} onClick={() => (form.consent && form.signature.trim() ? submit() : toast("Consentement et signature requis", "error"))}>
+              ✅ Valider mon check-in
+            </Btn>
+          </Surface>
+        )}
+
+        {step === 5 && entry && (
+          <Surface style={{ padding: 26, textAlign: "center" }}>
+            <div style={{ fontSize: 52 }}>🎉</div>
+            <h3 style={{ ...FF, fontSize: 22, fontWeight: 900, margin: "10px 0 4px" }}>Check-in enregistré !</h3>
+            <p style={{ ...FF, fontSize: 14, color: C.textSecondary }}>La réception est prévenue de votre arrivée, {entry.guest_name.split(" ")[0]}.</p>
+            <div style={{ background: C.dark, color: C.white, borderRadius: 16, padding: 18, margin: "18px 0", ...FF }}>
+              <div style={{ fontSize: 12, opacity: 0.7 }}>Votre code d'accès</div>
+              <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: 2 }}>{entry.access_code}</div>
+              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>À présenter à la réception pour récupérer votre clé</div>
+            </div>
+            <div style={{ ...FF, fontSize: 13.5, color: C.textSecondary, lineHeight: 1.8 }}>
+              Chambre {entry.room} · {entry.checkin_date} → {entry.checkout_date}<br />
+              {entry.guests} voyageur(s) · arrivée {entry.arrival_time || "—"}
+            </div>
+            <Btn variant="primary" size="lg" style={{ width: "100%", marginTop: 18 }} onClick={onBack}>Découvrir ma chambre →</Btn>
+          </Surface>
+        )}
       </div>
     </div>
   );
@@ -3912,14 +4422,22 @@ function AppInner() {
 
   if (path.includes("/oauth/gmail")) return <GmailCallback />;
   if (goMatch) return <GoRedirect slug={decodeURIComponent(goMatch[1])} />;
-  if (customerMatch) return <CustomerPage slug={decodeURIComponent(customerMatch[1])} tableNum={customerMatch[2]} />;
+  if (customerMatch) {
+    const cSlug = decodeURIComponent(customerMatch[1]);
+    // Hotel rooms open the guest portal (hub), not the restaurant menu flow.
+    if (cSlug === "demo-hotel") return <HotelGuestPortal room={customerMatch[2]} />;
+    return <CustomerPage slug={cSlug} tableNum={customerMatch[2]} />;
+  }
   if (loading) return <CenterMsg emoji="⏳" text="…" />;
 
   // Demo mode
   if (demoUser) {
     const demoR = verticalOf(vertical).demo;
     if (view.page === "kitchen") return <KitchenView restaurant={demoR} vertical={vertical} onExit={() => setView({ page: "dashboard", restaurant: demoR })} />;
-    if (view.page === "customer") return <CustomerPage slug={demoR.slug} tableNum="1" />;
+    if (view.page === "customer") {
+      if (vertical === "hotel") return <HotelGuestPortal room="204" />;
+      return <CustomerPage slug={demoR.slug} tableNum="1" />;
+    }
     if (view.page === "franchise") return <FranchiseDashboard group={DEMO_GROUP} demoMode onExit={() => setView({ page: "dashboard", restaurant: demoR })} />;
     return <DashboardPage restaurant={demoR} vertical={vertical} onBack={() => { setDemoUser(false); setView({ page: "landing" }); }} onKitchen={() => setView({ page: "kitchen" })} onCustomerView={() => setView({ page: "customer" })} onFranchise={vertical === "resto" ? () => setView({ page: "franchise" }) : undefined} />;
   }
