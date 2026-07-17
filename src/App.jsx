@@ -239,13 +239,22 @@ const HOTEL_EVENTS = [
 ];
 const HOTEL_INFO = [
   { emoji: "📶", label: "Wi-Fi", value: "Réseau « HotelDemo » · code SEJOUR2026" },
-  { emoji: "🥐", label: "Petit-déjeuner", value: "7h – 10h30 · Salle Verrière (RDC)" },
+  { emoji: "🥐", label: "Petit-déjeuner", value: "7h – 10h30 · Salle Verrière (RDC) · en chambre +8€ de service" },
   { emoji: "🕛", label: "Check-out", value: "Jusqu'à 12h · late check-out sur demande" },
   { emoji: "☎️", label: "Réception", value: "24h/24 · composez le 9 depuis la chambre" },
   { emoji: "🅿️", label: "Parking", value: "Souterrain · 28€/nuit · hauteur max 1,90 m" },
   { emoji: "🏋️", label: "Salle de sport", value: "Niveau -1 · 6h – 23h · accès avec la clé" },
 ];
 const ID_TYPES = ["Carte d'identité", "Passeport", "Permis de conduire", "Titre de séjour"];
+
+/* Breakfast — buffet info + in-room delivery (tray service charge). */
+const BREAKFAST_FORMULAS = [
+  { id: "continental", emoji: "🥐", name: "Continental", price: 22, desc: "Viennoiseries, pain frais, confitures, jus pressé, boisson chaude" },
+  { id: "gourmand", emoji: "🍳", name: "Gourmand", price: 28, desc: "Continental + œufs au choix, saumon fumé, fruits frais" },
+  { id: "healthy", emoji: "🥣", name: "Healthy", price: 24, desc: "Granola, yaourt grec, fruits de saison, avocado toast, jus détox" },
+];
+const BREAKFAST_SLOTS = ["7h00 – 7h30", "7h30 – 8h00", "8h00 – 8h30", "8h30 – 9h00", "9h00 – 9h30", "9h30 – 10h00", "10h00 – 10h30"];
+const TRAY_CHARGE = 8; // service en chambre, par plateau
 
 /* Vertical config — Wegemo (restaurant) vs Wegemo Hôtel. Same tooling, adapted
  * wording, demo dataset and extra tabs. */
@@ -3407,7 +3416,8 @@ function HotelGuestPortal({ room }) {
   const tiles = [
     !checkin && { id: "checkin", emoji: "🛎️", title: "Check-in en ligne", sub: "2 min — évitez l'attente à la réception", big: true, color: C.accentBlue },
     checkin && !checkedOut && { id: "checkout", emoji: "🧳", title: "Check-out express", sub: "Note de chambre, horaires, bagagerie — sans passer par la réception", big: true, color: C.accentOrange },
-    { id: "room", emoji: "🍽️", title: "Room service", sub: "Carte, boissons, petit-déjeuner", badge: orders.length ? `${orders.length} commande${orders.length > 1 ? "s" : ""}` : null },
+    { id: "room", emoji: "🍽️", title: "Room service", sub: "Carte, boissons, en-cas", badge: orders.filter((o) => !o.breakfast).length ? `${orders.filter((o) => !o.breakfast).length}` : null },
+    { id: "breakfast", emoji: "🥐", title: "Petit-déjeuner", sub: "Buffet 7h – 10h30 · en chambre (+8€)", badge: orders.filter((o) => o.breakfast).length ? "⏰" : null },
     { id: "services", emoji: "🧖", title: "Services de l'hôtel", sub: "Spa, pressing, ménage, réveil…" },
     { id: "around", emoji: "📍", title: "Autour de vous", sub: "Événements, bons plans, partenaires" },
     { id: "info", emoji: "ℹ️", title: "Infos pratiques", sub: "Wi-Fi, petit-déj, check-out, parking" },
@@ -3456,7 +3466,7 @@ function HotelGuestPortal({ room }) {
               <strong style={{ ...FF, fontSize: 14 }}>🕑 En cours</strong>
               {orders.map((o) => (
                 <div key={o.id} style={{ ...FF, fontSize: 13, display: "flex", justifyContent: "space-between", gap: 8, marginTop: 8 }}>
-                  <span>🍽️ {o.items.map((c) => `${c.qty}× ${c.item.name}`).join(", ")}</span>
+                  <span>{o.breakfast ? "🥐" : "🍽️"} {o.items.map((c) => `${c.qty}× ${c.item.name}`).join(", ")}</span>
                   <span style={{ color: C.accentBlue, fontWeight: 700, whiteSpace: "nowrap" }}>{o.status}</span>
                 </div>
               ))}
@@ -3551,6 +3561,14 @@ function HotelGuestPortal({ room }) {
           </div>
         )}
       </div>
+    );
+  }
+
+  /* ---------- BREAKFAST (info + in-room with tray charge) ---------- */
+  if (view === "breakfast") {
+    return (
+      <HotelBreakfast room={room} checkin={checkin} orders={orders}
+        onOrder={(o) => setOrders((p) => [o, ...p])} onBack={() => setView("home")} />
     );
   }
 
@@ -3658,6 +3676,114 @@ function HotelGuestPortal({ room }) {
   );
 }
 
+/* Breakfast — buffet info + order a tray in the room (service charge). */
+function HotelBreakfast({ room, checkin, orders, onOrder, onBack }) {
+  const toast = useToast();
+  const [formula, setFormula] = useState("continental");
+  const [persons, setPersons] = useState(2);
+  const [slot, setSlot] = useState("8h00 – 8h30");
+  const [note, setNote] = useState("");
+  const f = BREAKFAST_FORMULAS.find((x) => x.id === formula);
+  const total = f.price * persons + TRAY_CHARGE;
+  const scheduled = orders.filter((o) => o.breakfast);
+
+  const order = () => {
+    onOrder({
+      id: uid(), breakfast: true, slot, note,
+      items: [{ item: { id: `bf-${f.id}`, name: `Petit-déj ${f.name} en chambre`, price: f.price }, qty: persons }],
+      total, method: checkin ? "room" : "card",
+      status: `Programmé · ${slot} ⏰`,
+      at: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+    });
+    toast(`Petit-déjeuner programmé — livré entre ${slot}${checkin ? ` · sur la note Ch. ${room}` : " · payé à la livraison"}`, "success");
+    onBack();
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg }}>
+      <div style={{ maxWidth: 560, margin: "0 auto", padding: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <Btn variant="subtle" size="sm" onClick={onBack}>←</Btn>
+          <h2 style={{ ...FF, fontWeight: 800, fontSize: 19 }}>🥐 Petit-déjeuner</h2>
+        </div>
+
+        {scheduled.length > 0 && (
+          <Surface style={{ padding: 14, marginBottom: 14, background: "#EAF7EE", border: `1px solid ${C.accentGreen}44` }}>
+            {scheduled.map((o) => (
+              <div key={o.id} style={{ ...FF, fontSize: 13, display: "flex", justifyContent: "space-between", gap: 8, padding: "3px 0" }}>
+                <span>🥐 {o.items[0].qty}× {o.items[0].item.name} · {eur(o.total)}</span>
+                <span style={{ color: C.accentGreen, fontWeight: 700, whiteSpace: "nowrap" }}>{o.status}</span>
+              </div>
+            ))}
+          </Surface>
+        )}
+
+        {/* Buffet info */}
+        <Surface style={{ padding: 18, marginBottom: 14 }}>
+          <strong style={{ ...FF }}>🍽️ Au buffet — Salle Verrière (RDC)</strong>
+          <div style={{ ...FF, fontSize: 13.5, color: C.textSecondary, marginTop: 8, lineHeight: 1.9 }}>
+            Tous les jours de <b style={{ color: C.text }}>7h00 à 10h30</b> (dernier service 10h15)<br />
+            Buffet à volonté : <b style={{ color: C.text }}>22€/pers.</b> · enfants -12 ans : <b style={{ color: C.text }}>11€</b> · -3 ans : offert<br />
+            Viennoiseries, œufs minute, fruits frais, fromages, charcuterie, options sans gluten & vegan<br />
+            Inclus si votre tarif comprend le petit-déjeuner — présentez votre n° de chambre
+          </div>
+        </Surface>
+
+        {/* In-room */}
+        <Surface style={{ padding: 18 }}>
+          <strong style={{ ...FF }}>🛏️ En chambre — service {eur(TRAY_CHARGE)} / plateau</strong>
+          <p style={{ ...FF, fontSize: 12.5, color: C.textSecondary, marginTop: 4 }}>Livré à la porte de la chambre {room} sur le créneau choisi. Commandez avant 22h la veille pour les créneaux avant 8h.</p>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
+            {BREAKFAST_FORMULAS.map((bf) => (
+              <label key={bf.id} style={{ ...FF, display: "flex", gap: 12, alignItems: "flex-start", padding: 12, borderRadius: 14, border: `1.5px solid ${formula === bf.id ? C.accentOrange : C.border}`, background: formula === bf.id ? "#FFF6E5" : C.surface, cursor: "pointer" }}>
+                <input type="radio" name="bf" checked={formula === bf.id} onChange={() => setFormula(bf.id)} style={{ marginTop: 4 }} />
+                <span style={{ fontSize: 24 }}>{bf.emoji}</span>
+                <span style={{ flex: 1 }}>
+                  <b>{bf.name}</b> — {eur(bf.price)}/pers.<br />
+                  <span style={{ fontSize: 12.5, color: C.textSecondary }}>{bf.desc}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 14, alignItems: "flex-end" }}>
+            <div>
+              <label style={{ ...FF, display: "block", fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Personnes</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <button onClick={() => setPersons((p) => Math.max(1, p - 1))} style={{ ...FF, width: 34, height: 34, borderRadius: 999, border: `1px solid ${C.borderStrong}`, background: C.surface, fontWeight: 800 }}>−</button>
+                <strong style={{ ...FF, fontSize: 16 }}>{persons}</strong>
+                <button onClick={() => setPersons((p) => Math.min(6, p + 1))} style={{ ...FF, width: 34, height: 34, borderRadius: 999, border: "none", background: C.dark, color: C.white, fontWeight: 800 }}>+</button>
+              </div>
+            </div>
+            <div style={{ flex: "1 1 170px" }}>
+              <label style={{ ...FF, display: "block", fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Créneau de livraison</label>
+              <select value={slot} onChange={(e) => setSlot(e.target.value)} style={{ ...FF, width: "100%", padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.borderStrong}`, background: C.surface }}>
+                {BREAKFAST_SLOTS.map((s) => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <InputField label="Allergies / préférences (optionnel)" placeholder="Sans lactose, café déca…" value={note} onChange={(e) => setNote(e.target.value)} />
+          </div>
+
+          <div style={{ ...FF, fontSize: 13.5, background: C.surfaceAlt, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+            {persons} × {f.name} ({eur(f.price)}) + service en chambre {eur(TRAY_CHARGE)} = <b style={{ fontSize: 15 }}>{eur(total)}</b>
+          </div>
+
+          <Btn variant="primary" size="lg" style={{ width: "100%", background: C.accentOrange }} onClick={order}>
+            🥐 Commander pour la chambre {room} — {eur(total)}
+          </Btn>
+          <p style={{ ...FF, fontSize: 11.5, color: C.textTertiary, marginTop: 6, textAlign: "center" }}>
+            {checkin ? `Facturé sur la note de la chambre ${room}` : "Réglé à la livraison (check-in non effectué)"}
+          </p>
+        </Surface>
+      </div>
+    </div>
+  );
+}
+
 /* Express check-out — room bill review, departure schedule and instructions.
  * All figures are demo-fictional but internally consistent (nights × rate,
  * city tax, the room-service orders actually placed in this session). */
@@ -3682,7 +3808,7 @@ function HotelCheckoutFlow({ room, checkin, orders, onDone, onBack }) {
     { label: `Chambre ${room} · ${nights} nuit${nights > 1 ? "s" : ""} × ${eur(DEMO_NIGHT_RATE)}`, amount: nights * DEMO_NIGHT_RATE },
     { label: "Petit-déjeuner (2 pers. · hier)", amount: 44 },
     { label: "Minibar", amount: 8 },
-    ...(roomServiceSession > 0 ? [{ label: "Room service (votre séjour)", amount: roomServiceSession }] : []),
+    ...(roomServiceSession > 0 ? [{ label: "Room service & petit-déj en chambre (votre séjour)", amount: roomServiceSession }] : []),
     { label: `Taxe de séjour · ${guests} pers. × ${nights} nuit${nights > 1 ? "s" : ""}`, amount: Math.round(DEMO_CITY_TAX * guests * nights * 100) / 100 },
     ...(late ? [{ label: "Late check-out (jusqu'à 15h)", amount: 25 }] : []),
   ];
