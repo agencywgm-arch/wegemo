@@ -2900,6 +2900,11 @@ function CheckinTab({ restaurant, store }) {
                       {c.arrival_time ? ` · arrivée ${c.arrival_time}` : ""}
                     </div>
                   )}
+                  {c.express_checkout && (
+                    <div style={{ ...FF, fontSize: 11.5, color: C.accentOrange, marginTop: 2 }}>
+                      🧳 Check-out express{c.bill_total ? ` · note ${eur(c.bill_total)}` : ""}{c.late_checkout ? " · late 15h" : ""}{c.luggage_hold ? " · bagagerie" : ""} — vérifier la chambre puis confirmer
+                    </div>
+                  )}
                 </div>
                 {c.access_code && <Tag color={C.accentBlue}>📲 en ligne</Tag>}
                 <Tag color={st.color}>{st.label}</Tag>
@@ -3398,8 +3403,10 @@ function HotelGuestPortal({ room }) {
   );
 
   /* ---------- HOME (hub of large blocks) ---------- */
+  const checkedOut = checkin && (checkin.status === "departing" || checkin.status === "checked_out") && checkin.express_checkout;
   const tiles = [
     !checkin && { id: "checkin", emoji: "🛎️", title: "Check-in en ligne", sub: "2 min — évitez l'attente à la réception", big: true, color: C.accentBlue },
+    checkin && !checkedOut && { id: "checkout", emoji: "🧳", title: "Check-out express", sub: "Note de chambre, horaires, bagagerie — sans passer par la réception", big: true, color: C.accentOrange },
     { id: "room", emoji: "🍽️", title: "Room service", sub: "Carte, boissons, petit-déjeuner", badge: orders.length ? `${orders.length} commande${orders.length > 1 ? "s" : ""}` : null },
     { id: "services", emoji: "🧖", title: "Services de l'hôtel", sub: "Spa, pressing, ménage, réveil…" },
     { id: "around", emoji: "📍", title: "Autour de vous", sub: "Événements, bons plans, partenaires" },
@@ -3419,7 +3426,9 @@ function HotelGuestPortal({ room }) {
             </div>
             <h1 style={{ ...FF, fontSize: 24, fontWeight: 900, margin: "12px 0 4px" }}>{hotel.name}</h1>
             <p style={{ ...FF, fontSize: 14, opacity: 0.75 }}>
-              {checkin ? `Bon séjour, ${checkin.guest_name.split(" ")[0]} — vous êtes enregistré ✓` : "Bienvenue ! Toute votre chambre, depuis votre téléphone."}
+              {checkedOut
+                ? `Chambre libérée — merci pour votre séjour, ${checkin.guest_name.split(" ")[0]} ! 👋`
+                : checkin ? `Bon séjour, ${checkin.guest_name.split(" ")[0]} — vous êtes enregistré ✓` : "Bienvenue ! Toute votre chambre, depuis votre téléphone."}
             </p>
           </div>
 
@@ -3472,6 +3481,12 @@ function HotelGuestPortal({ room }) {
   if (view === "checkin") {
     return <HotelCheckinWizard room={room} hotel={hotel} today={today} tomorrow={tomorrow} existing={checkin}
       onDone={(entry) => { setCheckin(entry); }} onBack={() => setView("home")} />;
+  }
+
+  /* ---------- CHECK-OUT EXPRESS ---------- */
+  if (view === "checkout" && checkin) {
+    return <HotelCheckoutFlow room={room} checkin={checkin} orders={orders}
+      onDone={(updated) => { setCheckin(updated); }} onBack={() => setView("home")} />;
   }
 
   /* ---------- ROOM SERVICE ---------- */
@@ -3636,6 +3651,139 @@ function HotelGuestPortal({ room }) {
                 <span style={{ color: C.accentGreen, fontWeight: 700, whiteSpace: "nowrap" }}>{r.status}</span>
               </div>
             ))}
+          </Surface>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* Express check-out — room bill review, departure schedule and instructions.
+ * All figures are demo-fictional but internally consistent (nights × rate,
+ * city tax, the room-service orders actually placed in this session). */
+const DEMO_NIGHT_RATE = 145;      // fictional room rate for the demo
+const DEMO_CITY_TAX = 3.3;        // fictional taxe de séjour / pers / nuit
+function HotelCheckoutFlow({ room, checkin, orders, onDone, onBack }) {
+  const toast = useToast();
+  const [step, setStep] = useState(1);
+  const [late, setLate] = useState(false);
+  const [luggage, setLuggage] = useState(false);
+  const [invoiceEmail, setInvoiceEmail] = useState(checkin.email || "");
+  const [rating, setRating] = useState(0);
+  const [rated, setRated] = useState(false);
+
+  // Fictional-but-consistent bill.
+  const d1 = new Date(checkin.checkin_date || Date.now());
+  const d2 = new Date(checkin.checkout_date || Date.now());
+  const nights = Math.max(1, Math.round((d2 - d1) / 86400000));
+  const guests = Number(checkin.guests) || 1;
+  const roomServiceSession = orders.reduce((s, o) => s + o.total, 0);
+  const lines = [
+    { label: `Chambre ${room} · ${nights} nuit${nights > 1 ? "s" : ""} × ${eur(DEMO_NIGHT_RATE)}`, amount: nights * DEMO_NIGHT_RATE },
+    { label: "Petit-déjeuner (2 pers. · hier)", amount: 44 },
+    { label: "Minibar", amount: 8 },
+    ...(roomServiceSession > 0 ? [{ label: "Room service (votre séjour)", amount: roomServiceSession }] : []),
+    { label: `Taxe de séjour · ${guests} pers. × ${nights} nuit${nights > 1 ? "s" : ""}`, amount: Math.round(DEMO_CITY_TAX * guests * nights * 100) / 100 },
+    ...(late ? [{ label: "Late check-out (jusqu'à 15h)", amount: 25 }] : []),
+  ];
+  const totalBill = Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100) / 100;
+  const deadline = late ? "15h00" : "12h00";
+
+  const confirm = () => {
+    const updated = { ...checkin, status: "departing", express_checkout: true, late_checkout: late, luggage_hold: luggage, invoice_email: invoiceEmail, bill_total: totalBill };
+    writeGuestCheckins(readGuestCheckins().map((c) => (String(c.room) === String(room) ? updated : c)));
+    onDone(updated);
+    setStep(3);
+    toast("Check-out enregistré — la réception est prévenue", "success");
+  };
+
+  const header = (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+      <Btn variant="subtle" size="sm" onClick={step === 2 ? () => setStep(1) : onBack}>←</Btn>
+      <h2 style={{ ...FF, fontWeight: 800, fontSize: 19 }}>🧳 Check-out express — Chambre {room}</h2>
+    </div>
+  );
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg }}>
+      <div style={{ maxWidth: 560, margin: "0 auto", padding: 16 }}>
+        {header}
+
+        {step === 1 && (
+          <>
+            <Surface style={{ padding: 18, marginBottom: 14 }}>
+              <strong style={{ ...FF }}>🧾 Votre note de chambre</strong>
+              <div style={{ marginTop: 12 }}>
+                {lines.map((l) => (
+                  <div key={l.label} style={{ ...FF, fontSize: 13.5, display: "flex", justifyContent: "space-between", gap: 10, padding: "5px 0" }}>
+                    <span style={{ color: C.textSecondary }}>{l.label}</span>
+                    <span style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{eur(l.amount)}</span>
+                  </div>
+                ))}
+                <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 8, paddingTop: 10, display: "flex", justifyContent: "space-between", ...FF, fontWeight: 900, fontSize: 17 }}>
+                  <span>Total</span><span>{eur(totalBill)}</span>
+                </div>
+              </div>
+              <p style={{ ...FF, fontSize: 12, color: C.textTertiary, marginTop: 8 }}>Payé par la carte utilisée à la réservation. Une question sur la note ? Composez le 9.</p>
+            </Surface>
+            <Surface style={{ padding: 18, marginBottom: 14 }}>
+              <strong style={{ ...FF }}>🕛 Horaires de départ</strong>
+              <div style={{ ...FF, fontSize: 13.5, color: C.textSecondary, marginTop: 8, lineHeight: 1.8 }}>
+                Chambre à libérer avant <b style={{ color: C.text }}>12h00</b> · late check-out possible jusqu'à <b style={{ color: C.text }}>15h00</b> (+25€, selon dispo)<br />
+                Bagagerie gratuite jusqu'à <b style={{ color: C.text }}>18h00</b> · petit-déjeuner servi jusqu'à 10h30
+              </div>
+            </Surface>
+            <Btn variant="primary" size="lg" style={{ width: "100%" }} onClick={() => setStep(2)}>Continuer →</Btn>
+          </>
+        )}
+
+        {step === 2 && (
+          <Surface style={{ padding: 18 }}>
+            <strong style={{ ...FF }}>Options de départ</strong>
+            <label style={{ ...FF, display: "flex", gap: 12, alignItems: "flex-start", padding: "14px 0", borderBottom: `1px solid ${C.border}`, cursor: "pointer" }}>
+              <input type="checkbox" checked={late} onChange={(e) => setLate(e.target.checked)} style={{ marginTop: 3 }} />
+              <span><b>🕐 Late check-out jusqu'à 15h</b> — +25€<br /><span style={{ fontSize: 12.5, color: C.textSecondary }}>Confirmé immédiatement pour la démo (selon disponibilité en réel).</span></span>
+            </label>
+            <label style={{ ...FF, display: "flex", gap: 12, alignItems: "flex-start", padding: "14px 0", borderBottom: `1px solid ${C.border}`, cursor: "pointer" }}>
+              <input type="checkbox" checked={luggage} onChange={(e) => setLuggage(e.target.checked)} style={{ marginTop: 3 }} />
+              <span><b>🧳 Bagagerie jusqu'à 18h</b> — gratuit<br /><span style={{ fontSize: 12.5, color: C.textSecondary }}>Déposez vos bagages à la réception après avoir libéré la chambre.</span></span>
+            </label>
+            <div style={{ marginTop: 14 }}>
+              <InputField label="Facture par email" type="email" placeholder="votre@email.com" value={invoiceEmail} onChange={(e) => setInvoiceEmail(e.target.value)} />
+            </div>
+            <div style={{ ...FF, display: "flex", justifyContent: "space-between", fontWeight: 900, fontSize: 16, margin: "4px 0 14px" }}>
+              <span>Total {late ? "(avec late check-out)" : ""}</span><span>{eur(totalBill)}</span>
+            </div>
+            <Btn variant="primary" size="lg" style={{ width: "100%", background: C.accentOrange }} onClick={confirm}>✅ Valider mon check-out</Btn>
+          </Surface>
+        )}
+
+        {step === 3 && (
+          <Surface style={{ padding: 26, textAlign: "center" }}>
+            <div style={{ fontSize: 52 }}>👋</div>
+            <h3 style={{ ...FF, fontSize: 22, fontWeight: 900, margin: "10px 0 4px" }}>Check-out enregistré !</h3>
+            <p style={{ ...FF, fontSize: 14, color: C.textSecondary }}>La réception prépare votre départ, {checkin.guest_name.split(" ")[0]}.</p>
+            <div style={{ background: C.surfaceAlt, borderRadius: 16, padding: 16, margin: "16px 0", textAlign: "left", ...FF, fontSize: 13.5, lineHeight: 2 }}>
+              <div>🕛 Libérez la chambre avant <b>{deadline}</b></div>
+              <div>🔑 Laissez les clés sur la porte ou déposez-les à la réception</div>
+              {luggage && <div>🧳 Bagagerie réservée — jusqu'à 18h00</div>}
+              {invoiceEmail && <div>🧾 Facture ({eur(totalBill)}) envoyée à <b>{invoiceEmail}</b></div>}
+              <div>🚕 Besoin d'un taxi ? Conciergerie ou composez le 9</div>
+            </div>
+            {!rated ? (
+              <>
+                <p style={{ ...FF, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Comment était votre séjour ?</p>
+                <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 14 }}>
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <button key={s} onClick={() => { setRating(s); setRated(true); toast(s >= 4 ? "Merci ! ⭐ Votre avis compte énormément." : "Merci pour votre retour — la direction en est informée.", "success"); }}
+                      style={{ fontSize: 30, background: "none", border: "none", cursor: "pointer", filter: s <= rating ? "none" : "grayscale(1) opacity(.45)" }}>⭐</button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p style={{ ...FF, fontSize: 14, color: C.accentGreen, fontWeight: 700, marginBottom: 14 }}>Merci pour votre note de {rating}/5 ⭐</p>
+            )}
+            <Btn variant="primary" size="lg" style={{ width: "100%" }} onClick={onBack}>Retour à l'accueil chambre</Btn>
           </Surface>
         )}
       </div>
