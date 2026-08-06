@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, createContext, useContext } from "react";
 import QRCode from "qrcode";
 import { supabase, hasSupabase, callFunction } from "./lib/supabase.js";
+import { BAOMA_SLUG, BAOMA_THEME, BAOMA_CATEGORIES, BAOMA_MENU, BAOMA_RESTAURANT } from "./baomaData.js";
 
 /* ============================================================================
  * THEME
@@ -4110,10 +4111,14 @@ function CustomerPage({ slug, tableNum }) {
   useEffect(() => {
     (async () => {
       // Demo / offline
+      // Baoma sans Supabase = aperçu hors ligne ; dès que Supabase est
+      // configuré on passe par la vraie carte pour que les commandes partent
+      // en base et remontent en cuisine.
       if (slug === "demo" || slug === "demo-hotel" || !hasSupabase) {
         const hotel = slug === "demo-hotel";
-        setRestaurant(hotel ? DEMO_HOTEL : DEMO_RESTAURANT);
-        setMenu(hotel ? DEMO_HOTEL_MENU : DEMO_MENU);
+        const baoma = slug === BAOMA_SLUG;
+        setRestaurant(baoma ? BAOMA_RESTAURANT : hotel ? DEMO_HOTEL : DEMO_RESTAURANT);
+        setMenu(baoma ? BAOMA_MENU : hotel ? DEMO_HOTEL_MENU : DEMO_MENU);
         setTableId("t" + tableNum);
         setStep("ordertype");
         return;
@@ -4154,7 +4159,7 @@ function CustomerPage({ slug, tableNum }) {
   const dir = lang === "ar" ? "rtl" : "ltr";
 
   return (
-    <div dir={dir} style={{ minHeight: "100vh", background: C.bg, maxWidth: 480, margin: "0 auto", position: "relative" }}>
+    <div dir={dir} style={{ minHeight: "100vh", background: restaurant.slug === BAOMA_SLUG ? BAOMA_THEME.offwhite : C.bg, maxWidth: 480, margin: "0 auto", position: "relative" }}>
       {step === "ordertype" && (
         <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
@@ -4179,7 +4184,11 @@ function CustomerPage({ slug, tableNum }) {
       )}
 
       {step === "menu" && (
-        <CustomerMenu restaurant={restaurant} menu={menu} settings={settings} lang={lang} setLang={setLang} cart={cart} onCompose={(it) => setComposing(it)} onAdd={addToCart} onCart={() => setStep("cart")} tableLabel={tableLabel} tableNum={tableNum} />
+        restaurant.slug === BAOMA_SLUG ? (
+          <BaomaMenu restaurant={restaurant} menu={menu} lang={lang} setLang={setLang} cart={cart} onCompose={(it) => setComposing(it)} onAdd={addToCart} onCart={() => setStep("cart")} tableLabel={tableLabel} tableNum={tableNum} />
+        ) : (
+          <CustomerMenu restaurant={restaurant} menu={menu} settings={settings} lang={lang} setLang={setLang} cart={cart} onCompose={(it) => setComposing(it)} onAdd={addToCart} onCart={() => setStep("cart")} tableLabel={tableLabel} tableNum={tableNum} />
+        )
       )}
 
       {step === "cart" && (
@@ -4299,6 +4308,337 @@ function CustomerMenu({ restaurant, menu, settings, lang, setLang, cart, onCompo
     </div>
   );
 }
+/* ============================================================================
+ * THÈME BAOMA — rendu client dédié pour /r/baoma/t/{n}
+ *
+ * Reprend le design du site vitrine Baoma (grille 2 colonnes, tilt 3D au
+ * survol/appui, halo orange, Ken Burns, frise de catégories qui suit le
+ * scroll) tout en branchant les vrais menu_items et le vrai panier Wegemo.
+ * Activé uniquement quand restaurant.slug === "baoma" : tous les autres
+ * restaurants continuent d'utiliser <CustomerMenu /> sans changement.
+ * ==========================================================================*/
+const BK = BAOMA_THEME;
+const BFF = { fontFamily: "'Figtree', -apple-system, BlinkMacSystemFont, sans-serif" };
+const BDISPLAY = { fontFamily: BK.display, fontWeight: 400, textTransform: "uppercase" };
+const KB_DIRS = ["tl", "tr", "bl", "br"];
+
+// Le chemin des photos est relatif à la racine servie : on préfixe par la
+// base Vite pour rester correct sous un sous-chemin (GitHub Pages).
+const bImg = (u) => (u && u.startsWith("/") ? `${(import.meta.env.BASE_URL || "/").replace(/\/+$/, "")}${u}` : u);
+
+// Décale la dérive de chaque photo à partir de son nom, pour éviter que
+// toutes les cartes respirent exactement en même temps.
+function kbTiming(seed) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 997;
+  return { delay: -((h % 9) * 0.9), duration: 8 + (h % 5), dir: KB_DIRS[h % 4] };
+}
+
+// Tilt 3D piloté au pointeur, unifié souris + tactile : l'appui incline la
+// carte depuis le point touché, le relâchement la laisse revenir après un
+// court délai (sinon l'effet serait invisible sur mobile).
+function useBaomaTilt(strength = 8) {
+  const ref = useRef(null);
+  const [tilt, setTilt] = useState({ rx: 0, ry: 0, px: 0, py: 0 });
+  const [on, setOn] = useState(false);
+  const timer = useRef(undefined);
+
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const from = (clientX, clientY) => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const px = (clientX - r.left) / r.width - 0.5;
+    const py = (clientY - r.top) / r.height - 0.5;
+    setTilt({ rx: -py * strength, ry: px * strength, px, py });
+    setOn(true);
+  };
+  const release = () => { setTilt({ rx: 0, ry: 0, px: 0, py: 0 }); setOn(false); };
+
+  return {
+    ref, tilt, on,
+    handlers: {
+      onPointerMove: (e) => { clearTimeout(timer.current); from(e.clientX, e.clientY); },
+      onPointerDown: (e) => { clearTimeout(timer.current); from(e.clientX, e.clientY); },
+      onPointerLeave: (e) => { if (e.pointerType !== "mouse") return; clearTimeout(timer.current); release(); },
+      onPointerUp: (e) => { if (e.pointerType === "mouse") return; clearTimeout(timer.current); timer.current = setTimeout(release, 600); },
+      onPointerCancel: () => { clearTimeout(timer.current); release(); },
+    },
+  };
+}
+
+// Révèle les éléments .baoma-reveal à leur entrée dans le viewport.
+function useBaomaReveal(rootRef, deps = []) {
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const items = Array.from(root.querySelectorAll(".baoma-reveal"));
+    if (!items.length) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (!e.isIntersecting) return;
+          e.target.classList.add("baoma-reveal-in");
+          io.unobserve(e.target);
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
+    );
+    items.forEach((i) => io.observe(i));
+    return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+}
+
+function BaomaCard({ item, onPick }) {
+  const { ref, tilt, on, handlers } = useBaomaTilt(8);
+  const [failed, setFailed] = useState(false);
+  const kb = kbTiming(item.id || item.name);
+  const out = item.stock != null && Number(item.stock) <= 0;
+  const photo = bImg(item.photo_url);
+
+  return (
+    <div
+      ref={ref}
+      {...handlers}
+      onClick={() => !out && onPick(item)}
+      className="baoma-reveal"
+      style={{
+        position: "relative", overflow: "hidden", borderRadius: 16,
+        background: BK.charcoal, cursor: out ? "default" : "pointer",
+        opacity: out ? 0.45 : 1,
+        transformStyle: "preserve-3d", perspective: 900,
+        transform: `perspective(900px) rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg) translateY(${on ? -8 : 0}px)`,
+        boxShadow: on ? "0 0 40px -5px rgba(255,90,31,0.35)" : "none",
+        outline: `1px solid ${on ? "rgba(255,90,31,0.6)" : "rgba(10,10,10,0.06)"}`,
+        outlineOffset: -1,
+        transition: "transform .35s cubic-bezier(.16,1,.3,1), box-shadow .3s ease, outline-color .3s ease",
+      }}
+    >
+      <div style={{ position: "relative", aspectRatio: "1 / 1", overflow: "hidden" }}>
+        {photo && !failed ? (
+          <div
+            style={{
+              position: "absolute", inset: 0,
+              transform: `translate(${tilt.px * -4}%, ${tilt.py * -4}%)`,
+              transition: "transform .4s cubic-bezier(.16,1,.3,1)",
+            }}
+          >
+            <img
+              src={photo}
+              alt={item.name}
+              loading="lazy"
+              onError={() => setFailed(true)}
+              className={`baoma-kb${on ? " baoma-kb-paused" : ""}`}
+              style={{
+                width: "100%", height: "100%", objectFit: "cover", display: "block",
+                animationName: `baoma-kb-${kb.dir}`,
+                animationDelay: `${kb.delay}s`,
+                animationDuration: `${kb.duration}s`,
+              }}
+            />
+          </div>
+        ) : (
+          <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", fontSize: 40, background: `linear-gradient(135deg, ${BK.charcoal}, rgba(255,90,31,0.18))` }}>
+            {item.emoji || "🍽️"}
+          </div>
+        )}
+
+        {/* balayage lumineux au survol / à l'appui */}
+        <div
+          style={{
+            position: "absolute", inset: 0, pointerEvents: "none",
+            transform: `skewX(-12deg) translateX(${on ? 130 : -130}%)`,
+            background: "linear-gradient(90deg, transparent, rgba(245,245,240,0.4), transparent)",
+            transition: "transform .7s ease-out",
+          }}
+        />
+
+        {item.is_popular && (
+          <span style={{ ...BFF, position: "absolute", top: 8, left: 8, background: BK.orange, color: BK.ink, fontSize: 10, fontWeight: 800, padding: "3px 8px", borderRadius: 999, letterSpacing: 0.4 }}>
+            ★ POPULAIRE
+          </span>
+        )}
+
+        {/* bouton d'ajout, repris de la maquette client */}
+        <span
+          aria-hidden
+          style={{
+            position: "absolute", right: 8, bottom: 8, width: 34, height: 34,
+            borderRadius: 12, background: out ? "rgba(10,10,10,.35)" : BK.orange,
+            color: "#fff", display: "grid", placeItems: "center",
+            fontSize: 20, fontWeight: 700, lineHeight: 1,
+            boxShadow: "0 2px 10px rgba(0,0,0,.2)",
+          }}
+        >
+          {out ? "–" : "+"}
+        </span>
+      </div>
+
+      <div style={{ padding: "10px 12px 12px" }}>
+        <h3 style={{ ...BDISPLAY, fontSize: 13, lineHeight: 1.15, letterSpacing: 0.3, color: BK.ink }}>{item.name}</h3>
+        {item.description && (
+          <p style={{ ...BFF, fontSize: 11, lineHeight: 1.3, color: "rgba(10,10,10,.62)", marginTop: 3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            {item.description}
+          </p>
+        )}
+        <strong style={{ ...BFF, display: "block", marginTop: 5, fontSize: 13, fontWeight: 800, color: on ? BK.orange : BK.ink, transition: "color .3s ease" }}>
+          {eur(item.price)}
+        </strong>
+      </div>
+    </div>
+  );
+}
+
+function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, onCart, tableLabel, tableNum }) {
+  const rootRef = useRef(null);
+  const stripRef = useRef(null);
+  const [active, setActive] = useState(null);
+
+  // Catégories dans l'ordre Baoma, limitées à celles qui ont des plats.
+  const known = BAOMA_CATEGORIES.filter((c) => menu.some((m) => m.category === c.name));
+  const extra = [...new Set(menu.map((m) => m.category))]
+    .filter((n) => !BAOMA_CATEGORIES.some((c) => c.name === n))
+    .map((n) => ({ name: n, tagline: "" }));
+  const groups = [...known, ...extra].map((c) => ({
+    ...c,
+    key: slugify(c.name),
+    items: menu
+      .filter((m) => m.category === c.name)
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+  }));
+
+  useBaomaReveal(rootRef, [menu.length]);
+
+  // Tant que le scroll n'a rien signalé, la première catégorie est active.
+  const activeKey = active ?? groups[0]?.key;
+
+  // Frise : suit la catégorie qui passe sous l'en-tête collant.
+  useEffect(() => {
+    const els = groups
+      .map((g) => document.getElementById(`bcat-${g.key}`))
+      .filter(Boolean);
+    if (!els.length) return;
+    const order = groups.map((g) => g.key);
+    const io = new IntersectionObserver(
+      (entries) => {
+        const vis = entries.filter((e) => e.isIntersecting);
+        if (!vis.length) return;
+        const deepest = vis.reduce((a, b) =>
+          order.indexOf(a.target.id.replace("bcat-", "")) > order.indexOf(b.target.id.replace("bcat-", "")) ? a : b,
+        );
+        setActive(deepest.target.id.replace("bcat-", ""));
+      },
+      { rootMargin: "-140px 0px -72% 0px", threshold: 0 },
+    );
+    els.forEach((e) => io.observe(e));
+    return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menu.length]);
+
+  // Recentre la pastille active dans la frise (scrollLeft manuel : un
+  // scrollIntoView ferait aussi défiler la page verticalement).
+  useEffect(() => {
+    const strip = stripRef.current;
+    const pill = strip?.querySelector(`[data-bpill="${activeKey}"]`);
+    if (!strip || !pill) return;
+    strip.scrollTo({ left: pill.offsetLeft - strip.clientWidth / 2 + pill.offsetWidth / 2, behavior: "smooth" });
+  }, [activeKey]);
+
+  const goto = (key) => {
+    setActive(key);
+    document.getElementById(`bcat-${key}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const pick = (item) => ((item.supplements?.length || item.extras?.length) ? onCompose(item) : onAdd(item));
+  const count = cart.reduce((s, c) => s + (c.qty || 1), 0);
+
+  return (
+    <div ref={rootRef} style={{ background: BK.offwhite, minHeight: "100vh", paddingBottom: cart.length ? 92 : 24 }}>
+      {/* En-tête */}
+      <div style={{ background: BK.offwhite, padding: "16px 16px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(10,10,10,.07)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <img
+            src={bImg("/logo-baoma.png")}
+            alt="Baoma"
+            style={{ height: 34, width: "auto", display: "block" }}
+            onError={(e) => { e.currentTarget.style.display = "none"; }}
+          />
+          <div>
+            <div style={{ ...BDISPLAY, fontSize: 17, letterSpacing: 0.5, color: BK.ink, lineHeight: 1 }}>{restaurant.name}</div>
+            <div style={{ ...BFF, fontSize: 11, color: "rgba(10,10,10,.55)", marginTop: 2 }}>{tableLabel || `Table ${tableNum}`}</div>
+          </div>
+        </div>
+        <LangPicker lang={lang} setLang={setLang} />
+      </div>
+
+      {/* Frise de catégories collante */}
+      <div style={{ position: "sticky", top: 0, zIndex: 20, background: "rgba(245,245,240,.94)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", borderBottom: "1px solid rgba(10,10,10,.06)" }}>
+        <div
+          ref={stripRef}
+          style={{ display: "flex", gap: 8, overflowX: "auto", padding: "10px 16px", scrollbarWidth: "none" }}
+        >
+          {groups.map((g) => (
+            <button
+              key={g.key}
+              data-bpill={g.key}
+              onClick={() => goto(g.key)}
+              style={{
+                ...BFF, flexShrink: 0, whiteSpace: "nowrap", borderRadius: 999,
+                padding: "7px 15px", fontSize: 11, fontWeight: 800,
+                textTransform: "uppercase", letterSpacing: 0.6,
+                background: activeKey === g.key ? BK.orange : "rgba(10,10,10,.05)",
+                color: activeKey === g.key ? BK.ink : "rgba(10,10,10,.62)",
+                outline: activeKey === g.key ? "none" : "1px solid rgba(10,10,10,.1)",
+                outlineOffset: -1,
+                transition: "background .3s ease, color .3s ease",
+              }}
+            >
+              {g.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Sections : toute la carte à la suite */}
+      <div style={{ padding: "0 16px" }}>
+        {groups.map((g) => (
+          <section key={g.key} id={`bcat-${g.key}`} style={{ scrollMarginTop: 118, marginTop: 30 }}>
+            <div className="baoma-reveal">
+              <h2 style={{ ...BDISPLAY, fontSize: 24, letterSpacing: 0.5, color: BK.ink, lineHeight: 1.05 }}>{g.name}</h2>
+              {g.tagline && <p style={{ ...BFF, fontSize: 12, color: "rgba(10,10,10,.55)", marginTop: 3 }}>{g.tagline}</p>}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginTop: 14 }}>
+              {g.items.map((it) => (
+                <BaomaCard key={it.id} item={it} onPick={pick} />
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+
+      {/* Barre panier */}
+      {cart.length > 0 && (
+        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 480, margin: "0 auto", padding: 12, background: "linear-gradient(to top, rgba(245,245,240,.98) 60%, transparent)" }}>
+          <button
+            onClick={onCart}
+            style={{
+              ...BFF, width: "100%", padding: "15px 18px", borderRadius: 14,
+              background: BK.orange, color: BK.ink, fontWeight: 800, fontSize: 15,
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              boxShadow: "0 8px 26px -6px rgba(255,90,31,.5)",
+            }}
+          >
+            <span>🛒 {t(lang, "cart")} ({count})</span>
+            <span>{eur(cart.reduce((s, c) => s + c.lineTotal, 0))}</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ComposeModal({ item, lang, onClose, onAdd }) {
   const [selected, setSelected] = useState([]);
   const [qty, setQty] = useState(1);
