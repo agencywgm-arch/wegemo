@@ -330,6 +330,10 @@ function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [demoUser, setDemoUser] = useState(false);
+  // True while the user is going through a "reset password" email link —
+  // Supabase signs them in automatically but they must set a new password
+  // before landing in the app.
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   useEffect(() => {
     if (!hasSupabase) {
@@ -340,7 +344,8 @@ function AuthProvider({ children }) {
       setUser(data.session?.user ?? null);
       setLoading(false);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
       setUser(session?.user ?? null);
     });
     return () => sub.subscription.unsubscribe();
@@ -368,7 +373,22 @@ function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
-  const value = { user, loading, demoUser, setDemoUser, signIn, signUp, signOut };
+  const resetPassword = useCallback(async (email) => {
+    if (!hasSupabase) throw new Error("Supabase non configuré (mode démo uniquement)");
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}${window.location.pathname}`,
+    });
+    if (error) throw error;
+  }, []);
+
+  const updatePassword = useCallback(async (password) => {
+    if (!hasSupabase) throw new Error("Supabase non configuré (mode démo uniquement)");
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw error;
+    setPasswordRecovery(false);
+  }, []);
+
+  const value = { user, loading, demoUser, setDemoUser, signIn, signUp, signOut, resetPassword, updatePassword, passwordRecovery };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
@@ -868,7 +888,7 @@ function LandingPage({ onDemo, onLogin, onSignup, onPricing, vertical, setVertic
  * SIGNUP / LOGIN
  * ==========================================================================*/
 function SignupPage({ initialMode = "login", onBack, onSuccess }) {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resetPassword } = useAuth();
   const toast = useToast();
   const [mode, setMode] = useState(initialMode);
   const [email, setEmail] = useState("");
@@ -885,6 +905,9 @@ function SignupPage({ initialMode = "login", onBack, onSuccess }) {
         await signIn(email, password);
         toast("Connecté !", "success");
         onSuccess?.();
+      } else if (mode === "forgot") {
+        await resetPassword(email);
+        setSent(true);
       } else {
         await signUp(email, password, name);
         setSent(true);
@@ -907,9 +930,25 @@ function SignupPage({ initialMode = "login", onBack, onSuccess }) {
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 40 }}>📧</div>
             <h3 style={{ ...FF, margin: "12px 0" }}>Vérifiez votre boîte mail</h3>
-            <p style={{ ...FF, color: C.textSecondary, fontSize: 14 }}>Un lien de confirmation a été envoyé à {email}.</p>
+            <p style={{ ...FF, color: C.textSecondary, fontSize: 14 }}>
+              {mode === "forgot"
+                ? <>Un lien de réinitialisation a été envoyé à {email}. Ouvrez-le pour choisir un nouveau mot de passe.</>
+                : <>Un lien de confirmation a été envoyé à {email}.</>}
+            </p>
             <Btn variant="subtle" style={{ marginTop: 16 }} onClick={onBack}>Retour</Btn>
           </div>
+        ) : mode === "forgot" ? (
+          <form onSubmit={submit}>
+            <h3 style={{ ...FF, fontSize: 18, fontWeight: 800, textAlign: "center", marginBottom: 6 }}>Mot de passe oublié</h3>
+            <p style={{ ...FF, fontSize: 13, color: C.textSecondary, textAlign: "center", marginBottom: 18 }}>
+              Entrez votre email, on vous envoie un lien pour en choisir un nouveau.
+            </p>
+            <InputField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Btn type="submit" variant="primary" size="lg" style={{ width: "100%", marginTop: 6 }} disabled={busy}>
+              {busy ? "…" : "Envoyer le lien"}
+            </Btn>
+            <button type="button" onClick={() => setMode("login")} style={{ ...FF, display: "block", margin: "16px auto 0", color: C.textSecondary, fontSize: 13 }}>← Retour à la connexion</button>
+          </form>
         ) : (
           <form onSubmit={submit}>
             <div style={{ display: "flex", gap: 6, background: C.surfaceAlt, padding: 4, borderRadius: 12, marginBottom: 20 }}>
@@ -922,10 +961,71 @@ function SignupPage({ initialMode = "login", onBack, onSuccess }) {
             {mode === "signup" && <InputField label="Nom" value={name} onChange={(e) => setName(e.target.value)} required />}
             <InputField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             <InputField label="Mot de passe" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+            {mode === "login" && (
+              <button type="button" onClick={() => setMode("forgot")} style={{ ...FF, display: "block", marginBottom: 14, color: C.accentBlue, fontSize: 13, fontWeight: 600 }}>
+                Mot de passe oublié ?
+              </button>
+            )}
             <Btn type="submit" variant="primary" size="lg" style={{ width: "100%", marginTop: 6 }} disabled={busy}>
               {busy ? "…" : mode === "login" ? "Se connecter" : "Créer mon compte"}
             </Btn>
             <button type="button" onClick={onBack} style={{ ...FF, display: "block", margin: "16px auto 0", color: C.textSecondary, fontSize: 13 }}>← Retour</button>
+          </form>
+        )}
+      </Surface>
+    </div>
+  );
+}
+
+// Landed here after clicking the "reset password" email link (Supabase signs
+// the user in and fires PASSWORD_RECOVERY). Must choose a new password before
+// entering the app.
+function NewPasswordPage() {
+  const { updatePassword, signOut } = useAuth();
+  const toast = useToast();
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (password.length < 6) return toast("6 caractères minimum", "error");
+    if (password !== confirm) return toast("Les mots de passe ne correspondent pas", "error");
+    setBusy(true);
+    try {
+      await updatePassword(password);
+      setDone(true);
+      toast("Mot de passe mis à jour !", "success");
+    } catch (err) {
+      toast(err.message || "Erreur", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <Surface style={{ width: "100%", maxWidth: 400, padding: 28 }}>
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <Logo size={32} />
+        </div>
+        {done ? (
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 40 }}>✅</div>
+            <h3 style={{ ...FF, margin: "12px 0" }}>Mot de passe mis à jour</h3>
+            <p style={{ ...FF, color: C.textSecondary, fontSize: 14, marginBottom: 16 }}>Reconnectez-vous avec votre nouveau mot de passe.</p>
+            <Btn variant="primary" size="lg" style={{ width: "100%" }} onClick={() => signOut()}>Continuer</Btn>
+          </div>
+        ) : (
+          <form onSubmit={submit}>
+            <h3 style={{ ...FF, fontSize: 18, fontWeight: 800, textAlign: "center", marginBottom: 6 }}>Nouveau mot de passe</h3>
+            <p style={{ ...FF, fontSize: 13, color: C.textSecondary, textAlign: "center", marginBottom: 18 }}>Choisissez votre nouveau mot de passe.</p>
+            <InputField label="Nouveau mot de passe" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+            <InputField label="Confirmer le mot de passe" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={6} />
+            <Btn type="submit" variant="primary" size="lg" style={{ width: "100%", marginTop: 6 }} disabled={busy}>
+              {busy ? "…" : "Valider"}
+            </Btn>
           </form>
         )}
       </Surface>
@@ -4681,7 +4781,7 @@ function GmailCallback() {
  * ROOT
  * ==========================================================================*/
 function AppInner() {
-  const { user, loading, demoUser, setDemoUser, signOut } = useAuth();
+  const { user, loading, demoUser, setDemoUser, signOut, passwordRecovery } = useAuth();
   const path = window.location.pathname;
 
   // Customer route: /r/{slug}/t/{tableNum}
@@ -4695,6 +4795,7 @@ function AppInner() {
   }, [user]);
 
   if (path.includes("/oauth/gmail")) return <GmailCallback />;
+  if (passwordRecovery) return <NewPasswordPage />;
   if (goMatch) return <GoRedirect slug={decodeURIComponent(goMatch[1])} />;
   if (customerMatch) {
     const cSlug = decodeURIComponent(customerMatch[1]);
