@@ -78,3 +78,54 @@ a {
     transform: scale(1.08);
   }
 }
+
+/* ============================================================================
+ * THÈME BAOMA — page client /r/baoma/t/{n}
+ * Porté du site vitrine (bao-test-). Volontairement en CSS pur : les effets
+ * (tilt, glow, Ken Burns, balayage) tournent sur le compositeur sans ajouter
+ * framer-motion/gsap au bundle partagé par tous les autres restaurants.
+ * ==========================================================================*/
+
+/* Zoom + dérive diagonale : donne un rendu "plan caméra" sur les photos au
+   repos. Le translate reste sous le jeu du scale (min 1.05 = ~2.4% de marge
+   par bord) pour que le plat ne sorte jamais de son cadrage. */
+@keyframes baoma-kb-tl {
+  0%   { transform: scale(1.05) translate(1%, 1%); }
+  100% { transform: scale(1.12) translate(-1%, -1%); }
+}
+@keyframes baoma-kb-tr {
+  0%   { transform: scale(1.05) translate(-1%, 1%); }
+  100% { transform: scale(1.12) translate(1%, -1%); }
+}
+@keyframes baoma-kb-bl {
+  0%   { transform: scale(1.05) translate(1%, -1%); }
+  100% { transform: scale(1.12) translate(-1%, 1%); }
+}
+@keyframes baoma-kb-br {
+  0%   { transform: scale(1.05) translate(-1%, -1%); }
+  100% { transform: scale(1.12) translate(1%, 1%); }
+}
+
+.baoma-kb {
+  animation-duration: 9s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  will-change: transform;
+}
+.baoma-kb-paused { animation-play-state: paused; }
+
+/* Révélation à l'entrée dans le viewport (piloté par IntersectionObserver,
+   pas par la position de scroll). */
+.baoma-reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.baoma-reveal-in { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .baoma-kb { animation: none; }
+  .baoma-reveal { opacity: 1; transform: none; transition: none; }
+}
