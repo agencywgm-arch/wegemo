@@ -51,14 +51,22 @@ Deno.serve(async (req) => {
     }
 
     // --- Échange du code contre un token ------------------------------------
+    // HubRise attend les identifiants du client dans l'en-tête Basic (schéma
+    // OAuth2 standard) et le code dans un corps form-urlencoded. On répète
+    // client_id dans le corps : inoffensif, et certains serveurs OAuth s'en
+    // servent en priorité.
+    const basic = btoa(`${CLIENT_ID}:${CLIENT_SECRET}`);
     const tokenRes = await fetch(`${HUBRISE_OAUTH_BASE}/token`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
+      headers: {
+        Authorization: `Basic ${basic}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
         code,
         redirect_uri,
+        client_id: CLIENT_ID,
       }),
     });
     const tokens = await tokenRes.json().catch(() => ({}));
