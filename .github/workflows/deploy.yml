@@ -31,6 +31,10 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
           VITE_BASE_PATH: ${{ secrets.VITE_BASE_PATH || '/wegemo/' }}
+          # Intégration caisse HubRise — id public de l'app (voir POS_HUBRISE.md).
+          # Seul le client_id passe par le build : le client_secret reste un
+          # secret d'edge function et ne doit jamais être préfixé VITE_.
+          VITE_HUBRISE_CLIENT_ID: ${{ secrets.VITE_HUBRISE_CLIENT_ID }}
         run: npm run build
 
       - name: SPA fallback

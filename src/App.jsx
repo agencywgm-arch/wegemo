@@ -1478,7 +1478,17 @@ function OrdersTab({ store }) {
                   <strong style={{ ...FF }}>Table {o.table?.number ?? "?"}</strong>
                   <Tag color={STATUS_META[o.status].color}>{STATUS_META[o.status].label}</Tag>
                   <Tag color={o.order_type === "takeaway" ? C.accentPurple : C.accentBlue}>{o.order_type === "takeaway" ? "À emporter" : "Sur place"}</Tag>
+                  {/* Suivi de transmission à la caisse, masqué si le restaurant
+                      n'a pas d'intégration POS (statut not_applicable). */}
+                  {o.pos_sync_status && o.pos_sync_status !== "not_applicable" && (
+                    <Tag color={(POS_SYNC_UI[o.pos_sync_status] || POS_SYNC_UI.pending).color}>
+                      Caisse : {(POS_SYNC_UI[o.pos_sync_status] || POS_SYNC_UI.pending).label}
+                    </Tag>
+                  )}
                 </div>
+                {o.pos_sync_error && (
+                  <p style={{ ...FF, fontSize: 11, color: C.accent, marginTop: 3 }}>{o.pos_sync_error}</p>
+                )}
                 <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginTop: 4 }}>
                   {(o.items || []).map((it) => `${it.quantity}× ${it.name}`).join(", ") || o.customer_name}
                   {o.note ? ` — “${o.note}”` : ""}
@@ -3124,6 +3134,7 @@ function SettingsTab({ restaurant, store, modules = ["base"], onModulesChange })
 
       <Surface style={{ padding: 18, marginBottom: 16 }}>
         <strong style={{ ...FF }}>📧 Connexion Gmail</strong>
+        <PosConnectSection restaurant={restaurant} demoMode={store.demoMode} />
         <GmailConnectSection restaurant={restaurant} />
       </Surface>
 
@@ -3143,6 +3154,190 @@ function SettingsTab({ restaurant, store, modules = ["base"], onModulesChange })
         <Btn variant="red" onClick={() => toast("Confirmation requise (démo)", "info")}>Supprimer le restaurant</Btn>
       </Surface>
     </div>
+  );
+}
+
+/* ============================================================================
+ * INTÉGRATION CAISSE (POS) VIA HUBRISE
+ *
+ * HubRise est un middleware : Wegemo ne parle qu'à son API, et HubRise traduit
+ * vers la caisse du restaurateur (CLYO aujourd'hui, une autre demain sans
+ * travail supplémentaire ici). Le token d'accès n'est jamais exposé au
+ * navigateur : il vit dans pos_connections, table sans policy RLS, et cet
+ * écran lit l'état via la fonction get_pos_connection_status().
+ * ==========================================================================*/
+const POS_STATUS_UI = {
+  connected: { label: "Connectée", color: C.accentGreen, dot: "●" },
+  error: { label: "Erreur", color: C.accent, dot: "●" },
+  disconnected: { label: "Non connectée", color: C.textTertiary, dot: "○" },
+};
+
+const POS_SYNC_UI = {
+  accepted: { label: "Acceptée en caisse", color: C.accentGreen },
+  sent: { label: "Transmise", color: C.accentBlue },
+  pending: { label: "En attente", color: C.accentOrange },
+  rejected: { label: "Refusée", color: C.accent },
+  failed: { label: "Échec", color: C.accent },
+  not_applicable: { label: "—", color: C.textTertiary },
+};
+
+function PosConnectSection({ restaurant, demoMode }) {
+  const toast = useToast();
+  const [conn, setConn] = useState(null);
+  const [logs, setLogs] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const clientId = import.meta.env.VITE_HUBRISE_CLIENT_ID;
+
+  const load = useCallback(async () => {
+    if (demoMode || !hasSupabase) return;
+    const { data } = await supabase.rpc("get_pos_connection_status", { p_restaurant_id: restaurant.id });
+    setConn(Array.isArray(data) ? data[0] ?? null : data ?? null);
+    const { data: l } = await supabase
+      .from("pos_sync_log")
+      .select("*")
+      .eq("restaurant_id", restaurant.id)
+      .order("created_at", { ascending: false })
+      .limit(8);
+    setLogs(l || []);
+  }, [restaurant.id, demoMode]);
+
+  // load() est asynchrone : ses setState ont lieu après await, pas dans le
+  // corps de l'effet. La règle ne sait pas le distinguer d'un setState direct.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { load(); }, [load]);
+
+  // Retour du flux OAuth HubRise : le code arrive en query string.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const rid = sessionStorage.getItem("wgm_hubrise_rid");
+    if (!code || rid !== restaurant.id) return;
+    sessionStorage.removeItem("wgm_hubrise_rid");
+    window.history.replaceState({}, "", window.location.pathname);
+    (async () => {
+      setBusy(true);
+      try {
+        const res = await callFunction("hubrise-connect", {
+          code, restaurant_id: restaurant.id,
+          redirect_uri: `${window.location.origin}${window.location.pathname}`,
+        });
+        if (res?.warning) toast(`Connectée, mais : ${res.warning}`, "info");
+        else toast("Caisse connectée", "success");
+        await load();
+      } catch (e) {
+        toast(e.message || "Échec de la connexion", "error");
+      } finally { setBusy(false); }
+    })();
+  }, [restaurant.id, load, toast]);
+
+  const connect = () => {
+    if (demoMode || !hasSupabase) return toast("(Démo) Connexion caisse indisponible", "info");
+    if (!clientId) return toast("VITE_HUBRISE_CLIENT_ID non configuré", "error");
+    sessionStorage.setItem("wgm_hubrise_rid", restaurant.id);
+    const redirect = `${window.location.origin}${window.location.pathname}`;
+    const url = `https://manager.hubrise.com/oauth2/v1/authorize?client_id=${encodeURIComponent(clientId)}` +
+      `&redirect_uri=${encodeURIComponent(redirect)}` +
+      `&scope=${encodeURIComponent("location[orders.write,catalog.write]")}`;
+    window.location.href = url;
+  };
+
+  const syncCatalog = async () => {
+    setBusy(true);
+    try {
+      const res = await callFunction("hubrise-sync-catalog", { restaurant_id: restaurant.id });
+      toast(`Catalogue envoyé : ${res.products} produits`, "success");
+      await load();
+    } catch (e) {
+      toast(e.message || "Échec de la synchronisation", "error");
+    } finally { setBusy(false); }
+  };
+
+  const disconnect = async () => {
+    if (!window.confirm("Déconnecter la caisse ? Les commandes ne seront plus transmises.")) return;
+    setBusy(true);
+    try {
+      await supabase.rpc("disconnect_pos", { p_restaurant_id: restaurant.id });
+      toast("Caisse déconnectée", "success");
+      await load();
+    } catch (e) {
+      toast(e.message || "Erreur", "error");
+    } finally { setBusy(false); }
+  };
+
+  const status = conn?.status || "disconnected";
+  const ui = POS_STATUS_UI[status] || POS_STATUS_UI.disconnected;
+
+  return (
+    <Surface style={{ padding: 20, marginTop: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <strong style={{ ...FF, fontSize: 16 }}>🧾 Caisse (CLYO via HubRise)</strong>
+          <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginTop: 4 }}>
+            Envoie les commandes QR code sur l'écran de caisse, en paiement sur place.
+          </p>
+        </div>
+        <span style={{ ...FF, fontSize: 13, fontWeight: 700, color: ui.color }}>
+          {ui.dot} {ui.label}
+        </span>
+      </div>
+
+      {status === "error" && conn?.last_error && (
+        <p style={{ ...FF, fontSize: 12, color: C.accent, marginTop: 10, wordBreak: "break-word" }}>
+          {conn.last_error}
+        </p>
+      )}
+
+      {conn?.hubrise_location_id && (
+        <div style={{ ...FF, fontSize: 12, color: C.textSecondary, marginTop: 10, lineHeight: 1.6 }}>
+          <div>Location HubRise : <code>{conn.hubrise_location_id}</code></div>
+          <div>
+            Catalogue : {conn.catalog_synced_at
+              ? `synchronisé le ${new Date(conn.catalog_synced_at).toLocaleString("fr-FR")}`
+              : "jamais synchronisé"}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+        {status === "connected" ? (
+          <>
+            <Btn variant="primary" size="sm" disabled={busy} onClick={syncCatalog}>
+              {busy ? "…" : "Synchroniser le menu"}
+            </Btn>
+            <Btn variant="secondary" size="sm" disabled={busy} onClick={disconnect}>Déconnecter</Btn>
+          </>
+        ) : (
+          <Btn variant="primary" size="sm" disabled={busy} onClick={connect}>
+            {busy ? "…" : "Connecter ma caisse"}
+          </Btn>
+        )}
+      </div>
+
+      {!conn?.catalog_synced_at && status === "connected" && (
+        <p style={{ ...FF, fontSize: 12, color: C.accentOrange, marginTop: 10 }}>
+          Synchronise le menu avant la première commande : la caisse ne reconnaît
+          que les articles présents dans son catalogue.
+        </p>
+      )}
+
+      {logs.length > 0 && (
+        <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+          <strong style={{ ...FF, fontSize: 12, color: C.textSecondary }}>Dernières transmissions</strong>
+          <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+            {logs.map((l) => (
+              <div key={l.id} style={{ ...FF, fontSize: 11, display: "flex", gap: 8, alignItems: "baseline" }}>
+                <span style={{ color: l.ok ? C.accentGreen : C.accent }}>{l.ok ? "✓" : "✕"}</span>
+                <span style={{ color: C.textTertiary, whiteSpace: "nowrap" }}>
+                  {new Date(l.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+                <span style={{ color: C.textSecondary, whiteSpace: "nowrap" }}>{l.action}</span>
+                <span style={{ color: C.textTertiary, overflow: "hidden", textOverflow: "ellipsis" }}>{l.message}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Surface>
   );
 }
 
@@ -4942,17 +5137,31 @@ function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, p
         onDone(uid());
         return;
       }
+      // Deux flux de paiement strictement séparés :
+      //   card → Stripe (PaymentIntent déjà confirmé avant d'arriver ici)
+      //   cash → encaissement en caisse, transmis à la caisse via HubRise
+      const paymentMode = method === "cash" ? "pay_at_counter" : "online_stripe";
       const { data: order, error } = await supabase
         .from("orders")
         .insert({
           restaurant_id: restaurant.id, table_id: tableId, total, payment_method: method,
           order_type: orderType, customer_name: profile.name, customer_email: profile.email, status: "PENDING",
+          payment_mode: paymentMode,
+          pos_sync_status: paymentMode === "pay_at_counter" ? "pending" : "not_applicable",
         })
         .select()
         .single();
       if (error) throw error;
       const items = cart.map((c) => ({ order_id: order.id, menu_item_id: c.item.id, quantity: c.qty, detail: c.supplements.map((s) => s.name).join(", ") }));
       await supabase.from("order_items").insert(items);
+
+      // Transmission à la caisse. Volontairement après l'insertion des lignes
+      // (la fonction les relit) et non bloquant : si la caisse est injoignable,
+      // la commande reste valide et visible dans la vue cuisine Wegemo, avec
+      // son pos_sync_status en échec pour que le restaurateur puisse relancer.
+      if (paymentMode === "pay_at_counter") {
+        callFunction("hubrise-push-order", { order_id: order.id }).catch(() => {});
+      }
       if (promo?.code) {
         await supabase.rpc("increment_promo_use", { p_code: promo.code });
         // Attribute the order to any marketing tracker carrying this code.
