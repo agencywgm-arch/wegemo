@@ -18,8 +18,11 @@
 //   * Il n'existe PAS de champ payment_status. Une commande sans tableau
 //     `payments` est considérée comme NON PAYÉE — c'est exactement ce qu'on
 //     veut pour l'encaissement en caisse.
-//   * Le tableau d'options du catalogue s'appelle `options_lists` (pluriel aux
-//     deux mots) alors que les SKU y font référence via `option_list_refs`.
+//   * Le tableau d'options du catalogue s'appelle `option_lists` (au singulier
+//     sur "option", comme le `option_list_refs` que les SKU utilisent pour y
+//     référer). Confirmé en recette le 2026-08-12 : `options_lists` (pluriel
+//     aux deux mots, ma première hypothèse) est rejeté par l'API avec
+//     "is not a valid key".
 
 export const HUBRISE_OAUTH_BASE = "https://manager.hubrise.com/oauth2/v1";
 export const HUBRISE_API_BASE = "https://api.hubrise.com/v1";
@@ -210,7 +213,7 @@ export function buildCatalogData(items: WegemoMenuItem[]) {
   // Les suppléments Wegemo sont libres par article ; on crée donc une liste
   // d'options par article plutôt qu'un référentiel partagé, faute de pouvoir
   // deviner que deux suppléments homonymes sont le même.
-  const options_lists: Array<Record<string, unknown>> = [];
+  const option_lists: Array<Record<string, unknown>> = [];
   const products = available.map((item) => {
     const supplements = (item.supplements ?? []).filter((s) => s?.name);
     const optionListRefs: string[] = [];
@@ -218,7 +221,7 @@ export function buildCatalogData(items: WegemoMenuItem[]) {
     if (supplements.length) {
       const listRef = `opt-${item.id}`;
       optionListRefs.push(listRef);
-      options_lists.push({
+      option_lists.push({
         ref: listRef,
         name: "Suppléments",
         // Choix libre et multiple : correspond au ComposeModal de Wegemo.
@@ -252,7 +255,7 @@ export function buildCatalogData(items: WegemoMenuItem[]) {
     variants: [],
     categories,
     products,
-    options_lists,
+    option_lists,
     deals: [],
     discounts: [],
     charges: [],
