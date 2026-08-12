@@ -69,18 +69,26 @@ Deno.serve(async (req) => {
         client_id: CLIENT_ID,
       }),
     });
-    const tokens = await tokenRes.json().catch(() => ({}));
+    // Lu en texte d'abord : une erreur HubRise peut ne pas être du JSON
+    // (page d'erreur HTML, réponse vide), et .json() planterait sans jamais
+    // laisser voir le vrai motif de refus.
+    const tokenRaw = await tokenRes.text();
+    let tokens: Record<string, unknown> = {};
+    try { tokens = tokenRaw ? JSON.parse(tokenRaw) : {}; } catch { /* pas du JSON */ }
+
     if (!tokenRes.ok || !tokens?.access_token) {
+      const detail = (tokens?.error_description as string) ?? (tokens?.error as string) ??
+        (tokens?.message as string) ?? tokenRaw.slice(0, 300) ?? `http_${tokenRes.status}`;
       await logSync(admin, restaurant_id, null, "connect", false, tokenRes.status,
-        tokens?.message ?? tokens?.error ?? "token_exchange_failed");
-      return json({ error: tokens?.message ?? "token_exchange_failed" }, 400);
+        `échange de token refusé (${tokenRes.status}) : ${detail} — redirect_uri envoyé: ${redirect_uri}`);
+      return json({ error: `token_exchange_failed: ${detail}` }, 400);
     }
 
-    const accessToken: string = tokens.access_token;
+    const accessToken = tokens.access_token as string;
     // HubRise renvoie account_id / location_id avec le token ; on retombe sur
     // GET /location si l'un des deux manque.
-    let accountId: string | null = tokens.account_id ?? null;
-    let locationId: string | null = tokens.location_id ?? null;
+    let accountId: string | null = (tokens.account_id as string) ?? null;
+    let locationId: string | null = (tokens.location_id as string) ?? null;
 
     if (!locationId) {
       const loc = await hubriseFetch("/location", accessToken);
