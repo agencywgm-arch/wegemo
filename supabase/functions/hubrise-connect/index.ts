@@ -51,10 +51,11 @@ Deno.serve(async (req) => {
     }
 
     // --- Échange du code contre un token ------------------------------------
-    // HubRise attend les identifiants du client dans l'en-tête Basic (schéma
-    // OAuth2 standard) et le code dans un corps form-urlencoded. On répète
-    // client_id dans le corps : inoffensif, et certains serveurs OAuth s'en
-    // servent en priorité.
+    // L'implémentation réelle de HubRise (voir leur démo officielle
+    // github.com/HubRise/tiny-tablet) attend client_id ET client_secret dans
+    // le corps de la requête, pas seulement dans l'en-tête Basic — contrairement
+    // au schéma OAuth2 générique. On envoie les deux : l'en-tête ne gêne pas,
+    // et le corps est ce que leur serveur regarde effectivement.
     const basic = btoa(`${CLIENT_ID}:${CLIENT_SECRET}`);
     const tokenRes = await fetch(`${HUBRISE_OAUTH_BASE}/token`, {
       method: "POST",
@@ -67,6 +68,7 @@ Deno.serve(async (req) => {
         code,
         redirect_uri,
         client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
       }),
     });
     // Lu en texte d'abord : une erreur HubRise peut ne pas être du JSON

@@ -160,10 +160,14 @@ export async function hubriseFetch(
 function extractError(data: unknown): string | undefined {
   if (!data || typeof data !== "object") return undefined;
   const d = data as Record<string, unknown>;
-  if (typeof d.message === "string") return d.message;
-  if (typeof d.error === "string") return d.error;
-  if (Array.isArray(d.errors) && d.errors.length) return JSON.stringify(d.errors);
-  return undefined;
+  // HubRise renvoie parfois un message générique ("Validation failed") ET un
+  // détail par champ dans `errors` — les deux sont utiles, on les combine
+  // plutôt que de perdre le détail derrière le message générique.
+  const parts: string[] = [];
+  if (typeof d.message === "string") parts.push(d.message);
+  if (typeof d.error === "string" && d.error !== d.message) parts.push(d.error);
+  if (Array.isArray(d.errors) && d.errors.length) parts.push(JSON.stringify(d.errors));
+  return parts.length ? parts.join(" — ") : undefined;
 }
 
 /* ==========================================================================
