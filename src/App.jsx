@@ -3244,7 +3244,23 @@ function PosConnectSection({ restaurant, demoMode }) {
   const syncCatalog = async () => {
     setBusy(true);
     try {
-      const res = await callFunction("hubrise-sync-catalog", { restaurant_id: restaurant.id });
+      let res = await callFunction("hubrise-sync-catalog", { restaurant_id: restaurant.id });
+
+      // Un catalogue existant et non vide a été trouvé sur ce point de vente,
+      // jamais géré par Wegemo jusqu'ici : on montre son contenu réel avant
+      // de laisser l'écraser, plutôt que de remplacer en silence des produits
+      // potentiellement déjà configurés côté caisse.
+      if (res?.needs_confirmation) {
+        const names = (res.existing_product_names || []).join(", ");
+        const more = res.existing_product_count > (res.existing_product_names?.length || 0) ? "…" : "";
+        const proceed = window.confirm(
+          `Ce point de vente a déjà un catalogue HubRise${res.existing_name ? ` (« ${res.existing_name} »)` : ""} avec ${res.existing_product_count} produit(s)${names ? " : " + names + more : ""}.\n\n` +
+          `Synchroniser le remplacera ENTIÈREMENT par le menu Wegemo. Continuer ?`
+        );
+        if (!proceed) { setBusy(false); return; }
+        res = await callFunction("hubrise-sync-catalog", { restaurant_id: restaurant.id, confirm: true });
+      }
+
       toast(`Catalogue envoyé : ${res.products} produits`, "success");
       await load();
     } catch (e) {
