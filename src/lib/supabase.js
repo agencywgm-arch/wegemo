@@ -24,6 +24,22 @@ export const SUPABASE_ANON_KEY = anonKey || "";
 export async function callFunction(name, body) {
   if (!supabase) throw new Error("supabase_not_configured");
   const { data, error } = await supabase.functions.invoke(name, { body });
-  if (error) throw error;
+  if (error) throw new Error(await describeFunctionError(error));
   return data;
+}
+
+// supabase-js only exposes a generic "Edge Function returned a non-2xx
+// status code" on error.message ; the actual reason lives in the JSON body
+// of error.context (a Response), which the client never reads for you.
+async function describeFunctionError(error) {
+  try {
+    const res = error?.context;
+    if (res && typeof res.clone === "function") {
+      const body = await res.clone().json();
+      if (body?.error || body?.message) return body.error ?? body.message;
+    }
+  } catch {
+    // Body absent, already consumed, or not JSON: fall back below.
+  }
+  return error?.message || "unknown_error";
 }
