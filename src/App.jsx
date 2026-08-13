@@ -433,14 +433,25 @@ function useStore(restaurantId) {
     setLoading(true);
     const [m, o, tb, ing, pr, cu, rv] = await Promise.all([
       supabase.from("menu_items").select("*").eq("restaurant_id", restaurantId).order("sort_order", { ascending: true }),
-      supabase.from("orders").select("*, table:tables(number, label)").eq("restaurant_id", restaurantId).order("created_at", { ascending: false }).limit(200),
+      supabase.from("orders").select("*, table:tables(number, label), order_items(quantity, detail, menu_items(name, emoji, price))").eq("restaurant_id", restaurantId).order("created_at", { ascending: false }).limit(200),
       supabase.from("tables").select("*").eq("restaurant_id", restaurantId).order("number"),
       supabase.from("ingredients").select("*").eq("restaurant_id", restaurantId),
       supabase.from("promotions").select("*").eq("restaurant_id", restaurantId),
       supabase.from("customers").select("*").eq("restaurant_id", restaurantId),
       supabase.from("reviews").select("*").eq("restaurant_id", restaurantId).order("created_at", { ascending: false }),
     ]);
-    const allOrders = o.data || [];
+    // order_items est jointe pour reconstituer `items` (nom, emoji, prix) tel
+    // qu'attendu par la vue Cuisine, la liste Commandes et le ticket imprimé.
+    const allOrders = (o.data || []).map((ord) => ({
+      ...ord,
+      items: (ord.order_items || []).map((oi) => ({
+        quantity: oi.quantity,
+        name: oi.menu_items?.name || "Article",
+        emoji: oi.menu_items?.emoji || "",
+        price: oi.menu_items?.price ?? 0,
+        detail: oi.detail || "",
+      })),
+    }));
     setMenu(m.data || []);
     setOrders(allOrders.filter((x) => x.status !== "DONE"));
     setDoneOrders(allOrders.filter((x) => x.status === "DONE"));
@@ -1435,10 +1446,12 @@ const STATUS_META = {
   DONE: { label: "Terminée", color: C.textTertiary },
 };
 
-function OrdersTab({ store }) {
+function OrdersTab({ restaurant, store }) {
   const toast = useToast();
   const [filter, setFilter] = useState("ALL");
   const [editing, setEditing] = useState(null);
+  const settings = useRestaurantSettings(restaurant.id, store.demoMode);
+  const [printing, setPrinting] = useState(null);
 
   const updateStatus = async (order, status) => {
     if (!store.demoMode && hasSupabase) {
@@ -1505,6 +1518,7 @@ function OrdersTab({ store }) {
                 {o.status === "PENDING" && <Btn variant="blue" size="sm" onClick={() => updateStatus(o, "PREPARING")}>Préparer</Btn>}
                 {o.status === "PREPARING" && <Btn variant="green" size="sm" onClick={() => updateStatus(o, "READY")}>Prête</Btn>}
                 {o.status === "READY" && <Btn variant="subtle" size="sm" onClick={() => updateStatus(o, "DONE")}>Servie</Btn>}
+                <Btn variant="ghost" size="sm" onClick={() => setPrinting(o)}>🖨️</Btn>
                 <Btn variant="ghost" size="sm" onClick={() => setEditing(o)}>✏️</Btn>
               </div>
             </Surface>
@@ -1512,6 +1526,7 @@ function OrdersTab({ store }) {
         </div>
       )}
       {editing && <EditOrderModal order={editing} onClose={() => setEditing(null)} onSave={updateStatus} onDelete={remove} />}
+      <TicketPrintLayer job={printing} onDone={() => setPrinting(null)} restaurant={restaurant} settings={settings} />
     </div>
   );
 }
@@ -3270,7 +3285,7 @@ function CheckinTab({ restaurant, store }) {
 /* ---- Settings ---- */
 function SettingsTab({ restaurant, store, modules = ["base"], onModulesChange }) {
   const toast = useToast();
-  const [settings, setSettings] = useState({ stripe_publishable_key: "", stripe_secret_key: "", openai_api_key: "", resend_api_key: "", resend_from: "", google_review_url: "", google_review_enabled: false });
+  const [settings, setSettings] = useState({ stripe_publishable_key: "", stripe_secret_key: "", openai_api_key: "", resend_api_key: "", resend_from: "", google_review_url: "", google_review_enabled: false, ticket_address: "", ticket_phone: "", ticket_tax_id: "", ticket_footer: "", auto_print_enabled: true });
 
   const toggleModule = async (id) => {
     if (id === "base") return; // socle always active
@@ -3356,6 +3371,23 @@ function SettingsTab({ restaurant, store, modules = ["base"], onModulesChange })
             <input type="checkbox" checked={settings.google_review_enabled} onChange={(e) => setSettings({ ...settings, google_review_enabled: e.target.checked })} /> Proposer l'avis Google après commande
           </label>
         </div>
+      </Surface>
+
+      <Surface style={{ padding: 18, marginBottom: 16 }}>
+        <strong style={{ ...FF }}>🖨️ Ticket de caisse</strong>
+        <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginTop: 6 }}>
+          Dès qu'une commande arrive, l'écran Cuisine imprime automatiquement un ticket sur l'imprimante par défaut de l'appareil sur lequel il est ouvert. Laissez ce navigateur ouvert sur l'écran Cuisine du poste relié à l'imprimante.
+        </p>
+        <label style={{ ...FF, fontSize: 14, display: "flex", gap: 8, alignItems: "center", margin: "10px 0 4px" }}>
+          <input type="checkbox" checked={settings.auto_print_enabled !== false} onChange={(e) => setSettings({ ...settings, auto_print_enabled: e.target.checked })} /> Impression automatique des tickets
+        </label>
+        <div style={{ marginTop: 8 }}>
+          {field("ticket_address", "Adresse (affichée sur le ticket)")}
+          {field("ticket_phone", "Téléphone")}
+          {field("ticket_tax_id", "SIRET / n° TVA")}
+          {field("ticket_footer", "Message de fin de ticket (ex : Merci de votre visite !)")}
+        </div>
+        <Btn variant="primary" onClick={save}>Enregistrer</Btn>
       </Surface>
 
       <Surface style={{ padding: 18, marginBottom: 16 }}>
@@ -3625,11 +3657,115 @@ function useOrderSound() {
   }, []);
 }
 
+/* ============================================================================
+ * TICKET DE CAISSE (impression)
+ *
+ * Remplace le flux CLYO côté impression : dès qu'une commande arrive côté
+ * SaaS, on déclenche l'impression navigateur sur l'imprimante système. Le
+ * ticket est scopé via `visibility` (et non `display`) pour rester imprimable
+ * quel que soit l'endroit du DOM où `TicketPrintLayer` est monté.
+ * ==========================================================================*/
+function useRestaurantSettings(restaurantId, demoMode) {
+  const [settings, setSettings] = useState({});
+  useEffect(() => {
+    if (demoMode || !hasSupabase) return;
+    let active = true;
+    supabase.from("restaurant_settings").select("*").eq("restaurant_id", restaurantId).maybeSingle()
+      .then(({ data }) => { if (active) setSettings(data || {}); });
+    return () => { active = false; };
+  }, [restaurantId, demoMode]);
+  return settings;
+}
+
+function ReceiptTicket({ order, restaurant, settings }) {
+  if (!order) return null;
+  const items = order.items || [];
+  const shortId = (order.id || "").slice(0, 8).toUpperCase();
+  const when = order.created_at ? new Date(order.created_at) : new Date();
+  const tableLabel = order.order_type === "takeaway"
+    ? "À emporter"
+    : (order.table?.label || (order.table?.number != null ? `Table ${order.table.number}` : ""));
+  const line = { display: "flex", justifyContent: "space-between", gap: 8 };
+
+  return (
+    <div style={{ width: "72mm", padding: "4mm", fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#000", background: "#fff" }}>
+      <div style={{ textAlign: "center", marginBottom: 6 }}>
+        <div style={{ fontSize: 16, fontWeight: 700 }}>{restaurant?.name}</div>
+        {settings?.ticket_address && <div>{settings.ticket_address}</div>}
+        {settings?.ticket_phone && <div>{settings.ticket_phone}</div>}
+        {settings?.ticket_tax_id && <div>SIRET : {settings.ticket_tax_id}</div>}
+      </div>
+      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+      <div>N° {shortId}</div>
+      <div>{when.toLocaleDateString("fr-FR")} {when.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</div>
+      {tableLabel && <div>{tableLabel}</div>}
+      {order.customer_name && <div>Client : {order.customer_name}</div>}
+      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+      {items.map((it, i) => (
+        <div key={i} style={line}>
+          <span>{it.quantity}× {it.name}{it.detail ? ` (${it.detail})` : ""}</span>
+          <span>{eur(Number(it.price || 0) * it.quantity)}</span>
+        </div>
+      ))}
+      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+      <div style={{ ...line, fontWeight: 700, fontSize: 14 }}>
+        <span>TOTAL</span><span>{eur(order.total)}</span>
+      </div>
+      <div style={{ marginTop: 4 }}>
+        {order.payment_method === "cash" ? "Réglé — espèces"
+          : order.payment_method === "card" ? "Réglé — carte"
+            : order.payment_mode === "pay_at_counter" ? "À encaisser en caisse" : ""}
+      </div>
+      {order.note && <div>Note : {order.note}</div>}
+      {settings?.ticket_footer && <div style={{ textAlign: "center", marginTop: 10 }}>{settings.ticket_footer}</div>}
+    </div>
+  );
+}
+
+// Monté une fois par écran (Cuisine ou Commandes) : reçoit une commande à
+// imprimer via `job`, déclenche window.print() scopé au ticket, et prévient
+// `onDone` une fois l'impression terminée (ou annulée) pour libérer la file.
+function TicketPrintLayer({ job, onDone, restaurant, settings }) {
+  useEffect(() => {
+    if (!job) return;
+    document.body.classList.add("wegemo-printing-ticket");
+    const finish = () => {
+      document.body.classList.remove("wegemo-printing-ticket");
+      window.removeEventListener("afterprint", finish);
+      onDone();
+    };
+    window.addEventListener("afterprint", finish);
+    const t = setTimeout(() => window.print(), 60);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job]);
+
+  if (!job) return null;
+  return (
+    <div id="wegemo-ticket-print">
+      <style>{`
+        @media print {
+          body.wegemo-printing-ticket * { visibility: hidden; }
+          body.wegemo-printing-ticket #wegemo-ticket-print,
+          body.wegemo-printing-ticket #wegemo-ticket-print * { visibility: visible; }
+          body.wegemo-printing-ticket #wegemo-ticket-print { position: fixed; top: 0; left: 0; width: 80mm; }
+        }
+        @media screen { #wegemo-ticket-print { position: fixed; left: -9999px; top: 0; } }
+      `}</style>
+      <ReceiptTicket order={job} restaurant={restaurant} settings={settings} />
+    </div>
+  );
+}
+
 function KitchenView({ restaurant, onExit }) {
   const store = useStore(restaurant.id);
+  const settings = useRestaurantSettings(restaurant.id, store.demoMode);
   const playSound = useOrderSound();
   const [alert, setAlert] = useState(false);
   const prevCount = useRef(0);
+  const prevIds = useRef(null);
+  const [printQueue, setPrintQueue] = useState([]);
+  const printing = printQueue[0] ?? null;
 
   useEffect(() => {
     const pending = store.orders.filter((o) => o.status === "PENDING").length;
@@ -3639,6 +3775,19 @@ function KitchenView({ restaurant, onExit }) {
     }
     prevCount.current = pending;
   }, [store.orders, playSound]);
+
+  // Ticket automatique : on n'imprime que les commandes qui n'existaient pas
+  // encore au dernier passage — le premier chargement de l'écran ne compte
+  // pas, sinon toutes les commandes déjà en cours s'imprimeraient d'un coup.
+  useEffect(() => {
+    const ids = new Set(store.orders.map((o) => o.id));
+    if (prevIds.current === null) { prevIds.current = ids; return; }
+    if (settings.auto_print_enabled !== false) {
+      const fresh = store.orders.filter((o) => !prevIds.current.has(o.id));
+      if (fresh.length) setPrintQueue((q) => [...q, ...fresh]);
+    }
+    prevIds.current = ids;
+  }, [store.orders, settings.auto_print_enabled]);
 
   const cols = [
     { status: "PENDING", title: "🆕 Nouvelles", color: C.accentOrange },
@@ -3685,9 +3834,12 @@ function KitchenView({ restaurant, onExit }) {
                       {(o.items || []).map((it, i) => <li key={i}>{it.quantity}× {it.emoji} {it.name}</li>)}
                     </ul>
                     {o.note && <p style={{ ...FF, fontSize: 13, color: C.accent }}>📝 {o.note}</p>}
-                    <Btn variant="primary" size="sm" style={{ width: "100%", marginTop: 6 }} onClick={() => advance(o)}>
-                      {o.status === "PENDING" ? "Commencer" : o.status === "PREPARING" ? "Marquer prête" : "Servie"}
-                    </Btn>
+                    <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                      <Btn variant="primary" size="sm" style={{ flex: 1 }} onClick={() => advance(o)}>
+                        {o.status === "PENDING" ? "Commencer" : o.status === "PREPARING" ? "Marquer prête" : "Servie"}
+                      </Btn>
+                      <Btn variant="subtle" size="sm" onClick={() => setPrintQueue((q) => [...q, o])}>🖨️</Btn>
+                    </div>
                   </div>
                 );
               })}
@@ -3695,6 +3847,8 @@ function KitchenView({ restaurant, onExit }) {
           </div>
         ))}
       </div>
+
+      <TicketPrintLayer job={printing} onDone={() => setPrintQueue((q) => q.slice(1))} restaurant={restaurant} settings={settings} />
 
       {alert && (
         <div onClick={() => setAlert(false)} style={{ position: "fixed", inset: 0, background: "rgba(255,55,95,.92)", zIndex: 2000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
