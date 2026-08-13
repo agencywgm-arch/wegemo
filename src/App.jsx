@@ -3,6 +3,10 @@ import QRCode from "qrcode";
 import { supabase, hasSupabase, callFunction } from "./lib/supabase.js";
 import { BAOMA_SLUG, BAOMA_THEME, BAOMA_CATEGORIES, BAOMA_MENU, BAOMA_RESTAURANT } from "./baomaData.js";
 
+// Restaurants qui utilisent le design premium Baoma (photos, tilt 3D, etc.)
+// avec leur propre carte réelle — pas seulement le restaurant de démo.
+const BAOMA_THEME_SLUGS = [BAOMA_SLUG, "baoma-xuf"];
+
 /* ============================================================================
  * THEME
  * ==========================================================================*/
@@ -4692,7 +4696,7 @@ function CustomerPage({ slug, tableNum }) {
   const dir = lang === "ar" ? "rtl" : "ltr";
 
   return (
-    <div dir={dir} style={{ minHeight: "100vh", background: restaurant.slug === BAOMA_SLUG ? BAOMA_THEME.offwhite : C.bg, maxWidth: 480, margin: "0 auto", position: "relative" }}>
+    <div dir={dir} style={{ minHeight: "100vh", background: BAOMA_THEME_SLUGS.includes(restaurant.slug) ? BAOMA_THEME.offwhite : C.bg, maxWidth: 480, margin: "0 auto", position: "relative" }}>
       {step === "ordertype" && (
         <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
@@ -4717,7 +4721,7 @@ function CustomerPage({ slug, tableNum }) {
       )}
 
       {step === "menu" && (
-        restaurant.slug === BAOMA_SLUG ? (
+        BAOMA_THEME_SLUGS.includes(restaurant.slug) ? (
           <BaomaMenu restaurant={restaurant} menu={menu} lang={lang} setLang={setLang} cart={cart} onCompose={(it) => setComposing(it)} onAdd={addToCart} onCart={() => setStep("cart")} tableLabel={tableLabel} tableNum={tableNum} />
         ) : (
           <CustomerMenu restaurant={restaurant} menu={menu} settings={settings} lang={lang} setLang={setLang} cart={cart} onCompose={(it) => setComposing(it)} onAdd={addToCart} onCart={() => setStep("cart")} tableLabel={tableLabel} tableNum={tableNum} />
