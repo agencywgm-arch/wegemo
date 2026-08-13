@@ -186,6 +186,10 @@ export interface WegemoMenuItem {
   supplements?: Array<{ name: string; price: number | string }> | null;
   available?: boolean;
   sort_order?: number | null;
+  // Référence de l'article telle que connue par la caisse elle-même (ex:
+  // l'Id interne CLYO). Quand elle est renseignée, elle remplace la référence
+  // synthétique Wegemo : la caisse ne reconnaît que ses propres codes.
+  pos_ref?: string | null;
 }
 
 /**
@@ -242,7 +246,7 @@ export function buildCatalogData(items: WegemoMenuItem[]) {
       category_ref: catRef(item.category || "Autres"),
       skus: [
         {
-          ref: skuRef(item.id),
+          ref: item.pos_ref || skuRef(item.id),
           name: item.name,
           price: money(item.price),
           option_list_refs: optionListRefs,
@@ -291,6 +295,8 @@ export interface WegemoOrderLine {
   name: string;
   price: number | string;
   supplements?: Array<{ name: string; price: number | string }> | null;
+  // Voir WegemoMenuItem.pos_ref — même logique de priorité.
+  pos_ref?: string | null;
 }
 
 export interface BuildOrderInput {
@@ -328,7 +334,7 @@ export function buildOrderPayload(input: BuildOrderInput) {
 
     return {
       product_name: line.name,
-      sku_ref: skuRef(line.menu_item_id),
+      sku_ref: line.pos_ref || skuRef(line.menu_item_id),
       sku_name: line.name,
       price: money(line.price),
       quantity: String(line.quantity ?? 1),

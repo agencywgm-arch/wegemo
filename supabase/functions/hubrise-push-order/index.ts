@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
     // --- Construction du payload -------------------------------------------
     const { data: lines } = await admin
       .from("order_items")
-      .select("menu_item_id, quantity, detail, menu_items(name, price)")
+      .select("menu_item_id, quantity, detail, menu_items(name, price, pos_ref)")
       .eq("order_id", orderId);
 
     if (!lines?.length) return json({ error: "empty_order" }, 400);
@@ -104,6 +104,7 @@ Deno.serve(async (req) => {
           detail: (l.detail as string) || null,
           name: (mi.name as string) ?? "Article",
           price: (mi.price as number) ?? 0,
+          pos_ref: (mi.pos_ref as string) || null,
           // Les suppléments choisis sont stockés en texte libre dans `detail`
           // côté Wegemo : on les laisse en note de ligne plutôt que d'inventer
           // des refs d'options que la caisse ne reconnaîtrait pas.

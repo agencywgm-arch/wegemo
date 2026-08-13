@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
 
     const { data: items } = await admin
       .from("menu_items")
-      .select("id, name, description, price, category, supplements, available, sort_order")
+      .select("id, name, description, price, category, supplements, available, sort_order, pos_ref")
       .eq("restaurant_id", restaurant_id);
 
     if (!items?.length) return json({ error: "empty_menu" }, 400);
