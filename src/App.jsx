@@ -1156,6 +1156,7 @@ const DASH_TABS = [
   { id: "setup", label: "Setup", icon: "⚡", module: "base" },
   { id: "overview", label: "Overview", icon: "📊", module: "base" },
   { id: "orders", label: "Commandes", icon: "🧾", module: "base" },
+  { id: "pos", label: "Vente", icon: "🛒", module: "base" },
   { id: "register", label: "Caisse", icon: "💶", module: "base" },
   { id: "qr", label: "QR Codes", icon: "🔳", module: "base" },
   { id: "inventory", label: "Inventaire", icon: "📦", module: "base" },
@@ -1284,6 +1285,7 @@ function DashTabContent({ tab, setTab, restaurant, store, onKitchen, onCustomerV
     case "setup": return <SetupTab restaurant={restaurant} store={store} setTab={setTab} />;
     case "overview": return <OverviewTab restaurant={restaurant} store={store} onKitchen={onKitchen} onCustomerView={onCustomerView} />;
     case "orders": return <OrdersTab restaurant={restaurant} store={store} />;
+    case "pos": return <PosTab restaurant={restaurant} store={store} />;
     case "register": return <RegisterTab restaurant={restaurant} store={store} />;
     case "qr": return <QRTab restaurant={restaurant} store={store} />;
     case "inventory": return <InventoryTab restaurant={restaurant} store={store} />;
@@ -1536,6 +1538,226 @@ function EditOrderModal({ order, onClose, onSave, onDelete }) {
 }
 
 /* ---- Register / Caisse ---- */
+/* ============================================================================
+ * PRISE DE COMMANDE AU COMPTOIR
+ *
+ * Terminal de vente pour le personnel : on tape les articles, on choisit la
+ * table (ou À emporter), on encaisse. La commande part directement en vue
+ * cuisine comme une commande QR code.
+ *
+ * Volontairement AUCUN appel à Stripe ni à la caisse externe : l'encaissement
+ * est physique et le personnel est déjà au comptoir. La commande est donc
+ * marquée pay_at_counter / not_applicable — inutile de la renvoyer vers un
+ * système de caisse devant lequel on se trouve.
+ * ==========================================================================*/
+function PosTab({ restaurant, store }) {
+  const toast = useToast();
+  const isMobile = useIsMobile();
+  const [cat, setCat] = useState("ALL");
+  const [lines, setLines] = useState([]); // { key, item, qty }
+  const [tableId, setTableId] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const available = store.menu.filter((m) => m.available !== false);
+  const cats = ["ALL", ...new Set(available.map((m) => m.category).filter(Boolean))];
+  const shown = cat === "ALL" ? available : available.filter((m) => m.category === cat);
+
+  // La table 0 sert de "vente à emporter" (créée par le seed avec les autres).
+  const sortedTables = [...store.tables].sort((a, b) => a.number - b.number);
+  const total = lines.reduce((s, l) => s + Number(l.item.price) * l.qty, 0);
+  const count = lines.reduce((s, l) => s + l.qty, 0);
+
+  const add = (item) => {
+    setLines((p) => {
+      // Même article tapé deux fois : on incrémente au lieu d'empiler.
+      const i = p.findIndex((l) => l.item.id === item.id);
+      if (i >= 0) {
+        const next = [...p];
+        next[i] = { ...next[i], qty: next[i].qty + 1 };
+        return next;
+      }
+      return [...p, { key: uid(), item, qty: 1 }];
+    });
+  };
+
+  const bump = (key, delta) => {
+    setLines((p) =>
+      p.map((l) => (l.key === key ? { ...l, qty: l.qty + delta } : l)).filter((l) => l.qty > 0),
+    );
+  };
+
+  const validate = async (method) => {
+    if (!lines.length) return toast("Le ticket est vide", "error");
+    if (!tableId) return toast("Choisis une table", "error");
+    setBusy(true);
+    try {
+      if (store.demoMode || !hasSupabase) {
+        await new Promise((r) => setTimeout(r, 400));
+        toast(`(Démo) Commande de ${eur(total)} enregistrée`, "success");
+        setLines([]);
+        return;
+      }
+      const table = sortedTables.find((t) => t.id === tableId);
+      const { data: order, error } = await supabase
+        .from("orders")
+        .insert({
+          restaurant_id: restaurant.id,
+          table_id: tableId,
+          total,
+          payment_method: method,
+          order_type: table?.number === 0 ? "takeaway" : "dine_in",
+          customer_name: "Comptoir",
+          customer_email: "",
+          status: "PENDING",
+          payment_mode: "pay_at_counter",
+          // Le personnel encaisse à l'instant même : rien à transmettre à une
+          // caisse externe, et l'argent est déjà pris.
+          pos_sync_status: "not_applicable",
+          cash_collected: true,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+
+      await supabase.from("order_items").insert(
+        lines.map((l) => ({
+          order_id: order.id,
+          menu_item_id: l.item.id,
+          quantity: l.qty,
+          detail: "",
+        })),
+      );
+
+      toast(`Commande envoyée en cuisine — ${eur(total)}`, "success");
+      setLines([]);
+      store.reload();
+    } catch (e) {
+      toast(e.message || "Erreur", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const ticket = (
+    <Surface style={{ padding: 16, position: isMobile ? "static" : "sticky", top: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <strong style={{ ...FF, fontSize: 16 }}>🧾 Ticket</strong>
+        {lines.length > 0 && (
+          <button onClick={() => setLines([])} style={{ ...FF, fontSize: 13, color: C.accent }}>
+            Vider
+          </button>
+        )}
+      </div>
+
+      <select
+        value={tableId}
+        onChange={(e) => setTableId(e.target.value)}
+        style={{ ...FF, width: "100%", padding: "11px 12px", borderRadius: 12, border: `1px solid ${C.border}`, background: C.surface, fontSize: 15, marginBottom: 12 }}
+      >
+        <option value="">— Choisir une table —</option>
+        {sortedTables.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.number === 0 ? "🥡 À emporter" : `🍽️ ${t.label || `Table ${t.number}`}`}
+          </option>
+        ))}
+      </select>
+
+      {lines.length === 0 ? (
+        <p style={{ ...FF, color: C.textTertiary, fontSize: 14, textAlign: "center", padding: "20px 0" }}>
+          Touche un article pour l'ajouter
+        </p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12, maxHeight: isMobile ? "none" : "40vh", overflowY: "auto" }}>
+          {lines.map((l) => (
+            <div key={l.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ ...FF, fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {l.item.name}
+                </div>
+                <div style={{ ...FF, fontSize: 12, color: C.textSecondary }}>
+                  {eur(Number(l.item.price) * l.qty)}
+                </div>
+              </div>
+              <button onClick={() => bump(l.key, -1)} style={{ ...FF, width: 32, height: 32, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 18, fontWeight: 700 }}>−</button>
+              <span style={{ ...FF, minWidth: 22, textAlign: "center", fontWeight: 700 }}>{l.qty}</span>
+              <button onClick={() => bump(l.key, 1)} style={{ ...FF, width: 32, height: 32, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 18, fontWeight: 700 }}>+</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "12px 0", borderTop: `1px solid ${C.border}` }}>
+        <span style={{ ...FF, fontWeight: 700 }}>Total {count > 0 && `(${count})`}</span>
+        <strong style={{ ...FF, fontSize: 24, fontWeight: 900 }}>{eur(total)}</strong>
+      </div>
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <Btn variant="primary" size="lg" style={{ flex: 1 }} disabled={busy || !lines.length} onClick={() => validate("cash")}>
+          💵 Espèces
+        </Btn>
+        <Btn variant="secondary" size="lg" style={{ flex: 1 }} disabled={busy || !lines.length} onClick={() => validate("card")}>
+          💳 Carte
+        </Btn>
+      </div>
+      <p style={{ ...FF, fontSize: 11, color: C.textTertiary, marginTop: 8, textAlign: "center" }}>
+        Encaissement au comptoir — la commande part en cuisine.
+      </p>
+    </Surface>
+  );
+
+  return (
+    <div>
+      <h2 style={{ ...FF, fontSize: 22, fontWeight: 800, marginBottom: 4 }}>🛒 Prise de commande</h2>
+      <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginBottom: 16 }}>
+        Pour les clients qui commandent directement au comptoir.
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 340px", gap: 16, alignItems: "start" }}>
+        <div>
+          <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 10, marginBottom: 4 }}>
+            {cats.map((c) => (
+              <button
+                key={c}
+                onClick={() => setCat(c)}
+                style={{ ...FF, flexShrink: 0, whiteSpace: "nowrap", padding: "7px 14px", borderRadius: 999, fontWeight: 600, fontSize: 13, border: `1px solid ${cat === c ? C.text : C.border}`, background: cat === c ? C.text : C.surface, color: cat === c ? C.white : C.text }}
+              >
+                {c === "ALL" ? "Tout" : c}
+              </button>
+            ))}
+          </div>
+
+          {shown.length === 0 ? (
+            <Surface style={{ padding: 30, textAlign: "center", ...FF, color: C.textSecondary }}>
+              Aucun article dans la carte.
+            </Surface>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 108 : 140}px, 1fr))`, gap: 10 }}>
+              {shown.map((m) => {
+                const out = m.stock != null && Number(m.stock) <= 0;
+                return (
+                  <button
+                    key={m.id}
+                    disabled={out}
+                    onClick={() => add(m)}
+                    style={{ ...FF, textAlign: "left", padding: 12, borderRadius: 14, border: `1px solid ${C.border}`, background: C.surface, opacity: out ? 0.45 : 1, minHeight: 84, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 6 }}
+                  >
+                    <span style={{ ...FF, fontSize: 13, fontWeight: 600, lineHeight: 1.25 }}>{m.name}</span>
+                    <strong style={{ ...FF, fontSize: 14, color: out ? C.textTertiary : C.accentGreen }}>
+                      {out ? "Épuisé" : eur(m.price)}
+                    </strong>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {ticket}
+      </div>
+    </div>
+  );
+}
+
 function RegisterTab({ restaurant, store }) {
   const toast = useToast();
   const all = [...store.orders, ...store.doneOrders];

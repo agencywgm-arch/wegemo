@@ -48,10 +48,11 @@ const MENU = [
 
 test("le catalogue expose les clés attendues par HubRise", () => {
   const data = buildCatalogData(MENU);
-  // `options_lists` : pluriel aux deux mots, contrairement à option_list_refs.
+  // `option_lists` : singulier sur "option", confirmé en recette le
+  // 2026-08-12 (l'API rejette "options_lists" avec "is not a valid key").
   assert.deepEqual(
     Object.keys(data).sort(),
-    ["categories", "charges", "deals", "discounts", "options_lists", "products", "variants"],
+    ["categories", "charges", "deals", "discounts", "option_lists", "products", "variants"],
   );
 });
 
@@ -75,7 +76,7 @@ test("les suppléments deviennent une liste d'options rattachée au SKU", () => 
   const frites = data.products.find((p) => p.ref === "uuid-frites")!;
   assert.deepEqual(frites.skus[0].option_list_refs, ["opt-uuid-frites"]);
 
-  const list = data.options_lists.find((l) => l.ref === "opt-uuid-frites")!;
+  const list = data.option_lists.find((l) => l.ref === "opt-uuid-frites")!;
   assert.equal((list.options as unknown[]).length, 2);
   assert.equal((list.options as Array<{ price: string }>)[0].price, "1.50 EUR");
 
