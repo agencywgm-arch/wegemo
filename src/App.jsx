@@ -1572,10 +1572,12 @@ function EditOrderModal({ order, onClose, onSave, onDelete }) {
 function PosTab({ restaurant, store }) {
   const toast = useToast();
   const isMobile = useIsMobile();
+  const settings = useRestaurantSettings(restaurant.id, store.demoMode);
   const [cat, setCat] = useState("ALL");
   const [lines, setLines] = useState([]); // { key, item, qty }
   const [tableId, setTableId] = useState("");
   const [busy, setBusy] = useState(false);
+  const [printing, setPrinting] = useState(null);
 
   const available = store.menu.filter((m) => m.available !== false);
   const cats = ["ALL", ...new Set(available.map((m) => m.category).filter(Boolean))];
@@ -1605,15 +1607,36 @@ function PosTab({ restaurant, store }) {
     );
   };
 
+  // Le ticket imprimé au comptoir est construit à partir du panier tel qu'il
+  // est au moment de valider, pas de la commande relue en base ensuite : le
+  // personnel doit avoir son papier immédiatement, sans attendre un aller-retour.
+  const buildTicketJob = (order, method) => {
+    const table = sortedTables.find((t) => t.id === tableId);
+    return {
+      id: order?.id || uid(),
+      created_at: order?.created_at || new Date().toISOString(),
+      order_type: table?.number === 0 ? "takeaway" : "dine_in",
+      table: table ? { number: table.number, label: table.label } : null,
+      customer_name: "Comptoir",
+      items: lines.map((l) => ({ quantity: l.qty, name: l.item.name, price: l.item.price, detail: "" })),
+      total,
+      payment_method: method,
+      payment_mode: "pay_at_counter",
+      note: "",
+    };
+  };
+
   const validate = async (method) => {
     if (!lines.length) return toast("Le ticket est vide", "error");
     if (!tableId) return toast("Choisis une table", "error");
     setBusy(true);
     try {
       if (store.demoMode || !hasSupabase) {
+        const job = buildTicketJob(null, method);
         await new Promise((r) => setTimeout(r, 400));
         toast(`(Démo) Commande de ${eur(total)} enregistrée`, "success");
         setLines([]);
+        setPrinting(job);
         return;
       }
       const table = sortedTables.find((t) => t.id === tableId);
@@ -1647,8 +1670,10 @@ function PosTab({ restaurant, store }) {
         })),
       );
 
+      const job = buildTicketJob(order, method);
       toast(`Commande envoyée en cuisine — ${eur(total)}`, "success");
       setLines([]);
+      setPrinting(job);
       store.reload();
     } catch (e) {
       toast(e.message || "Erreur", "error");
@@ -1773,6 +1798,7 @@ function PosTab({ restaurant, store }) {
 
         {ticket}
       </div>
+      <TicketPrintLayer job={printing} onDone={() => setPrinting(null)} restaurant={restaurant} settings={settings} />
     </div>
   );
 }
