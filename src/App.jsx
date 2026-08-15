@@ -1607,6 +1607,8 @@ function PosTab({ restaurant, store }) {
     );
   };
 
+  const removeLine = (key) => setLines((p) => p.filter((l) => l.key !== key));
+
   // Le ticket imprimé au comptoir est construit à partir du panier tel qu'il
   // est au moment de valider, pas de la commande relue en base ensuite : le
   // personnel doit avoir son papier immédiatement, sans attendre un aller-retour.
@@ -1682,29 +1684,49 @@ function PosTab({ restaurant, store }) {
     }
   };
 
+  const checkoutBar = (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "10px 0" }}>
+        <span style={{ ...FF, fontWeight: 700 }}>Total {count > 0 && `(${count})`}</span>
+        <strong style={{ ...FF, fontSize: 26, fontWeight: 900 }}>{eur(total)}</strong>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <Btn variant="primary" size="lg" style={{ flex: 1, minHeight: 58, fontSize: 17 }} disabled={busy || !lines.length} onClick={() => validate("cash")}>
+          💵 Espèces
+        </Btn>
+        <Btn variant="blue" size="lg" style={{ flex: 1, minHeight: 58, fontSize: 17 }} disabled={busy || !lines.length} onClick={() => validate("card")}>
+          💳 Carte
+        </Btn>
+      </div>
+    </div>
+  );
+
   const ticket = (
     <Surface style={{ padding: 16, position: isMobile ? "static" : "sticky", top: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <strong style={{ ...FF, fontSize: 16 }}>🧾 Ticket</strong>
         {lines.length > 0 && (
-          <button onClick={() => setLines([])} style={{ ...FF, fontSize: 13, color: C.accent }}>
+          <button onClick={() => setLines([])} style={{ ...FF, fontSize: 13, color: C.accent, padding: "6px 4px" }}>
             Vider
           </button>
         )}
       </div>
 
-      <select
-        value={tableId}
-        onChange={(e) => setTableId(e.target.value)}
-        style={{ ...FF, width: "100%", padding: "11px 12px", borderRadius: 12, border: `1px solid ${C.border}`, background: C.surface, fontSize: 15, marginBottom: 12 }}
-      >
-        <option value="">— Choisir une table —</option>
-        {sortedTables.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.number === 0 ? "🥡 À emporter" : `🍽️ ${t.label || `Table ${t.number}`}`}
-          </option>
-        ))}
-      </select>
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, marginBottom: 14 }}>
+        {sortedTables.map((t) => {
+          const selected = tableId === t.id;
+          const label = t.number === 0 ? "🥡 À emporter" : `🍽️ ${t.label || `Table ${t.number}`}`;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTableId(t.id)}
+              style={{ ...FF, flexShrink: 0, whiteSpace: "nowrap", padding: "10px 16px", borderRadius: 999, fontWeight: 700, fontSize: 14, border: `2px solid ${selected ? C.accentBlue : C.border}`, background: selected ? C.accentBlue : C.surface, color: selected ? C.white : C.text }}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
 
       {lines.length === 0 ? (
         <p style={{ ...FF, color: C.textTertiary, fontSize: 14, textAlign: "center", padding: "20px 0" }}>
@@ -1713,57 +1735,51 @@ function PosTab({ restaurant, store }) {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12, maxHeight: isMobile ? "none" : "40vh", overflowY: "auto" }}>
           {lines.map((l) => (
-            <div key={l.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div key={l.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ ...FF, fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {l.item.name}
+                  {l.item.emoji} {l.item.name}
                 </div>
                 <div style={{ ...FF, fontSize: 12, color: C.textSecondary }}>
                   {eur(Number(l.item.price) * l.qty)}
                 </div>
               </div>
-              <button onClick={() => bump(l.key, -1)} style={{ ...FF, width: 32, height: 32, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 18, fontWeight: 700 }}>−</button>
-              <span style={{ ...FF, minWidth: 22, textAlign: "center", fontWeight: 700 }}>{l.qty}</span>
-              <button onClick={() => bump(l.key, 1)} style={{ ...FF, width: 32, height: 32, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 18, fontWeight: 700 }}>+</button>
+              <button onClick={() => bump(l.key, -1)} style={{ ...FF, width: 38, height: 38, borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 20, fontWeight: 700 }}>−</button>
+              <span style={{ ...FF, minWidth: 24, textAlign: "center", fontWeight: 700, fontSize: 15 }}>{l.qty}</span>
+              <button onClick={() => bump(l.key, 1)} style={{ ...FF, width: 38, height: 38, borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 20, fontWeight: 700 }}>+</button>
+              <button onClick={() => removeLine(l.key)} style={{ ...FF, width: 38, height: 38, borderRadius: 10, border: "none", background: "transparent", fontSize: 16, color: C.textTertiary }}>🗑️</button>
             </div>
           ))}
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "12px 0", borderTop: `1px solid ${C.border}` }}>
-        <span style={{ ...FF, fontWeight: 700 }}>Total {count > 0 && `(${count})`}</span>
-        <strong style={{ ...FF, fontSize: 24, fontWeight: 900 }}>{eur(total)}</strong>
-      </div>
-
-      <div style={{ display: "flex", gap: 8 }}>
-        <Btn variant="primary" size="lg" style={{ flex: 1 }} disabled={busy || !lines.length} onClick={() => validate("cash")}>
-          💵 Espèces
-        </Btn>
-        <Btn variant="secondary" size="lg" style={{ flex: 1 }} disabled={busy || !lines.length} onClick={() => validate("card")}>
-          💳 Carte
-        </Btn>
-      </div>
-      <p style={{ ...FF, fontSize: 11, color: C.textTertiary, marginTop: 8, textAlign: "center" }}>
-        Encaissement au comptoir — la commande part en cuisine.
-      </p>
+      {!isMobile && (
+        <div style={{ borderTop: `1px solid ${C.border}` }}>
+          {checkoutBar}
+          <p style={{ ...FF, fontSize: 11, color: C.textTertiary, marginTop: 4, textAlign: "center" }}>
+            Encaissement au comptoir — la commande part en cuisine.
+          </p>
+        </div>
+      )}
     </Surface>
   );
 
   return (
-    <div>
+    <div style={{ paddingBottom: isMobile ? 160 : 0 }}>
+      <style>{`.wgm-pos-tile:active { transform: scale(0.95); box-shadow: 0 0 0 2px ${C.accentBlue} inset; }`}</style>
       <h2 style={{ ...FF, fontSize: 22, fontWeight: 800, marginBottom: 4 }}>🛒 Prise de commande</h2>
       <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginBottom: 16 }}>
         Pour les clients qui commandent directement au comptoir.
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 340px", gap: 16, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "minmax(0, 1fr)" : "minmax(0, 1fr) 340px", gap: 16, alignItems: "start" }}>
         <div>
           <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 10, marginBottom: 4 }}>
             {cats.map((c) => (
               <button
                 key={c}
                 onClick={() => setCat(c)}
-                style={{ ...FF, flexShrink: 0, whiteSpace: "nowrap", padding: "7px 14px", borderRadius: 999, fontWeight: 600, fontSize: 13, border: `1px solid ${cat === c ? C.text : C.border}`, background: cat === c ? C.text : C.surface, color: cat === c ? C.white : C.text }}
+                style={{ ...FF, flexShrink: 0, whiteSpace: "nowrap", padding: "9px 16px", borderRadius: 999, fontWeight: 600, fontSize: 14, border: `1px solid ${cat === c ? C.text : C.border}`, background: cat === c ? C.text : C.surface, color: cat === c ? C.white : C.text }}
               >
                 {c === "ALL" ? "Tout" : c}
               </button>
@@ -1775,18 +1791,26 @@ function PosTab({ restaurant, store }) {
               Aucun article dans la carte.
             </Surface>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 108 : 140}px, 1fr))`, gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 128 : 152}px, 1fr))`, gap: 10 }}>
               {shown.map((m) => {
                 const out = m.stock != null && Number(m.stock) <= 0;
+                const inCart = lines.find((l) => l.item.id === m.id)?.qty;
                 return (
                   <button
                     key={m.id}
                     disabled={out}
                     onClick={() => add(m)}
-                    style={{ ...FF, textAlign: "left", padding: 12, borderRadius: 14, border: `1px solid ${C.border}`, background: C.surface, opacity: out ? 0.45 : 1, minHeight: 84, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 6 }}
+                    className="wgm-pos-tile"
+                    style={{ ...FF, position: "relative", textAlign: "left", padding: 14, borderRadius: 16, border: `2px solid ${inCart ? C.accentBlue : C.border}`, background: C.surface, opacity: out ? 0.45 : 1, minHeight: 108, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 8, transition: "transform .1s ease, box-shadow .1s ease" }}
                   >
-                    <span style={{ ...FF, fontSize: 13, fontWeight: 600, lineHeight: 1.25 }}>{m.name}</span>
-                    <strong style={{ ...FF, fontSize: 14, color: out ? C.textTertiary : C.accentGreen }}>
+                    {inCart > 0 && (
+                      <span style={{ position: "absolute", top: -8, right: -8, background: C.accentBlue, color: C.white, borderRadius: 999, minWidth: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, padding: "0 6px" }}>
+                        {inCart}
+                      </span>
+                    )}
+                    <span style={{ fontSize: 26, lineHeight: 1 }}>{m.emoji || "🍽️"}</span>
+                    <span style={{ ...FF, fontSize: 14, fontWeight: 700, lineHeight: 1.25 }}>{m.name}</span>
+                    <strong style={{ ...FF, fontSize: 15, color: out ? C.textTertiary : C.accentGreen }}>
                       {out ? "Épuisé" : eur(m.price)}
                     </strong>
                   </button>
@@ -1798,6 +1822,13 @@ function PosTab({ restaurant, store }) {
 
         {ticket}
       </div>
+
+      {isMobile && (
+        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: C.surface, borderTop: `1px solid ${C.border}`, padding: "10px 16px calc(10px + env(safe-area-inset-bottom))", zIndex: 60, boxShadow: "0 -4px 16px rgba(0,0,0,.08)" }}>
+          {checkoutBar}
+        </div>
+      )}
+
       <TicketPrintLayer job={printing} onDone={() => setPrinting(null)} restaurant={restaurant} settings={settings} />
     </div>
   );
