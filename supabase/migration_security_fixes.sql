@@ -32,6 +32,7 @@ create table if not exists campaign_logs (
   created_at timestamptz not null default now()
 );
 alter table campaign_logs enable row level security;
+drop policy if exists "Owner manages campaign_logs" on campaign_logs;
 create policy "Owner manages campaign_logs" on campaign_logs for all using (
   exists (select 1 from restaurants r where r.id = campaign_logs.restaurant_id and r.owner_id = auth.uid())
 );

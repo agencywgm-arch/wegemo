@@ -15,6 +15,7 @@ create table if not exists influencer_analyses (
   created_at timestamptz not null default now()
 );
 alter table influencer_analyses enable row level security;
+drop policy if exists "Owner manages influencer analyses" on influencer_analyses;
 create policy "Owner manages influencer analyses" on influencer_analyses for all using (
   exists (select 1 from restaurants r where r.id = influencer_analyses.restaurant_id and r.owner_id = auth.uid())
 ) with check (

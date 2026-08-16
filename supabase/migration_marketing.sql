@@ -22,6 +22,7 @@ create table if not exists marketing_trackers (
   created_at timestamptz not null default now()
 );
 alter table marketing_trackers enable row level security;
+drop policy if exists "Owner manages trackers" on marketing_trackers;
 create policy "Owner manages trackers" on marketing_trackers for all using (
   exists (select 1 from restaurants r where r.id = marketing_trackers.restaurant_id and r.owner_id = auth.uid())
 ) with check (

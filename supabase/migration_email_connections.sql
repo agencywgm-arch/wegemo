@@ -10,6 +10,7 @@ create table if not exists email_connections (
   unique(restaurant_id)
 );
 alter table email_connections enable row level security;
+drop policy if exists "Owner manages email connection" on email_connections;
 create policy "Owner manages email connection" on email_connections for all using (
   exists (select 1 from restaurants r where r.id = email_connections.restaurant_id and r.owner_id = auth.uid())
 );

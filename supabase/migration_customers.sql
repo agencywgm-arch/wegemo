@@ -14,6 +14,7 @@ create table if not exists customers (
   unique(restaurant_id, email)
 );
 alter table customers enable row level security;
+drop policy if exists "Owner manages customers" on customers;
 create policy "Owner manages customers" on customers for all using (
   exists (select 1 from restaurants r where r.id = customers.restaurant_id and r.owner_id = auth.uid())
 );
@@ -30,5 +31,6 @@ begin
   end if;
   return NEW;
 end; $$;
+drop trigger if exists customer_stats_trigger on customers;
 create trigger customer_stats_trigger before insert or update on customers
   for each row execute function update_customer_stats();
