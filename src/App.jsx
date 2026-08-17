@@ -3908,7 +3908,7 @@ function ReceiptTicket({ order, restaurant, settings, detailed = true }) {
     // laisse le ticket se conformer au papier réel, `maxWidth` l'empêche de
     // s'étaler au-delà de la zone imprimable d'un rouleau 80mm standard, et
     // `border-box` évite que le padding s'ajoute à cette largeur.
-    <div style={{ width: "100%", maxWidth: "72mm", boxSizing: "border-box", padding: "2mm", fontFamily: "'Courier New', Courier, monospace", fontSize: 16, lineHeight: 1.35, color: "#000", background: "#fff" }}>
+    <div style={{ width: "100%", maxWidth: "72mm", boxSizing: "border-box", padding: "2mm", fontFamily: "'Courier New', Courier, monospace", fontSize: 16, fontWeight: 700, lineHeight: 1.35, color: "#000", background: "#fff" }}>
       {isTest && (
         <div style={{ textAlign: "center", fontWeight: 700, border: "2px solid #000", padding: "4px 0", marginBottom: 6 }}>
           *** TICKET TEST — NE PAS ENCAISSER ***
@@ -4007,7 +4007,7 @@ function KitchenTicket({ order }) {
   const num = order.fiscal_number || (order.id || "").slice(0, 8).toUpperCase();
 
   return (
-    <div style={{ width: "100%", maxWidth: "72mm", boxSizing: "border-box", padding: "2mm", fontFamily: "'Courier New', Courier, monospace", fontSize: 18, lineHeight: 1.4, color: "#000", background: "#fff" }}>
+    <div style={{ width: "100%", maxWidth: "72mm", boxSizing: "border-box", padding: "2mm", fontFamily: "'Courier New', Courier, monospace", fontSize: 18, fontWeight: 700, lineHeight: 1.4, color: "#000", background: "#fff" }}>
       <div style={{ textAlign: "center", fontWeight: 700, fontSize: 20 }}>🍳 BON DE CUISINE</div>
       <div style={{ borderTop: "2px dashed #000", margin: "6px 0" }} />
       {tableLabel && <div style={{ textAlign: "center", fontWeight: 700, fontSize: 26 }}>{tableLabel}</div>}
