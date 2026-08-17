@@ -158,9 +158,9 @@ const DEMO_MENU = [
 ];
 const minsAgo = (m) => new Date(Date.now() - m * 60000).toISOString();
 const DEMO_ORDERS = [
-  { id: "o1", restaurant_id: "demo", table_id: "t3", status: "PENDING", note: "Sans oignons", total: 19, payment_method: "card", customer_name: "Léa", order_type: "dine_in", cash_collected: false, created_at: minsAgo(3), table: { number: 3 }, items: [{ name: "Burger Maison", emoji: "🍔", quantity: 1 }, { name: "Frites Maison", emoji: "🍟", quantity: 1 }] },
-  { id: "o2", restaurant_id: "demo", table_id: "t1", status: "PREPARING", note: "", total: 11, payment_method: "cash", customer_name: "Tom", order_type: "takeaway", cash_collected: false, created_at: minsAgo(8), table: { number: 1 }, items: [{ name: "Pizza Margherita", emoji: "🍕", quantity: 1 }] },
-  { id: "o3", restaurant_id: "demo", table_id: "t5", status: "READY", note: "", total: 16, payment_method: "card", customer_name: "Sarah", order_type: "dine_in", cash_collected: false, created_at: minsAgo(12), table: { number: 5 }, items: [{ name: "Salade César", emoji: "🥗", quantity: 1 }, { name: "Limonade Maison", emoji: "🍋", quantity: 1 }] },
+  { id: "o1", restaurant_id: "demo", table_id: "t3", status: "PENDING", note: "Sans oignons", total: 19, covers: 2, payment_method: "card", customer_name: "Léa", order_type: "dine_in", cash_collected: false, created_at: minsAgo(3), table: { number: 3 }, items: [{ name: "Burger Maison", emoji: "🍔", quantity: 1, price: 14.5, vat_rate: 10 }, { name: "Frites Maison", emoji: "🍟", quantity: 1, price: 4.5, vat_rate: 10 }] },
+  { id: "o2", restaurant_id: "demo", table_id: "t1", status: "PREPARING", note: "", total: 11, covers: 1, payment_method: "cash", customer_name: "Tom", order_type: "takeaway", cash_collected: false, created_at: minsAgo(8), table: { number: 1 }, items: [{ name: "Pizza Margherita", emoji: "🍕", quantity: 1, price: 11, vat_rate: 10 }] },
+  { id: "o3", restaurant_id: "demo", table_id: "t5", status: "READY", note: "", total: 16, covers: 2, payment_method: "card", customer_name: "Sarah", order_type: "dine_in", cash_collected: false, created_at: minsAgo(12), table: { number: 5 }, items: [{ name: "Salade César", emoji: "🥗", quantity: 1, price: 12, vat_rate: 10 }, { name: "Limonade Maison", emoji: "🍋", quantity: 1, price: 4, vat_rate: 10 }] },
 ];
 const DEMO_DONE_ORDERS = [
   { id: "d1", restaurant_id: "demo", status: "DONE", total: 28, payment_method: "card", created_at: minsAgo(60), table: { number: 2 } },
@@ -287,6 +287,13 @@ const verticalOf = (id) => VERTICALS[id] || VERTICALS.resto;
  * SMALL HELPERS
  * ==========================================================================*/
 const eur = (n) => `${Number(n || 0).toFixed(2)} €`;
+
+// Lettre de TVA par taux, convention standard des logiciels de caisse
+// français (20 % = A, taux réduits ensuite par ordre décroissant) : permet
+// de reconnaître un taux d'un coup d'œil sur le ticket sans répéter le
+// pourcentage sur chaque ligne d'article.
+const VAT_LETTERS = { 20: "A", 10: "B", 5.5: "C", 2.1: "D", 0: "E" };
+const vatLetter = (rate) => VAT_LETTERS[Number(rate)] || "?";
 const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : `id-${Math.random().toString(36).slice(2)}`);
 const slugify = (s) =>
   s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") ||
@@ -433,7 +440,7 @@ function useStore(restaurantId) {
     setLoading(true);
     const [m, o, tb, ing, pr, cu, rv] = await Promise.all([
       supabase.from("menu_items").select("*").eq("restaurant_id", restaurantId).order("sort_order", { ascending: true }),
-      supabase.from("orders").select("*, table:tables(number, label), order_items(quantity, detail, menu_items(name, emoji, price))").eq("restaurant_id", restaurantId).order("created_at", { ascending: false }).limit(200),
+      supabase.from("orders").select("*, table:tables(number, label), order_items(quantity, detail, menu_items(name, emoji, price, vat_rate))").eq("restaurant_id", restaurantId).order("created_at", { ascending: false }).limit(200),
       supabase.from("tables").select("*").eq("restaurant_id", restaurantId).order("number"),
       supabase.from("ingredients").select("*").eq("restaurant_id", restaurantId),
       supabase.from("promotions").select("*").eq("restaurant_id", restaurantId),
@@ -449,6 +456,7 @@ function useStore(restaurantId) {
         name: oi.menu_items?.name || "Article",
         emoji: oi.menu_items?.emoji || "",
         price: oi.menu_items?.price ?? 0,
+        vat_rate: oi.menu_items?.vat_rate ?? 10,
         detail: oi.detail || "",
       })),
     }));
@@ -1453,12 +1461,15 @@ function OrdersTab({ restaurant, store }) {
   const settings = useRestaurantSettings(restaurant.id, store.demoMode);
   const [printing, setPrinting] = useState(null);
 
+  // `order` porte les champs édités (note, couverts) quand l'appel vient du
+  // modal ; les boutons de statut rapides passent la commande telle quelle,
+  // ce qui réécrit alors les mêmes valeurs — sans effet, donc sans risque.
   const updateStatus = async (order, status) => {
     if (!store.demoMode && hasSupabase) {
-      await supabase.from("orders").update({ status }).eq("id", order.id);
+      await supabase.from("orders").update({ status, note: order.note || "", covers: order.covers ?? null }).eq("id", order.id);
       store.reload();
     } else {
-      store.setOrders((p) => p.map((o) => (o.id === order.id ? { ...o, status } : o)));
+      store.setOrders((p) => p.map((o) => (o.id === order.id ? { ...o, ...order, status } : o)));
     }
     toast(`Commande → ${STATUS_META[status].label}`, "success");
   };
@@ -1535,6 +1546,7 @@ function OrdersTab({ restaurant, store }) {
 function EditOrderModal({ order, onClose, onSave, onDelete }) {
   const [status, setStatus] = useState(order.status);
   const [note, setNote] = useState(order.note || "");
+  const [covers, setCovers] = useState(order.covers ?? "");
   return (
     <Modal onClose={onClose}>
       <div style={{ padding: 22 }}>
@@ -1548,8 +1560,9 @@ function EditOrderModal({ order, onClose, onSave, onDelete }) {
           ))}
         </div>
         <InputField label="Note" value={note} onChange={(e) => setNote(e.target.value)} />
+        <InputField label="Couverts (affiché sur le ticket)" type="number" min="0" value={covers} onChange={(e) => setCovers(e.target.value)} style={{ width: 140 }} />
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          <Btn variant="primary" style={{ flex: 1 }} onClick={() => { onSave({ ...order, note }, status); onClose(); }}>Enregistrer</Btn>
+          <Btn variant="primary" style={{ flex: 1 }} onClick={() => { onSave({ ...order, note, covers: covers === "" ? null : Number(covers) }, status); onClose(); }}>Enregistrer</Btn>
           <Btn variant="red" onClick={() => onDelete(order)}>Supprimer</Btn>
         </div>
       </div>
@@ -1577,6 +1590,7 @@ function PosTab({ restaurant, store }) {
   const [cat, setCat] = useState("ALL");
   const [lines, setLines] = useState([]); // { key, item, qty }
   const [tableId, setTableId] = useState("");
+  const [covers, setCovers] = useState("");
   const [busy, setBusy] = useState(false);
   const [printing, setPrinting] = useState(null);
   const [printDetailed, setPrintDetailed] = useState(true);
@@ -1644,7 +1658,8 @@ function PosTab({ restaurant, store }) {
       order_type: table?.number === 0 ? "takeaway" : "dine_in",
       table: table ? { number: table.number, label: table.label } : null,
       customer_name: "Comptoir",
-      items: lines.map((l) => ({ quantity: l.qty, name: l.item.name, price: l.item.price, detail: "" })),
+      covers: covers === "" ? null : Number(covers),
+      items: lines.map((l) => ({ quantity: l.qty, name: l.item.name, price: l.item.price, vat_rate: Number(l.item.vat_rate ?? 10), detail: "" })),
       subtotal: res?.subtotal ?? total,
       discount: res?.discount ?? 0,
       total: res?.total ?? total,
@@ -1690,8 +1705,10 @@ function PosTab({ restaurant, store }) {
 
       // L'argent est encaissé sur-le-champ : on marque la commande réglée et
       // on n'a rien à transmettre à une caisse externe devant laquelle on est.
+      // Le nombre de couverts n'a pas sa place dans create_order_secure (ce
+      // n'est pas une donnée fiscale) : mise à jour séparée, ordinaire.
       await supabase.from("orders")
-        .update({ cash_collected: true, pos_sync_status: "not_applicable" })
+        .update({ cash_collected: true, pos_sync_status: "not_applicable", covers: covers === "" ? null : Number(covers) })
         .eq("id", res.order_id);
 
       const job = buildTicketJob(res, method);
@@ -1761,6 +1778,16 @@ function PosTab({ restaurant, store }) {
           );
         })}
       </div>
+
+      <label style={{ ...FF, display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: C.textSecondary, marginBottom: 14 }}>
+        Couverts
+        <input
+          type="number" min="0" placeholder="—" value={covers}
+          onChange={(e) => setCovers(e.target.value)}
+          style={{ ...FF, width: 60, padding: "6px 8px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 14 }}
+        />
+        <span style={{ fontSize: 11, color: C.textTertiary }}>(affiché sur le ticket)</span>
+      </label>
 
       {lines.length === 0 ? (
         <p style={{ ...FF, color: C.textTertiary, fontSize: 14, textAlign: "center", padding: "20px 0" }}>
@@ -3827,13 +3854,8 @@ function ReceiptTicket({ order, restaurant, settings, detailed = true }) {
   if (!order) return null;
   const items = order.items || [];
   const when = order.created_at ? new Date(order.created_at) : new Date();
-  const tableLabel = order.order_type === "takeaway"
-    ? "À emporter"
-    : (order.table?.label || (order.table?.number != null ? `Table ${order.table.number}` : ""));
   const line = { display: "flex", justifyContent: "space-between", gap: 8 };
   const vat = Array.isArray(order.vat_breakdown) ? order.vat_breakdown : [];
-  const totalHt = vat.reduce((s, v) => s + Number(v.base_ht || 0), 0);
-  const totalVat = vat.reduce((s, v) => s + Number(v.vat || 0), 0);
   const num = order.fiscal_number || (order.id || "").slice(0, 8).toUpperCase();
   const isTest = order.fiscal_number === "TEST";
 
@@ -3847,23 +3869,27 @@ function ReceiptTicket({ order, restaurant, settings, detailed = true }) {
       <div style={{ textAlign: "center", marginBottom: 6 }}>
         <div style={{ fontSize: 16, fontWeight: 700 }}>{restaurant?.name}</div>
         {settings?.ticket_address && <div>{settings.ticket_address}</div>}
-        {settings?.ticket_phone && <div>Tél. {settings.ticket_phone}</div>}
-        {settings?.ticket_tax_id && <div>SIRET {settings.ticket_tax_id}</div>}
-        {settings?.ticket_vat_number && <div>TVA {settings.ticket_vat_number}</div>}
+        {settings?.ticket_phone && <div>Tel : {settings.ticket_phone}</div>}
+        {settings?.ticket_tax_id && <div>Siret : {settings.ticket_tax_id}</div>}
+        {settings?.ticket_vat_number && <div>Tva : {settings.ticket_vat_number}</div>}
       </div>
       <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
-      <div style={{ fontWeight: 700 }}>Ticket n° {num}</div>
-      <div>{when.toLocaleDateString("fr-FR")} à {when.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</div>
-      {tableLabel && <div>{tableLabel}</div>}
-      {order.customer_name && <div>Client : {order.customer_name}</div>}
+
+      {order.order_type === "takeaway" ? (
+        <div>À EMPORTER</div>
+      ) : (
+        order.table?.number != null && <div>TABLE : {order.table.label || order.table.number}</div>
+      )}
+      {order.covers != null && <div>Couvert : {order.covers}</div>}
+      {order.customer_name && order.customer_name !== "Comptoir" && <div>Client : {order.customer_name}</div>}
       <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
 
       {detailed ? (
         <>
           {items.map((it, i) => (
             <div key={i} style={line}>
-              <span>{it.quantity}× {it.name}{it.detail ? ` (${it.detail})` : ""}</span>
-              <span>{eur(Number(it.price || 0) * it.quantity)}</span>
+              <span>{it.quantity} {it.name}{it.detail ? ` (${it.detail})` : ""}</span>
+              <span>{Number(it.price || 0).toFixed(2)} {vatLetter(it.vat_rate)}</span>
             </div>
           ))}
           <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
@@ -3880,42 +3906,31 @@ function ReceiptTicket({ order, restaurant, settings, detailed = true }) {
       <div style={{ ...line, fontWeight: 700, fontSize: 15 }}>
         <span>TOTAL TTC</span><span>{eur(order.total)}</span>
       </div>
-
-      {/* Ventilation de TVA : obligatoire sur une note de restaurant. */}
       {vat.length > 0 && (
         <>
-          <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
-          <div style={{ ...line, fontWeight: 700 }}>
-            <span style={{ flex: 1 }}>TVA</span>
-            <span style={{ width: 58, textAlign: "right" }}>Base HT</span>
-            <span style={{ width: 48, textAlign: "right" }}>Montant</span>
-          </div>
+          <div style={line}><span>Dont TVA</span><span>{eur(vat.reduce((s, v) => s + Number(v.vat || 0), 0))}</span></div>
+          <div style={line}><span>Total HT</span><span>{eur(vat.reduce((s, v) => s + Number(v.base_ht || 0), 0))}</span></div>
           {vat.map((v, i) => (
-            <div key={i} style={line}>
-              <span style={{ flex: 1 }}>{Number(v.rate).toFixed(1).replace(".", ",")} %</span>
-              <span style={{ width: 58, textAlign: "right" }}>{eur(v.base_ht)}</span>
-              <span style={{ width: 48, textAlign: "right" }}>{eur(v.vat)}</span>
+            <div key={i} style={{ fontSize: 11 }}>
+              {vatLetter(v.rate)} @{Number(v.rate).toFixed(2)}% {eur(v.base_ht)} HT {eur(v.vat)} TVA {eur(v.total_ttc)} TTC
             </div>
           ))}
-          <div style={{ ...line, fontWeight: 700 }}>
-            <span style={{ flex: 1 }}>Total</span>
-            <span style={{ width: 58, textAlign: "right" }}>{eur(totalHt)}</span>
-            <span style={{ width: 48, textAlign: "right" }}>{eur(totalVat)}</span>
-          </div>
         </>
       )}
 
       <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
       <div>
-        {order.payment_method === "cash" ? "Réglé en espèces"
-          : order.payment_method === "card" ? "Réglé par carte bancaire"
+        {order.payment_method === "cash" ? "Espèces"
+          : order.payment_method === "card" ? "Carte Bleue"
             : order.payment_mode === "pay_at_counter" ? "À encaisser en caisse" : ""}
+        <span style={{ float: "right" }}>{eur(order.total)}</span>
       </div>
-      {order.note && <div>Note : {order.note}</div>}
+      {order.note && <div style={{ clear: "both" }}>Note : {order.note}</div>}
+
+      <div style={{ borderTop: "1px dashed #000", margin: "6px 0", clear: "both" }} />
+      <div>{when.toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }).toUpperCase()} - {when.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</div>
+      <div>Ticket n° {num}</div>
       {settings?.ticket_footer && <div style={{ textAlign: "center", marginTop: 10 }}>{settings.ticket_footer}</div>}
-      <div style={{ textAlign: "center", marginTop: 8, fontSize: 10 }}>
-        Merci de votre visite — à bientôt !
-      </div>
     </div>
   );
 }
