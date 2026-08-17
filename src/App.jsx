@@ -1518,7 +1518,8 @@ function OrdersTab({ restaurant, store }) {
                 {o.status === "PENDING" && <Btn variant="blue" size="sm" onClick={() => updateStatus(o, "PREPARING")}>Préparer</Btn>}
                 {o.status === "PREPARING" && <Btn variant="green" size="sm" onClick={() => updateStatus(o, "READY")}>Prête</Btn>}
                 {o.status === "READY" && <Btn variant="subtle" size="sm" onClick={() => updateStatus(o, "DONE")}>Servie</Btn>}
-                <Btn variant="ghost" size="sm" onClick={() => setPrinting(o)}>🖨️</Btn>
+                <Btn variant="ghost" size="sm" title="Ticket détaillé" onClick={() => setPrinting({ ...o, detailed: true })}>🖨️</Btn>
+                <Btn variant="ghost" size="sm" title="Note sans détail (justificatif)" onClick={() => setPrinting({ ...o, detailed: false })}>📄</Btn>
                 <Btn variant="ghost" size="sm" onClick={() => setEditing(o)}>✏️</Btn>
               </div>
             </Surface>
@@ -1578,6 +1579,7 @@ function PosTab({ restaurant, store }) {
   const [tableId, setTableId] = useState("");
   const [busy, setBusy] = useState(false);
   const [printing, setPrinting] = useState(null);
+  const [printDetailed, setPrintDetailed] = useState(true);
 
   const available = store.menu.filter((m) => m.available !== false);
   const cats = ["ALL", ...new Set(available.map((m) => m.category).filter(Boolean))];
@@ -1650,6 +1652,7 @@ function PosTab({ restaurant, store }) {
       payment_method: method,
       payment_mode: "pay_at_counter",
       note: "",
+      detailed: printDetailed,
     };
   };
 
@@ -1714,6 +1717,13 @@ function PosTab({ restaurant, store }) {
         <span style={{ ...FF, fontWeight: 700 }}>Total {count > 0 && `(${count})`}</span>
         <strong style={{ ...FF, fontSize: 26, fontWeight: 900 }}>{eur(total)}</strong>
       </div>
+      {/* Un client en déplacement professionnel demande parfois une note sans
+          le détail des plats (justificatif de note de frais) plutôt que le
+          ticket détaillé habituel. */}
+      <label style={{ ...FF, display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: C.textSecondary, marginBottom: 10 }}>
+        <input type="checkbox" checked={printDetailed} onChange={(e) => setPrintDetailed(e.target.checked)} />
+        Ticket détaillé (décocher pour une note sans le détail des plats)
+      </label>
       <div style={{ display: "flex", gap: 8 }}>
         <Btn variant="primary" size="lg" style={{ flex: 1, minHeight: 58, fontSize: 17 }} disabled={busy || !lines.length} onClick={() => validate("cash")}>
           💵 Espèces
@@ -3781,7 +3791,11 @@ function useRestaurantSettings(restaurantId, demoMode) {
 // de la base (figée à l'encaissement par create_order_secure) et n'est jamais
 // recalculée à l'impression : réimprimer un ticket doit redonner exactement le
 // même document, même si les prix de la carte ont changé depuis.
-function ReceiptTicket({ order, restaurant, settings }) {
+// `detailed=false` produit une note pour justificatif professionnel (note de
+// frais) : mentions légales, numéro fiscal, total et TVA, mais sans la liste
+// des plats — ce que la plupart des employeurs demandent, sans exposer le
+// détail (alcool compris) de ce qui a été consommé.
+function ReceiptTicket({ order, restaurant, settings, detailed = true }) {
   if (!order) return null;
   const items = order.items || [];
   const when = order.created_at ? new Date(order.created_at) : new Date();
@@ -3810,14 +3824,19 @@ function ReceiptTicket({ order, restaurant, settings }) {
       {order.customer_name && <div>Client : {order.customer_name}</div>}
       <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
 
-      {items.map((it, i) => (
-        <div key={i} style={line}>
-          <span>{it.quantity}× {it.name}{it.detail ? ` (${it.detail})` : ""}</span>
-          <span>{eur(Number(it.price || 0) * it.quantity)}</span>
-        </div>
-      ))}
-
-      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+      {detailed ? (
+        <>
+          {items.map((it, i) => (
+            <div key={i} style={line}>
+              <span>{it.quantity}× {it.name}{it.detail ? ` (${it.detail})` : ""}</span>
+              <span>{eur(Number(it.price || 0) * it.quantity)}</span>
+            </div>
+          ))}
+          <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+        </>
+      ) : (
+        <div style={{ fontStyle: "italic", color: "#333" }}>Note — justificatif</div>
+      )}
       {Number(order.discount) > 0 && (
         <>
           <div style={line}><span>Sous-total</span><span>{eur(order.subtotal)}</span></div>
@@ -3897,7 +3916,7 @@ function TicketPrintLayer({ job, onDone, restaurant, settings }) {
         }
         @media screen { #wegemo-ticket-print { position: fixed; left: -9999px; top: 0; } }
       `}</style>
-      <ReceiptTicket order={job} restaurant={restaurant} settings={settings} />
+      <ReceiptTicket order={job} restaurant={restaurant} settings={settings} detailed={job.detailed !== false} />
     </div>
   );
 }
@@ -3924,7 +3943,13 @@ function KitchenView({ restaurant, onExit }) {
   // Ticket automatique : on n'imprime que les commandes qui n'existaient pas
   // encore au dernier passage — le premier chargement de l'écran ne compte
   // pas, sinon toutes les commandes déjà en cours s'imprimeraient d'un coup.
+  //
+  // `store.orders` part de [] avant que le chargement initial (asynchrone)
+  // n'arrive : sans la garde sur `store.loading`, ce passage de [] aux vraies
+  // commandes serait lui-même vu comme "des commandes toutes neuves" et tout
+  // imprimerait d'un coup à l'ouverture de l'écran.
   useEffect(() => {
+    if (store.loading) return;
     const ids = new Set(store.orders.map((o) => o.id));
     if (prevIds.current === null) { prevIds.current = ids; return; }
     if (settings.auto_print_enabled !== false) {
@@ -3932,7 +3957,7 @@ function KitchenView({ restaurant, onExit }) {
       if (fresh.length) setPrintQueue((q) => [...q, ...fresh]);
     }
     prevIds.current = ids;
-  }, [store.orders, settings.auto_print_enabled]);
+  }, [store.orders, store.loading, settings.auto_print_enabled]);
 
   const cols = [
     { status: "PENDING", title: "🆕 Nouvelles", color: C.accentOrange },
@@ -3983,7 +4008,8 @@ function KitchenView({ restaurant, onExit }) {
                       <Btn variant="primary" size="sm" style={{ flex: 1 }} onClick={() => advance(o)}>
                         {o.status === "PENDING" ? "Commencer" : o.status === "PREPARING" ? "Marquer prête" : "Servie"}
                       </Btn>
-                      <Btn variant="subtle" size="sm" onClick={() => setPrintQueue((q) => [...q, o])}>🖨️</Btn>
+                      <Btn variant="subtle" size="sm" title="Ticket détaillé" onClick={() => setPrintQueue((q) => [...q, { ...o, detailed: true }])}>🖨️</Btn>
+                      <Btn variant="subtle" size="sm" title="Note sans détail (justificatif)" onClick={() => setPrintQueue((q) => [...q, { ...o, detailed: false }])}>📄</Btn>
                     </div>
                   </div>
                 );
