@@ -1,0 +1,58 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - claude/wizardly-planck-46wp95
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
+          VITE_BASE_PATH: ${{ secrets.VITE_BASE_PATH || '/wegemo/' }}
+          # Intégration caisse HubRise — id public de l'app (voir POS_HUBRISE.md).
+          # Seul le client_id passe par le build : le client_secret reste un
+          # secret d'edge function et ne doit jamais être préfixé VITE_.
+          VITE_HUBRISE_CLIENT_ID: ${{ secrets.VITE_HUBRISE_CLIENT_ID }}
+        run: npm run build
+
+      - name: SPA fallback
+        run: cp dist/index.html dist/404.html
+
+      # git direct plutôt qu'une action tierce (peaceiris/actions-gh-pages) :
+      # ce téléchargement d'action se fait heurter à des 429 (Too Many
+      # Requests) répétés sur codeload.github.com, faisant échouer le
+      # déploiement avant même que le job ne démarre vraiment. `git` est
+      # déjà présent sur le runner, ça élimine ce point de défaillance —
+      # même comportement (force-push d'un commit propre sur gh-pages).
+      - name: Deploy
+        run: |
+          cd dist
+          git init -q
+          git checkout -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Deploy ${{ github.sha }}"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:gh-pages
