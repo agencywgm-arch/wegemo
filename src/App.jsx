@@ -1465,7 +1465,8 @@ function OrdersTab({ restaurant, store }) {
 
   const remove = async (order) => {
     if (!store.demoMode && hasSupabase) {
-      await supabase.from("orders").delete().eq("id", order.id);
+      const { error } = await supabase.from("orders").delete().eq("id", order.id);
+      if (error) return toast(error.message || "Échec de la suppression", "error");
       store.reload();
     } else {
       store.setOrders((p) => p.filter((o) => o.id !== order.id));
@@ -1894,7 +1895,8 @@ function RegisterTab({ restaurant, store }) {
 
   const collectCash = async (o) => {
     if (!store.demoMode && hasSupabase) {
-      await supabase.from("orders").update({ cash_collected: true }).eq("id", o.id);
+      const { error } = await supabase.from("orders").update({ cash_collected: true }).eq("id", o.id);
+      if (error) return toast(error.message || "Échec de l'enregistrement", "error");
       store.reload();
     } else {
       store.setOrders((p) => p.map((x) => (x.id === o.id ? { ...x, cash_collected: true } : x)));
@@ -2013,7 +2015,8 @@ function TableLabelEditor({ table, store }) {
   const [label, setLabel] = useState(table.label || "");
   const save = async () => {
     if (!store.demoMode && hasSupabase) {
-      await supabase.from("tables").update({ label: label || null }).eq("id", table.id);
+      const { error } = await supabase.from("tables").update({ label: label || null }).eq("id", table.id);
+      if (error) return toast(error.message || "Échec de l'enregistrement", "error");
       store.reload();
     }
     toast("Nom de table enregistré", "success");
@@ -2035,7 +2038,8 @@ function InventoryTab({ restaurant, store }) {
   const adjust = async (ing, delta) => {
     const newStock = Math.max(0, Number(ing.stock) + delta);
     if (!store.demoMode && hasSupabase) {
-      await supabase.from("ingredients").update({ stock: newStock }).eq("id", ing.id);
+      const { error } = await supabase.from("ingredients").update({ stock: newStock }).eq("id", ing.id);
+      if (error) return toast(error.message || "Échec de la mise à jour du stock", "error");
       store.reload();
     } else {
       store.setIngredients((p) => p.map((i) => (i.id === ing.id ? { ...i, stock: newStock } : i)));
@@ -2046,7 +2050,8 @@ function InventoryTab({ restaurant, store }) {
     e.preventDefault();
     const row = { ...form, restaurant_id: restaurant.id, stock: Number(form.stock), alert_threshold: form.alert_threshold === "" ? null : Number(form.alert_threshold) };
     if (!store.demoMode && hasSupabase) {
-      await supabase.from("ingredients").insert(row);
+      const { error } = await supabase.from("ingredients").insert(row);
+      if (error) return toast(error.message || "Échec de l'ajout", "error");
       store.reload();
     } else {
       store.setIngredients((p) => [...p, { ...row, id: uid() }]);
@@ -2110,7 +2115,8 @@ function PromosTab({ restaurant, store }) {
     e.preventDefault();
     const row = { ...form, restaurant_id: restaurant.id, discount_percent: Number(form.discount_percent), active: true };
     if (!store.demoMode && hasSupabase) {
-      await supabase.from("promotions").insert(row);
+      const { error } = await supabase.from("promotions").insert(row);
+      if (error) return toast(error.message || "Échec de la création", "error");
       store.reload();
     } else {
       store.setPromos((p) => [...p, { ...row, id: uid(), send_count: 0 }]);
@@ -2246,8 +2252,10 @@ function MenuTab({ restaurant, store }) {
       vat_rate: item.vat_rate == null || item.vat_rate === "" ? 10 : Number(item.vat_rate),
     };
     if (!store.demoMode && hasSupabase) {
-      if (item.id) await supabase.from("menu_items").update(row).eq("id", item.id);
-      else await supabase.from("menu_items").insert(row);
+      const { error } = item.id
+        ? await supabase.from("menu_items").update(row).eq("id", item.id)
+        : await supabase.from("menu_items").insert(row);
+      if (error) return toast(error.message || "Échec de l'enregistrement", "error");
       store.reload();
     } else {
       store.setMenu((p) => (item.id ? p.map((m) => (m.id === item.id ? row : m)) : [...p, { ...row, id: uid() }]));
@@ -2258,7 +2266,8 @@ function MenuTab({ restaurant, store }) {
 
   const remove = async (item) => {
     if (!store.demoMode && hasSupabase) {
-      await supabase.from("menu_items").delete().eq("id", item.id);
+      const { error } = await supabase.from("menu_items").delete().eq("id", item.id);
+      if (error) return toast(error.message || "Échec de la suppression", "error");
       store.reload();
     } else {
       store.setMenu((p) => p.filter((m) => m.id !== item.id));
@@ -3436,7 +3445,11 @@ function SettingsTab({ restaurant, store, modules = ["base"], onModulesChange })
 
   const save = async () => {
     if (store.demoMode || !hasSupabase) return toast("(Démo) Réglages non persistés", "info");
-    await supabase.from("restaurant_settings").upsert({ restaurant_id: restaurant.id, ...settings }, { onConflict: "restaurant_id" });
+    const { error } = await supabase.from("restaurant_settings").upsert({ restaurant_id: restaurant.id, ...settings }, { onConflict: "restaurant_id" });
+    // Sans cette vérification, une colonne manquante en base (migration non
+    // exécutée) échouait en silence : le message affiché disait "enregistré"
+    // alors que rien n'avait été écrit.
+    if (error) return toast(error.message || "Échec de l'enregistrement", "error");
     toast("Réglages enregistrés", "success");
   };
 
@@ -3942,11 +3955,28 @@ function TicketPrintLayer({ job, onDone, restaurant, settings }) {
   return (
     <div id="wegemo-ticket-print">
       <style>{`
+        /* Sans @page, Chrome imprime sur la taille de page par défaut du
+           pilote (souvent A4/Lettre) avec ses marges standard (~10mm) : le
+           ticket, positionné à 80mm de large depuis le bord gauche de la
+           zone imprimable, se retrouve amputé de sa partie droite par cette
+           marge — pas par un souci de contenu. html/body à marge nulle en
+           filet de sécurité, certaines versions de Chrome n'honorant que
+           l'un des deux réglages selon le circuit d'impression emprunté.
+           Cette feuille de style n'existe dans le DOM que pendant une
+           impression de ticket (le composant retourne null sinon), donc
+           rien ici n'affecte le « Rapport Z » de l'onglet Caisse.
+           Si le ticket reste coupé après ce correctif, la taille de papier
+           configurée dans le pilote de l'imprimante (Windows/Mac) ne
+           correspond pas au rouleau réel — aucun CSS ne peut le corriger
+           depuis le navigateur, il faut ajuster le pilote.
+        */
         @media print {
+          @page { size: 80mm auto; margin: 0; }
+          html, body { margin: 0 !important; }
           body.wegemo-printing-ticket * { visibility: hidden; }
           body.wegemo-printing-ticket #wegemo-ticket-print,
           body.wegemo-printing-ticket #wegemo-ticket-print * { visibility: visible; }
-          body.wegemo-printing-ticket #wegemo-ticket-print { position: fixed; top: 0; left: 0; width: 80mm; }
+          body.wegemo-printing-ticket #wegemo-ticket-print { position: fixed; top: 0; left: 0; width: 80mm; margin: 0; }
         }
         @media screen { #wegemo-ticket-print { position: fixed; left: -9999px; top: 0; } }
       `}</style>
@@ -3956,6 +3986,7 @@ function TicketPrintLayer({ job, onDone, restaurant, settings }) {
 }
 
 function KitchenView({ restaurant, onExit }) {
+  const toast = useToast();
   const store = useStore(restaurant.id);
   const settings = useRestaurantSettings(restaurant.id, store.demoMode);
   const playSound = useOrderSound();
@@ -4002,7 +4033,8 @@ function KitchenView({ restaurant, onExit }) {
   const advance = async (o) => {
     const next = o.status === "PENDING" ? "PREPARING" : o.status === "PREPARING" ? "READY" : "DONE";
     if (!store.demoMode && hasSupabase) {
-      await supabase.from("orders").update({ status: next }).eq("id", o.id);
+      const { error } = await supabase.from("orders").update({ status: next }).eq("id", o.id);
+      if (error) return toast(error.message || "Échec de la mise à jour", "error");
       store.reload();
     } else {
       store.setOrders((p) => p.map((x) => (x.id === o.id ? { ...x, status: next } : x)));
