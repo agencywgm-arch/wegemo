@@ -3894,27 +3894,24 @@ function ReceiptTicket({ order, restaurant, settings, detailed = true }) {
         <span>TOTAL TTC</span><span>{eur(order.total)}</span>
       </div>
 
-      {/* Ventilation de TVA : obligatoire sur une note de restaurant. */}
+      {/* Ventilation de TVA : obligatoire sur une note de restaurant. Une
+          seule colonne de texte par taux plutôt qu'un tableau à largeurs
+          fixes en pixels : sur certains pilotes d'imprimante à ticket, une
+          largeur en px dans un contenu pensé en mm n'est pas convertie
+          correctement et pousse les valeurs hors de la zone imprimable —
+          les libellés à largeur automatique restent visibles, les colonnes
+          à largeur fixe disparaissent. Une ligne de texte simple élimine ce
+          risque, quel que soit le pilote. */}
       {vat.length > 0 && (
         <>
           <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
-          <div style={{ ...line, fontWeight: 700 }}>
-            <span style={{ flex: 1 }}>TVA</span>
-            <span style={{ width: 58, textAlign: "right" }}>Base HT</span>
-            <span style={{ width: 48, textAlign: "right" }}>Montant</span>
-          </div>
+          <div style={line}><span>Dont TVA</span><span>{eur(totalVat)}</span></div>
+          <div style={line}><span>Total HT</span><span>{eur(totalHt)}</span></div>
           {vat.map((v, i) => (
-            <div key={i} style={line}>
-              <span style={{ flex: 1 }}>{Number(v.rate).toFixed(1).replace(".", ",")} %</span>
-              <span style={{ width: 58, textAlign: "right" }}>{eur(v.base_ht)}</span>
-              <span style={{ width: 48, textAlign: "right" }}>{eur(v.vat)}</span>
+            <div key={i} style={{ fontSize: 11 }}>
+              {Number(v.rate).toFixed(1).replace(".", ",")}% {eur(v.base_ht)} HT {eur(v.vat)} TVA {eur(v.total_ttc ?? v.base_ht + v.vat)} TTC
             </div>
           ))}
-          <div style={{ ...line, fontWeight: 700 }}>
-            <span style={{ flex: 1 }}>Total</span>
-            <span style={{ width: 58, textAlign: "right" }}>{eur(totalHt)}</span>
-            <span style={{ width: 48, textAlign: "right" }}>{eur(totalVat)}</span>
-          </div>
         </>
       )}
 
