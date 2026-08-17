@@ -3877,6 +3877,18 @@ function useAutoPrintQueue(store, autoPrintEnabled) {
   };
 }
 
+// Papier vierge avant la coupe, en lignes de texte plutôt qu'en hauteur CSS
+// fixe (`height: "30mm"`) : une imprimante à ticket avance le papier ligne
+// par ligne, c'est son fonctionnement natif. Une hauteur en mm sur un div
+// vide dépend de la façon dont le pilote traduit les unités CSS — et ce
+// pilote-là s'est déjà montré peu fiable là-dessus (cf. les colonnes en
+// pixels qui débordaient). Des lignes de texte vides suivent toujours la
+// même police/interligne que le reste du ticket, donc l'avance de papier
+// reste proportionnelle à ce que l'imprimante vient d'imprimer.
+function PaperFeed({ lines = 12 }) {
+  return <>{Array.from({ length: lines }, (_, i) => <div key={i}>&nbsp;</div>)}</>;
+}
+
 // Ticket de caisse au format français : numéro fiscal séquentiel, ventilation
 // de TVA par taux, mentions légales de l'établissement. La ventilation vient
 // de la base (figée à l'encaissement par create_order_secure) et n'est jamais
@@ -3988,7 +4000,7 @@ function ReceiptTicket({ order, restaurant, settings, detailed = true }) {
           contenu pour que le massicot automatique s'engage correctement.
           Sans ça, un ticket court (peu d'articles) peut ne pas se couper du
           tout, ou se couper en plein milieu du texte. */}
-      <div style={{ height: "30mm" }} />
+      <PaperFeed lines={12} />
     </div>
   );
 }
@@ -4031,7 +4043,7 @@ function KitchenTicket({ order }) {
         </>
       )}
       {/* Marge de papier vierge avant la coupe, voir ReceiptTicket. */}
-      <div style={{ height: "30mm" }} />
+      <PaperFeed lines={12} />
     </div>
   );
 }
