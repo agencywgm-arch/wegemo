@@ -109,7 +109,7 @@ create or replace function create_order_secure(
   p_items          jsonb,
   p_client_token   text
 ) returns jsonb
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public, extensions as $$
 declare
   v_item        jsonb;
   v_id          uuid;
@@ -292,7 +292,7 @@ grant execute on function create_order_secure(uuid, uuid, text, text, text, text
 -- À présenter en cas de contrôle de l'administration fiscale.
 create or replace function verify_fiscal_chain(p_restaurant uuid)
 returns table (ok boolean, checked bigint, first_broken text)
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public, extensions as $$
 declare
   r record; v_prev text := null; v_calc text; v_n bigint := 0; v_bad text := null;
 begin
