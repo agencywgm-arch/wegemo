@@ -3391,9 +3391,30 @@ function CheckinTab({ restaurant, store }) {
 }
 
 /* ---- Settings ---- */
+// Commande factice couvrant deux taux de TVA, pour vérifier le rendu du
+// bloc TVA sans passer par create_order_secure : aucune commande, aucun
+// numéro fiscal, aucune écriture au journal ne doivent résulter d'un test.
+function makeTestTicket() {
+  return {
+    id: "test", fiscal_number: "TEST", created_at: new Date().toISOString(),
+    order_type: "dine_in", table: { number: 1 }, customer_name: "Client test",
+    items: [
+      { quantity: 2, name: "Plat test", price: 12.50, detail: "" },
+      { quantity: 1, name: "Boisson test", price: 6.00, detail: "" },
+    ],
+    subtotal: 31.00, discount: 0, total: 31.00,
+    vat_breakdown: [
+      { rate: 10, base_ht: 22.73, vat: 2.27, total_ttc: 25.00 },
+      { rate: 20, base_ht: 5.00, vat: 1.00, total_ttc: 6.00 },
+    ],
+    payment_method: "cash", payment_mode: "pay_at_counter", note: "", detailed: true,
+  };
+}
+
 function SettingsTab({ restaurant, store, modules = ["base"], onModulesChange }) {
   const toast = useToast();
   const [settings, setSettings] = useState({ stripe_publishable_key: "", stripe_secret_key: "", openai_api_key: "", resend_api_key: "", resend_from: "", google_review_url: "", google_review_enabled: false, ticket_address: "", ticket_phone: "", ticket_tax_id: "", ticket_vat_number: "", ticket_footer: "", auto_print_enabled: true });
+  const [testPrint, setTestPrint] = useState(null);
 
   const toggleModule = async (id) => {
     if (id === "base") return; // socle always active
@@ -3496,7 +3517,14 @@ function SettingsTab({ restaurant, store, modules = ["base"], onModulesChange })
           {field("ticket_vat_number", "N° TVA intracommunautaire")}
           {field("ticket_footer", "Message de fin de ticket (ex : Merci de votre visite !)")}
         </div>
-        <Btn variant="primary" onClick={save}>Enregistrer</Btn>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Btn variant="primary" onClick={save}>Enregistrer</Btn>
+          <Btn variant="subtle" onClick={() => setTestPrint(makeTestTicket())}>🖨️ Imprimer un ticket test</Btn>
+        </div>
+        <p style={{ ...FF, fontSize: 12, color: C.textTertiary, marginTop: 8 }}>
+          Imprime immédiatement sur l'imprimante par défaut de cet appareil, avec les réglages ci-dessus tels qu'affichés (même non enregistrés) — pour vérifier le format avant l'ouverture. Ne crée aucune commande ni écriture fiscale.
+        </p>
+        <TicketPrintLayer job={testPrint} onDone={() => setTestPrint(null)} restaurant={restaurant} settings={settings} />
       </Surface>
 
       <Surface style={{ padding: 18, marginBottom: 16 }}>
@@ -3807,9 +3835,15 @@ function ReceiptTicket({ order, restaurant, settings, detailed = true }) {
   const totalHt = vat.reduce((s, v) => s + Number(v.base_ht || 0), 0);
   const totalVat = vat.reduce((s, v) => s + Number(v.vat || 0), 0);
   const num = order.fiscal_number || (order.id || "").slice(0, 8).toUpperCase();
+  const isTest = order.fiscal_number === "TEST";
 
   return (
     <div style={{ width: "72mm", padding: "4mm", fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#000", background: "#fff" }}>
+      {isTest && (
+        <div style={{ textAlign: "center", fontWeight: 700, border: "2px solid #000", padding: "4px 0", marginBottom: 6 }}>
+          *** TICKET TEST — NE PAS ENCAISSER ***
+        </div>
+      )}
       <div style={{ textAlign: "center", marginBottom: 6 }}>
         <div style={{ fontSize: 16, fontWeight: 700 }}>{restaurant?.name}</div>
         {settings?.ticket_address && <div>{settings.ticket_address}</div>}
