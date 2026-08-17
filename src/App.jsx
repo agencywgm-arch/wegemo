@@ -3988,7 +3988,7 @@ function ReceiptTicket({ order, restaurant, settings, detailed = true }) {
           contenu pour que le massicot automatique s'engage correctement.
           Sans ça, un ticket court (peu d'articles) peut ne pas se couper du
           tout, ou se couper en plein milieu du texte. */}
-      <div style={{ height: "14mm" }} />
+      <div style={{ height: "30mm" }} />
     </div>
   );
 }
@@ -4031,7 +4031,7 @@ function KitchenTicket({ order }) {
         </>
       )}
       {/* Marge de papier vierge avant la coupe, voir ReceiptTicket. */}
-      <div style={{ height: "14mm" }} />
+      <div style={{ height: "30mm" }} />
     </div>
   );
 }
