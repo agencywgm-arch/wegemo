@@ -3851,7 +3851,14 @@ function ReceiptTicket({ order, restaurant, settings, detailed = true }) {
   const isTest = order.fiscal_number === "TEST";
 
   return (
-    <div style={{ width: "72mm", padding: "4mm", fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#000", background: "#fff" }}>
+    // Largeur adaptative et non fixée en dur : le pilote d'imprimante impose
+    // sa propre taille de papier (48mm chez un utilisateur, 80mm chez un
+    // autre) et le CSS @page n'est qu'une préférence qu'il peut ignorer. Un
+    // `width: 72mm` en dur débordait donc et se faisait rogner. `width: 100%`
+    // laisse le ticket se conformer au papier réel, `maxWidth` l'empêche de
+    // s'étaler au-delà de la zone imprimable d'un rouleau 80mm standard, et
+    // `border-box` évite que le padding s'ajoute à cette largeur.
+    <div style={{ width: "100%", maxWidth: "72mm", boxSizing: "border-box", padding: "2mm", fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#000", background: "#fff" }}>
       {isTest && (
         <div style={{ textAlign: "center", fontWeight: 700, border: "2px solid #000", padding: "4px 0", marginBottom: 6 }}>
           *** TICKET TEST — NE PAS ENCAISSER ***
@@ -3952,28 +3959,24 @@ function TicketPrintLayer({ job, onDone, restaurant, settings }) {
   return (
     <div id="wegemo-ticket-print">
       <style>{`
-        /* Sans @page, Chrome imprime sur la taille de page par défaut du
-           pilote (souvent A4/Lettre) avec ses marges standard (~10mm) : le
-           ticket, positionné à 80mm de large depuis le bord gauche de la
-           zone imprimable, se retrouve amputé de sa partie droite par cette
-           marge — pas par un souci de contenu. html/body à marge nulle en
-           filet de sécurité, certaines versions de Chrome n'honorant que
-           l'un des deux réglages selon le circuit d'impression emprunté.
-           Cette feuille de style n'existe dans le DOM que pendant une
-           impression de ticket (le composant retourne null sinon), donc
-           rien ici n'affecte le « Rapport Z » de l'onglet Caisse.
-           Si le ticket reste coupé après ce correctif, la taille de papier
-           configurée dans le pilote de l'imprimante (Windows/Mac) ne
-           correspond pas au rouleau réel — aucun CSS ne peut le corriger
-           depuis le navigateur, il faut ajuster le pilote.
-        */
+        /* @page n'est qu'une PRÉFÉRENCE : le pilote d'imprimante garde la
+           main sur la taille de papier réelle (un poste a été observé en
+           Custom 48mm alors que le rouleau physique fait 80mm), et les
+           marges par défaut (~10mm) rognent en plus les bords. D'où deux
+           précautions complémentaires ici : marges à zéro, et surtout aucune
+           largeur fixe — le conteneur est en width:100% pour se conformer
+           au papier annoncé par le pilote au lieu de déborder d'une taille
+           imposée en dur. Cette feuille de style n'existe dans le DOM que
+           pendant l'impression d'un ticket (le composant retourne null
+           sinon), donc rien ici n'affecte le « Rapport Z » de l'onglet
+           Caisse ni aucune autre impression. */
         @media print {
           @page { size: 80mm auto; margin: 0; }
           html, body { margin: 0 !important; }
           body.wegemo-printing-ticket * { visibility: hidden; }
           body.wegemo-printing-ticket #wegemo-ticket-print,
           body.wegemo-printing-ticket #wegemo-ticket-print * { visibility: visible; }
-          body.wegemo-printing-ticket #wegemo-ticket-print { position: fixed; top: 0; left: 0; width: 80mm; margin: 0; }
+          body.wegemo-printing-ticket #wegemo-ticket-print { position: fixed; top: 0; left: 0; width: 100%; margin: 0; }
         }
         @media screen { #wegemo-ticket-print { position: fixed; left: -9999px; top: 0; } }
       `}</style>
