@@ -40,9 +40,19 @@ jobs:
       - name: SPA fallback
         run: cp dist/index.html dist/404.html
 
+      # git direct plutôt qu'une action tierce (peaceiris/actions-gh-pages) :
+      # ce téléchargement d'action se fait heurter à des 429 (Too Many
+      # Requests) répétés sur codeload.github.com, faisant échouer le
+      # déploiement avant même que le job ne démarre vraiment. `git` est
+      # déjà présent sur le runner, ça élimine ce point de défaillance —
+      # même comportement (force-push d'un commit propre sur gh-pages).
       - name: Deploy
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          force_orphan: true
+        run: |
+          cd dist
+          git init -q
+          git checkout -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Deploy ${{ github.sha }}"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:gh-pages
