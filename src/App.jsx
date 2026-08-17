@@ -1529,6 +1529,7 @@ function OrdersTab({ restaurant, store }) {
                 {o.status === "READY" && <Btn variant="subtle" size="sm" onClick={() => updateStatus(o, "DONE")}>Servie</Btn>}
                 <Btn variant="ghost" size="sm" title="Ticket détaillé" onClick={() => setPrinting({ ...o, detailed: true })}>🖨️</Btn>
                 <Btn variant="ghost" size="sm" title="Note sans détail (justificatif)" onClick={() => setPrinting({ ...o, detailed: false })}>📄</Btn>
+                <Btn variant="ghost" size="sm" title="Bon de cuisine" onClick={() => setPrinting({ ...o, kind: "kitchen" })}>🍳</Btn>
                 <Btn variant="ghost" size="sm" onClick={() => setEditing(o)}>✏️</Btn>
               </div>
             </Surface>
@@ -1587,7 +1588,10 @@ function PosTab({ restaurant, store }) {
   const [lines, setLines] = useState([]); // { key, item, qty }
   const [tableId, setTableId] = useState("");
   const [busy, setBusy] = useState(false);
-  const [printing, setPrinting] = useState(null);
+  // File plutôt qu'un simple job unique : chaque encaissement imprime le
+  // ticket client puis le bon de cuisine juste derrière, l'un après l'autre.
+  const [printQueue, setPrintQueue] = useState([]);
+  const printing = printQueue[0] ?? null;
   const [printDetailed, setPrintDetailed] = useState(true);
 
   const available = store.menu.filter((m) => m.available !== false);
@@ -1675,7 +1679,7 @@ function PosTab({ restaurant, store }) {
         await new Promise((r) => setTimeout(r, 400));
         toast(`(Démo) Commande de ${eur(total)} enregistrée`, "success");
         setLines([]);
-        setPrinting(job);
+        setPrintQueue((q) => [...q, job, { ...job, kind: "kitchen" }]);
         return;
       }
       const table = sortedTables.find((t) => t.id === tableId);
@@ -1706,7 +1710,7 @@ function PosTab({ restaurant, store }) {
       const job = buildTicketJob(res, method);
       toast(`Commande envoyée en cuisine — ${eur(res.total)}`, "success");
       setLines([]);
-      setPrinting(job);
+      setPrintQueue((q) => [...q, job, { ...job, kind: "kitchen" }]);
       store.reload();
     } catch (e) {
       const msg = String(e?.message || "");
@@ -1872,7 +1876,7 @@ function PosTab({ restaurant, store }) {
         </div>
       )}
 
-      <TicketPrintLayer job={printing} onDone={() => setPrinting(null)} restaurant={restaurant} settings={settings} />
+      <TicketPrintLayer job={printing} onDone={() => setPrintQueue((q) => q.slice(1))} restaurant={restaurant} settings={settings} />
     </div>
   );
 }
@@ -3856,7 +3860,12 @@ function useAutoPrintQueue(store, autoPrintEnabled) {
     if (prevIds.current === null) { prevIds.current = ids; return; }
     if (autoPrintEnabled !== false) {
       const fresh = store.orders.filter((o) => !prevIds.current.has(o.id) && o.customer_name !== "Comptoir");
-      if (fresh.length) setPrintQueue((q) => [...q, ...fresh]);
+      // Deux documents par commande, l'un après l'autre : le ticket client
+      // (avec prix et TVA) puis le bon de cuisine juste derrière (sans prix,
+      // pour la brigade) — imprimés en deux temps sur la même imprimante.
+      if (fresh.length) {
+        setPrintQueue((q) => [...q, ...fresh.flatMap((o) => [o, { ...o, kind: "kitchen" }])]);
+      }
     }
     prevIds.current = ids;
   }, [store.orders, store.loading, autoPrintEnabled]);
@@ -3974,6 +3983,55 @@ function ReceiptTicket({ order, restaurant, settings, detailed = true }) {
       <div style={{ textAlign: "center", marginTop: 8, fontSize: 13 }}>
         Merci de votre visite — à bientôt !
       </div>
+      {/* Marge de papier vierge avant la coupe : beaucoup d'imprimantes à
+          ticket ont besoin de faire défiler un peu de papier après le
+          contenu pour que le massicot automatique s'engage correctement.
+          Sans ça, un ticket court (peu d'articles) peut ne pas se couper du
+          tout, ou se couper en plein milieu du texte. */}
+      <div style={{ height: "14mm" }} />
+    </div>
+  );
+}
+
+// Bon de cuisine : ce que la brigade prépare, sans aucun prix ni mention
+// fiscale — un bon de cuisine n'est pas un document de caisse, il n'a pas à
+// en avoir l'apparence. Grande police et repères visuels forts (table,
+// couverts) pensés pour être lus vite, de loin, dans le feu du service.
+function KitchenTicket({ order }) {
+  if (!order) return null;
+  const items = order.items || [];
+  const when = order.created_at ? new Date(order.created_at) : new Date();
+  const tableLabel = order.order_type === "takeaway"
+    ? "À EMPORTER"
+    : (order.table?.label || (order.table?.number != null ? `TABLE ${order.table.number}` : "")).toString().toUpperCase();
+  const num = order.fiscal_number || (order.id || "").slice(0, 8).toUpperCase();
+
+  return (
+    <div style={{ width: "100%", maxWidth: "72mm", boxSizing: "border-box", padding: "2mm", fontFamily: "'Courier New', Courier, monospace", fontSize: 18, lineHeight: 1.4, color: "#000", background: "#fff" }}>
+      <div style={{ textAlign: "center", fontWeight: 700, fontSize: 20 }}>🍳 BON DE CUISINE</div>
+      <div style={{ borderTop: "2px dashed #000", margin: "6px 0" }} />
+      {tableLabel && <div style={{ textAlign: "center", fontWeight: 700, fontSize: 26 }}>{tableLabel}</div>}
+      {order.covers != null && (
+        <div style={{ textAlign: "center" }}>{order.covers} couvert{order.covers > 1 ? "s" : ""}</div>
+      )}
+      <div style={{ textAlign: "center" }}>
+        {when.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} — n° {num}
+      </div>
+      <div style={{ borderTop: "1px dashed #000", margin: "8px 0" }} />
+      {items.map((it, i) => (
+        <div key={i} style={{ marginBottom: 8 }}>
+          <div style={{ fontWeight: 700, fontSize: 20 }}>{it.quantity}× {it.name}</div>
+          {it.detail && <div style={{ fontStyle: "italic", marginLeft: 8 }}>↳ {it.detail}</div>}
+        </div>
+      ))}
+      {order.note && (
+        <>
+          <div style={{ borderTop: "2px dashed #000", margin: "8px 0" }} />
+          <div style={{ fontWeight: 700 }}>📝 {order.note}</div>
+        </>
+      )}
+      {/* Marge de papier vierge avant la coupe, voir ReceiptTicket. */}
+      <div style={{ height: "14mm" }} />
     </div>
   );
 }
@@ -3981,6 +4039,7 @@ function ReceiptTicket({ order, restaurant, settings, detailed = true }) {
 // Monté une fois par écran (Cuisine ou Commandes) : reçoit une commande à
 // imprimer via `job`, déclenche window.print() scopé au ticket, et prévient
 // `onDone` une fois l'impression terminée (ou annulée) pour libérer la file.
+// `job.kind === "kitchen"` imprime le bon de cuisine, sinon le ticket client.
 function TicketPrintLayer({ job, onDone, restaurant, settings }) {
   useEffect(() => {
     if (!job) return;
@@ -4021,7 +4080,9 @@ function TicketPrintLayer({ job, onDone, restaurant, settings }) {
         }
         @media screen { #wegemo-ticket-print { position: fixed; left: -9999px; top: 0; } }
       `}</style>
-      <ReceiptTicket order={job} restaurant={restaurant} settings={settings} detailed={job.detailed !== false} />
+      {job.kind === "kitchen"
+        ? <KitchenTicket order={job} />
+        : <ReceiptTicket order={job} restaurant={restaurant} settings={settings} detailed={job.detailed !== false} />}
     </div>
   );
 }
@@ -4096,6 +4157,7 @@ function KitchenView({ restaurant, onExit }) {
                       </Btn>
                       <Btn variant="subtle" size="sm" title="Ticket détaillé" onClick={() => enqueue({ ...o, detailed: true })}>🖨️</Btn>
                       <Btn variant="subtle" size="sm" title="Note sans détail (justificatif)" onClick={() => enqueue({ ...o, detailed: false })}>📄</Btn>
+                      <Btn variant="subtle" size="sm" title="Bon de cuisine" onClick={() => enqueue({ ...o, kind: "kitchen" })}>🍳</Btn>
                     </div>
                   </div>
                 );
