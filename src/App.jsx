@@ -287,6 +287,12 @@ const verticalOf = (id) => VERTICALS[id] || VERTICALS.resto;
  * SMALL HELPERS
  * ==========================================================================*/
 const eur = (n) => `${Number(n || 0).toFixed(2)} €`;
+
+// Lettre de TVA par taux, convention des logiciels de caisse français
+// (20 % = A, puis taux réduits) : permet de repérer le taux d'une ligne d'un
+// coup d'œil sans répéter le pourcentage sur chaque article du ticket.
+const VAT_LETTERS = { 20: "A", 10: "B", 5.5: "C", 2.1: "D", 0: "E" };
+const vatLetter = (rate) => VAT_LETTERS[Number(rate)] || "?";
 const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : `id-${Math.random().toString(36).slice(2)}`);
 const slugify = (s) =>
   s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") ||
@@ -412,6 +418,15 @@ function useStore(restaurantId) {
   const [customers, setCustomers] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
+  // `reload()` est aussi appelé en tâche de fond (nouvelle commande via le
+  // realtime, encaissement au comptoir, changement de statut...) — pas
+  // seulement au tout premier chargement. Sans cette référence, chaque
+  // rechargement remettait `loading` à true, ce qui démonte l'onglet actif
+  // le temps du fetch (voir DashboardPage) et détruit au passage tout état
+  // local qu'il portait — dont la file d'impression de l'onglet Vente,
+  // vidée avant même que le ticket n'ait eu le temps de partir à
+  // l'imprimante. Seul le premier chargement doit afficher "Chargement…".
+  const loadedOnce = useRef(false);
 
   const reload = useCallback(async () => {
     if (demoMode) {
@@ -428,9 +443,10 @@ function useStore(restaurantId) {
       setCustomers(DEMO_CUSTOMERS);
       setReviews(DEMO_REVIEWS);
       setLoading(false);
+      loadedOnce.current = true;
       return;
     }
-    setLoading(true);
+    if (!loadedOnce.current) setLoading(true);
     const [m, o, tb, ing, pr, cu, rv] = await Promise.all([
       supabase.from("menu_items").select("*").eq("restaurant_id", restaurantId).order("sort_order", { ascending: true }),
       supabase.from("orders").select("*, table:tables(number, label), order_items(quantity, detail, menu_items(name, emoji, price))").eq("restaurant_id", restaurantId).order("created_at", { ascending: false }).limit(200),
@@ -461,6 +477,7 @@ function useStore(restaurantId) {
     setCustomers(cu.data || []);
     setReviews(rv.data || []);
     setLoading(false);
+    loadedOnce.current = true;
   }, [restaurantId, demoMode]);
 
   useEffect(() => {
@@ -1973,6 +1990,39 @@ function QRTab({ restaurant, store }) {
     toast("QR téléchargé", "success");
   };
 
+  // Le nombre de tables n'était fixé qu'à la création du restaurant, sans
+  // moyen d'en ajouter ensuite : une salle qui grandit (ou une terrasse
+  // saisonnière) obligeait à repartir de zéro.
+  const addTable = async () => {
+    const nums = store.tables.map((t) => Number(t.number));
+    // On reprend après le plus grand numéro existant plutôt que de compter
+    // les tables : après une suppression, réutiliser un numéro déjà imprimé
+    // sur un QR ferait pointer l'ancien QR vers la nouvelle table.
+    const next = nums.length ? Math.max(...nums) + 1 : 1;
+    if (store.demoMode || !hasSupabase) return toast("(Démo) Ajout non persisté", "info");
+    const { error } = await supabase.from("tables").insert({ restaurant_id: restaurant.id, number: next });
+    if (error) return toast(error.message || "Échec de l'ajout", "error");
+    store.reload();
+    toast(`${unit} ${next} ajoutée`, "success");
+  };
+
+  const removeTable = async (tb) => {
+    if (store.demoMode || !hasSupabase) return toast("(Démo) Suppression non persistée", "info");
+    // `tables.id` est référencé par `orders.table_id` : supprimer une table
+    // qui a des commandes échouerait (ou les effacerait selon la contrainte).
+    // On prévient explicitement plutôt que de laisser passer une erreur brute.
+    const { count } = await supabase
+      .from("orders").select("id", { count: "exact", head: true }).eq("table_id", tb.id);
+    if (count) {
+      return toast(`${unit} ${tb.number} a ${count} commande(s) — suppression impossible`, "error");
+    }
+    if (!window.confirm(`Supprimer ${unit.toLowerCase()} ${tb.number} ? Son QR code ne fonctionnera plus.`)) return;
+    const { error } = await supabase.from("tables").delete().eq("id", tb.id);
+    if (error) return toast(error.message || "Échec de la suppression", "error");
+    store.reload();
+    toast(`${unit} ${tb.number} supprimée`, "info");
+  };
+
   const snippet = `<div data-wegemo="${restaurant.slug}" data-table="${embed.table}" data-label="${embed.label}" data-color="${embed.color}" data-text-color="${embed.textColor}" data-name="${restaurant.name}"></div>\n<script src="${origin}/embed.js"></script>`;
 
   return (
@@ -1986,6 +2036,10 @@ function QRTab({ restaurant, store }) {
       <Surface style={{ padding: 16, marginBottom: 16, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
         <label style={{ ...FF, fontSize: 13 }}>Couleur <input type="color" value={fg} onChange={(e) => setFg(e.target.value)} /></label>
         <label style={{ ...FF, fontSize: 13 }}>Fond <input type="color" value={bg} onChange={(e) => setBg(e.target.value)} /></label>
+        <span style={{ ...FF, fontSize: 13, color: C.textSecondary, marginLeft: "auto" }}>
+          {store.tables.length} {unit.toLowerCase()}{store.tables.length > 1 ? "s" : ""}
+        </span>
+        <Btn variant="primary" size="sm" onClick={addTable}>+ Ajouter une {unit.toLowerCase()}</Btn>
       </Surface>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 14, marginBottom: 24 }}>
         {store.tables.map((tb) => {
@@ -1997,7 +2051,10 @@ function QRTab({ restaurant, store }) {
                 <QRCanvas value={url} size={150} fg={fg} bg={bg} onReady={(c) => (canvasRefs.current[tb.number] = c)} />
               </div>
               <TableLabelEditor table={tb} store={store} />
-              <Btn variant="subtle" size="sm" style={{ width: "100%", marginTop: 6 }} onClick={() => download(tb.number)}>⬇️ PNG</Btn>
+              <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                <Btn variant="subtle" size="sm" style={{ flex: 1 }} onClick={() => download(tb.number)}>⬇️ PNG</Btn>
+                <Btn variant="ghost" size="sm" title={`Supprimer ${unit.toLowerCase()} ${tb.number}`} onClick={() => removeTable(tb)}>🗑️</Btn>
+              </div>
             </Surface>
           );
         })}
@@ -3420,8 +3477,8 @@ function makeTestTicket() {
     id: "test", fiscal_number: "TEST", created_at: new Date().toISOString(),
     order_type: "dine_in", table: { number: 1 }, customer_name: "Client test",
     items: [
-      { quantity: 2, name: "Plat test", price: 12.50, detail: "" },
-      { quantity: 1, name: "Boisson test", price: 6.00, detail: "" },
+      { quantity: 2, name: "Plat test", price: 12.50, vat_rate: 10, detail: "" },
+      { quantity: 1, name: "Boisson test", price: 6.00, vat_rate: 20, detail: "" },
     ],
     subtotal: 31.00, discount: 0, total: 31.00,
     vat_breakdown: [
@@ -3902,104 +3959,117 @@ function ReceiptTicket({ order, restaurant, settings, detailed = true }) {
   if (!order) return null;
   const items = order.items || [];
   const when = order.created_at ? new Date(order.created_at) : new Date();
-  const tableLabel = order.order_type === "takeaway"
-    ? "À emporter"
-    : (order.table?.label || (order.table?.number != null ? `Table ${order.table.number}` : ""));
-  const line = { display: "flex", justifyContent: "space-between", gap: 8 };
   const vat = Array.isArray(order.vat_breakdown) ? order.vat_breakdown : [];
   const totalHt = vat.reduce((s, v) => s + Number(v.base_ht || 0), 0);
   const totalVat = vat.reduce((s, v) => s + Number(v.vat || 0), 0);
   const num = order.fiscal_number || (order.id || "").slice(0, 8).toUpperCase();
   const isTest = order.fiscal_number === "TEST";
+  const row = { display: "flex", justifyContent: "space-between", gap: 6 };
+  // Séparateurs dessinés en caractères plutôt qu'en bordure CSS : une
+  // imprimante à ticket rend un caractère de façon prévisible, alors qu'une
+  // bordure de 1px dépend de la résolution et disparaît parfois à l'impression.
+  const sepDouble = "=".repeat(34);
+  const sepSingle = "-".repeat(34);
 
   return (
-    // Largeur adaptative et non fixée en dur : le pilote d'imprimante impose
-    // sa propre taille de papier (48mm chez un utilisateur, 80mm chez un
-    // autre) et le CSS @page n'est qu'une préférence qu'il peut ignorer. Un
-    // `width: 72mm` en dur débordait donc et se faisait rogner. `width: 100%`
-    // laisse le ticket se conformer au papier réel, `maxWidth` l'empêche de
-    // s'étaler au-delà de la zone imprimable d'un rouleau 80mm standard, et
-    // `border-box` évite que le padding s'ajoute à cette largeur.
-    <div style={{ width: "100%", maxWidth: "72mm", boxSizing: "border-box", padding: "2mm", fontFamily: "'Courier New', Courier, monospace", fontSize: 16, fontWeight: 700, lineHeight: 1.35, color: "#000", background: "#fff" }}>
+    // Largeur adaptative : le pilote impose sa propre taille de papier (48mm
+    // observé alors que le rouleau fait 80mm) et @page n'est qu'une
+    // préférence. width:100% laisse le ticket se conformer au papier réel,
+    // maxWidth borne la zone imprimable d'un rouleau 80mm standard.
+    <div style={{ width: "100%", maxWidth: "72mm", boxSizing: "border-box", padding: "2mm", fontFamily: "'Courier New', Courier, monospace", fontSize: 13, fontWeight: 700, lineHeight: 1.3, color: "#000", background: "#fff" }}>
       {isTest && (
-        <div style={{ textAlign: "center", fontWeight: 700, border: "2px solid #000", padding: "4px 0", marginBottom: 6 }}>
+        <div style={{ textAlign: "center", border: "2px solid #000", padding: "3px 0", marginBottom: 5 }}>
           *** TICKET TEST — NE PAS ENCAISSER ***
         </div>
       )}
-      <div style={{ textAlign: "center", marginBottom: 6 }}>
-        <div style={{ fontSize: 22, fontWeight: 700 }}>{restaurant?.name}</div>
-        {settings?.ticket_address && <div>{settings.ticket_address}</div>}
-        {settings?.ticket_phone && <div>Tél. {settings.ticket_phone}</div>}
-        {settings?.ticket_tax_id && <div>SIRET {settings.ticket_tax_id}</div>}
-        {settings?.ticket_vat_number && <div>TVA {settings.ticket_vat_number}</div>}
-      </div>
-      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
-      <div style={{ fontWeight: 700 }}>Ticket n° {num}</div>
-      <div>{when.toLocaleDateString("fr-FR")} à {when.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</div>
-      {tableLabel && <div>{tableLabel}</div>}
-      {order.customer_name && <div>Client : {order.customer_name}</div>}
-      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
 
+      {/* En-tête établissement, centré comme sur une note de restaurant. */}
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 20, letterSpacing: 1 }}>{restaurant?.name}</div>
+        {settings?.ticket_address && <div>{settings.ticket_address}</div>}
+        {settings?.ticket_phone && <div>Tel : {settings.ticket_phone}</div>}
+        {settings?.ticket_tax_id && <div>Siret : {settings.ticket_tax_id}</div>}
+        {settings?.ticket_vat_number && <div>Tva : {settings.ticket_vat_number}</div>}
+      </div>
+      <div style={{ overflow: "hidden", whiteSpace: "nowrap" }}>{sepDouble}</div>
+
+      {/* Table et couverts, en tête de note. */}
+      {order.order_type === "takeaway"
+        ? <div>A EMPORTER</div>
+        : order.table?.number != null && <div>TABLE : {order.table.label || order.table.number}</div>}
+      {order.covers != null && <div>Couvert : {order.covers}</div>}
+      {order.customer_name && order.customer_name !== "Comptoir" && <div>Client : {order.customer_name}</div>}
+      {order.reprint && <div style={{ marginTop: 4 }}>Duplicata</div>}
+      <div style={{ overflow: "hidden", whiteSpace: "nowrap" }}>{sepSingle}</div>
+
+      {/* Lignes : quantité + libellé à gauche, montant et lettre de TVA à
+          droite. La lettre (A=20 %, B=10 %, C=5,5 %) est la convention des
+          caisses françaises et évite de répéter le taux sur chaque ligne. */}
       {detailed ? (
-        <>
-          {items.map((it, i) => (
-            <div key={i} style={line}>
-              <span>{it.quantity}× {it.name}{it.detail ? ` (${it.detail})` : ""}</span>
-              <span>{eur(Number(it.price || 0) * it.quantity)}</span>
-            </div>
-          ))}
-          <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
-        </>
+        items.map((it, i) => (
+          <div key={i} style={row}>
+            <span style={{ flex: 1, minWidth: 0 }}>{it.quantity} {it.name}{it.detail ? ` (${it.detail})` : ""}</span>
+            <span style={{ whiteSpace: "nowrap" }}>{Number(Number(it.price || 0) * it.quantity).toFixed(2)} {vatLetter(it.vat_rate)}</span>
+          </div>
+        ))
       ) : (
-        <div style={{ fontStyle: "italic", color: "#333" }}>Note — justificatif</div>
+        <div style={{ fontStyle: "italic" }}>Note — justificatif</div>
       )}
+      <div style={{ overflow: "hidden", whiteSpace: "nowrap" }}>{sepDouble}</div>
+
       {Number(order.discount) > 0 && (
         <>
-          <div style={line}><span>Sous-total</span><span>{eur(order.subtotal)}</span></div>
-          <div style={line}><span>Remise</span><span>-{eur(order.discount)}</span></div>
+          <div style={row}><span>Sous-total</span><span>{eur(order.subtotal)}</span></div>
+          <div style={row}><span>Remise</span><span>-{eur(order.discount)}</span></div>
         </>
       )}
-      <div style={{ ...line, fontWeight: 700, fontSize: 20 }}>
+      <div style={{ ...row, fontSize: 19 }}>
         <span>TOTAL TTC</span><span>{eur(order.total)}</span>
       </div>
 
-      {/* Ventilation de TVA : obligatoire sur une note de restaurant. Une
-          seule colonne de texte par taux plutôt qu'un tableau à largeurs
-          fixes en pixels : sur certains pilotes d'imprimante à ticket, une
-          largeur en px dans un contenu pensé en mm n'est pas convertie
-          correctement et pousse les valeurs hors de la zone imprimable —
-          les libellés à largeur automatique restent visibles, les colonnes
-          à largeur fixe disparaissent. Une ligne de texte simple élimine ce
-          risque, quel que soit le pilote. */}
       {vat.length > 0 && (
         <>
-          <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
-          <div style={line}><span>Dont TVA</span><span>{eur(totalVat)}</span></div>
-          <div style={line}><span>Total HT</span><span>{eur(totalHt)}</span></div>
+          <div style={row}><span>Dont TVA</span><span>{eur(totalVat)}</span></div>
+          <div style={row}><span>Total HT</span><span>{eur(totalHt)}</span></div>
+          {/* Une ligne de texte par taux, sans colonne à largeur fixe en
+              pixels : ces largeurs débordaient de la zone imprimable sur le
+              pilote utilisé (les montants disparaissaient). */}
           {vat.map((v, i) => (
-            <div key={i} style={{ fontSize: 14 }}>
-              {Number(v.rate).toFixed(1).replace(".", ",")}% {eur(v.base_ht)} HT {eur(v.vat)} TVA {eur(v.total_ttc ?? v.base_ht + v.vat)} TTC
+            <div key={i} style={{ fontSize: 12 }}>
+              {vatLetter(v.rate)} @{Number(v.rate).toFixed(2)}% {Number(v.base_ht).toFixed(2)} HT {Number(v.vat).toFixed(2)} TVA {Number(v.total_ttc ?? v.base_ht + v.vat).toFixed(2)} TTC
             </div>
           ))}
         </>
       )}
+      <div style={{ overflow: "hidden", whiteSpace: "nowrap" }}>{sepSingle}</div>
 
-      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
-      <div>
-        {order.payment_method === "cash" ? "Réglé en espèces"
-          : order.payment_method === "card" ? "Réglé par carte bancaire"
-            : order.payment_mode === "pay_at_counter" ? "À encaisser en caisse" : ""}
+      {/* Règlement : libellé et montant sur une seule ligne, comme sur une
+          note de caisse (« Carte Bleue          47.80 »). */}
+      <div style={row}>
+        <span>
+          {order.payment_method === "cash" ? "Especes"
+            : order.payment_method === "card" ? "Carte Bleue"
+              : order.payment_mode === "pay_at_counter" ? "A encaisser" : "Reglement"}
+        </span>
+        <span>{eur(order.total)}</span>
       </div>
       {order.note && <div>Note : {order.note}</div>}
-      {settings?.ticket_footer && <div style={{ textAlign: "center", marginTop: 10 }}>{settings.ticket_footer}</div>}
-      <div style={{ textAlign: "center", marginTop: 8, fontSize: 13 }}>
-        Merci de votre visite — à bientôt !
+      <div style={{ overflow: "hidden", whiteSpace: "nowrap" }}>{sepSingle}</div>
+
+      {/* Pied : date en clair puis numéro de ticket, comme sur une note de
+          restaurant. Volontairement AUCUNE mention de certification (type
+          « NF525 ») : Wegemo n'est pas certifié, l'afficher serait une
+          fausse déclaration de conformité. */}
+      <div style={{ fontSize: 12 }}>
+        {when.toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }).toUpperCase()}
+        {" - "}
+        {when.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
       </div>
-      {/* Marge de papier vierge avant la coupe : beaucoup d'imprimantes à
-          ticket ont besoin de faire défiler un peu de papier après le
-          contenu pour que le massicot automatique s'engage correctement.
-          Sans ça, un ticket court (peu d'articles) peut ne pas se couper du
-          tout, ou se couper en plein milieu du texte. */}
+      <div style={{ fontSize: 12 }}>Ticket : {num}{items.length ? ` - Nombre de Lignes: ${items.length}` : ""}</div>
+      <div style={{ overflow: "hidden", whiteSpace: "nowrap" }}>{sepDouble}</div>
+      <div style={{ textAlign: "center" }}>
+        {settings?.ticket_footer || "Service compris - Merci de votre visite"}
+      </div>
       <PaperFeed lines={12} />
     </div>
   );
