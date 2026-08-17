@@ -10,6 +10,7 @@ create table if not exists ingredients (
   created_at timestamptz not null default now()
 );
 alter table ingredients enable row level security;
+drop policy if exists "Owner manages ingredients" on ingredients;
 create policy "Owner manages ingredients" on ingredients for all using (
   exists (select 1 from restaurants r where r.id = ingredients.restaurant_id and r.owner_id = auth.uid())
 );
@@ -22,6 +23,7 @@ create table if not exists recipe_items (
   unique(menu_item_id, ingredient_id)
 );
 alter table recipe_items enable row level security;
+drop policy if exists "Owner manages recipe items" on recipe_items;
 create policy "Owner manages recipe items" on recipe_items for all using (
   exists (select 1 from menu_items mi join restaurants r on r.id = mi.restaurant_id
           where mi.id = recipe_items.menu_item_id and r.owner_id = auth.uid())

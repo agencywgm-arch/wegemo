@@ -1612,16 +1612,41 @@ function PosTab({ restaurant, store }) {
   // Le ticket imprimé au comptoir est construit à partir du panier tel qu'il
   // est au moment de valider, pas de la commande relue en base ensuite : le
   // personnel doit avoir son papier immédiatement, sans attendre un aller-retour.
-  const buildTicketJob = (order, method) => {
+  // `res` est la réponse de create_order_secure : montants, numéro fiscal et
+  // ventilation de TVA font autorité et sont repris tels quels sur le ticket.
+  // En mode démo il est absent, on retombe alors sur le panier local.
+  const buildTicketJob = (res, method) => {
     const table = sortedTables.find((t) => t.id === tableId);
+    // En démo il n'y a pas de passage en base : on reconstitue la ventilation
+    // localement pour que l'aperçu du ticket soit fidèle au ticket réel.
+    const demoVat = () => {
+      const byRate = new Map();
+      lines.forEach((l) => {
+        const rate = Number(l.item.vat_rate ?? 10);
+        byRate.set(rate, (byRate.get(rate) || 0) + Number(l.item.price) * l.qty);
+      });
+      return [...byRate.entries()].sort((a, b) => a[0] - b[0]).map(([rate, ttc]) => {
+        const ht = ttc / (1 + rate / 100);
+        return {
+          rate,
+          base_ht: Math.round(ht * 100) / 100,
+          vat: Math.round((ttc - ht) * 100) / 100,
+          total_ttc: Math.round(ttc * 100) / 100,
+        };
+      });
+    };
     return {
-      id: order?.id || uid(),
-      created_at: order?.created_at || new Date().toISOString(),
+      id: res?.order_id || uid(),
+      created_at: new Date().toISOString(),
+      fiscal_number: res?.fiscal_number || null,
       order_type: table?.number === 0 ? "takeaway" : "dine_in",
       table: table ? { number: table.number, label: table.label } : null,
       customer_name: "Comptoir",
       items: lines.map((l) => ({ quantity: l.qty, name: l.item.name, price: l.item.price, detail: "" })),
-      total,
+      subtotal: res?.subtotal ?? total,
+      discount: res?.discount ?? 0,
+      total: res?.total ?? total,
+      vat_breakdown: res?.vat_breakdown || demoVat(),
       payment_method: method,
       payment_mode: "pay_at_counter",
       note: "",
@@ -1642,43 +1667,42 @@ function PosTab({ restaurant, store }) {
         return;
       }
       const table = sortedTables.find((t) => t.id === tableId);
-      const { data: order, error } = await supabase
-        .from("orders")
-        .insert({
-          restaurant_id: restaurant.id,
-          table_id: tableId,
-          total,
-          payment_method: method,
-          order_type: table?.number === 0 ? "takeaway" : "dine_in",
-          customer_name: "Comptoir",
-          customer_email: "",
-          status: "PENDING",
-          payment_mode: "pay_at_counter",
-          // Le personnel encaisse à l'instant même : rien à transmettre à une
-          // caisse externe, et l'argent est déjà pris.
-          pos_sync_status: "not_applicable",
-          cash_collected: true,
-        })
-        .select()
-        .single();
+      // Une vente au comptoir est un encaissement au même titre qu'une commande
+      // QR : elle doit être numérotée et inscrite au journal fiscal. On passe
+      // donc par la même transaction que le flux client.
+      const { data: res, error } = await supabase.rpc("create_order_secure", {
+        p_restaurant: restaurant.id,
+        p_table: tableId,
+        p_order_type: table?.number === 0 ? "takeaway" : "dine_in",
+        p_payment_method: method,
+        p_payment_mode: "pay_at_counter",
+        p_customer_name: "Comptoir",
+        p_customer_email: "",
+        p_note: "",
+        p_promo_code: null,
+        p_items: lines.map((l) => ({ menu_item_id: l.item.id, quantity: l.qty, detail: "" })),
+        p_client_token: uid(),
+      });
       if (error) throw error;
 
-      await supabase.from("order_items").insert(
-        lines.map((l) => ({
-          order_id: order.id,
-          menu_item_id: l.item.id,
-          quantity: l.qty,
-          detail: "",
-        })),
-      );
+      // L'argent est encaissé sur-le-champ : on marque la commande réglée et
+      // on n'a rien à transmettre à une caisse externe devant laquelle on est.
+      await supabase.from("orders")
+        .update({ cash_collected: true, pos_sync_status: "not_applicable" })
+        .eq("id", res.order_id);
 
-      const job = buildTicketJob(order, method);
-      toast(`Commande envoyée en cuisine — ${eur(total)}`, "success");
+      const job = buildTicketJob(res, method);
+      toast(`Commande envoyée en cuisine — ${eur(res.total)}`, "success");
       setLines([]);
       setPrinting(job);
       store.reload();
     } catch (e) {
-      toast(e.message || "Erreur", "error");
+      const msg = String(e?.message || "");
+      if (msg.includes("rupture_stock")) {
+        toast(`Stock épuisé : ${msg.split("rupture_stock:")[1]?.trim() || "article"}`, "error");
+      } else {
+        toast(msg || "Erreur", "error");
+      }
     } finally {
       setBusy(false);
     }
@@ -2203,12 +2227,13 @@ function PromoCodes({ restaurant, store }) {
 function MenuTab({ restaurant, store }) {
   const toast = useToast();
   const [editing, setEditing] = useState(null);
-  const blank = { name: "", description: "", price: 0, category: "Plats", emoji: "🍴", is_popular: false, available: true, stock: "", supplements: [], extras: [] };
+  const blank = { name: "", description: "", price: 0, category: "Plats", emoji: "🍴", is_popular: false, available: true, stock: "", vat_rate: 10, supplements: [], extras: [] };
 
   const save = async (item) => {
     const row = {
       ...item, restaurant_id: restaurant.id, price: Number(item.price),
       stock: item.stock === "" || item.stock == null ? null : Number(item.stock),
+      vat_rate: item.vat_rate == null || item.vat_rate === "" ? 10 : Number(item.vat_rate),
     };
     if (!store.demoMode && hasSupabase) {
       if (item.id) await supabase.from("menu_items").update(row).eq("id", item.id);
@@ -2283,6 +2308,22 @@ function MenuItemModal({ item, onClose, onSave, onDelete }) {
           <InputField label="Prix €" type="number" step="0.01" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} style={{ width: 100 }} />
           <div style={{ flex: 1 }}><InputField label="Catégorie" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} /></div>
           <InputField label="Stock (vide=∞)" type="number" value={f.stock} onChange={(e) => setF({ ...f, stock: e.target.value })} style={{ width: 110 }} />
+          {/* Taux de TVA : 10 % en restauration, 20 % sur l'alcool, 5,5 % sur
+              l'alimentaire à emporter conditionné. Figé sur le ticket à la
+              vente, donc modifiable ici sans réécrire l'historique. */}
+          <label style={{ ...FF, display: "flex", flexDirection: "column", gap: 4, fontSize: 13, fontWeight: 600, color: C.textSecondary }}>
+            TVA
+            <select
+              value={f.vat_rate ?? 10}
+              onChange={(e) => setF({ ...f, vat_rate: Number(e.target.value) })}
+              style={{ ...FF, padding: "10px 12px", borderRadius: 12, border: `1px solid ${C.border}`, background: C.surface, fontSize: 15, width: 110 }}
+            >
+              <option value={10}>10 %</option>
+              <option value={20}>20 % (alcool)</option>
+              <option value={5.5}>5,5 %</option>
+              <option value={0}>0 %</option>
+            </select>
+          </label>
         </div>
         <div style={{ display: "flex", gap: 16, margin: "8px 0 14px" }}>
           <label style={{ ...FF, fontSize: 14, display: "flex", gap: 6, alignItems: "center" }}>
@@ -3342,7 +3383,7 @@ function CheckinTab({ restaurant, store }) {
 /* ---- Settings ---- */
 function SettingsTab({ restaurant, store, modules = ["base"], onModulesChange }) {
   const toast = useToast();
-  const [settings, setSettings] = useState({ stripe_publishable_key: "", stripe_secret_key: "", openai_api_key: "", resend_api_key: "", resend_from: "", google_review_url: "", google_review_enabled: false, ticket_address: "", ticket_phone: "", ticket_tax_id: "", ticket_footer: "", auto_print_enabled: true });
+  const [settings, setSettings] = useState({ stripe_publishable_key: "", stripe_secret_key: "", openai_api_key: "", resend_api_key: "", resend_from: "", google_review_url: "", google_review_enabled: false, ticket_address: "", ticket_phone: "", ticket_tax_id: "", ticket_vat_number: "", ticket_footer: "", auto_print_enabled: true });
 
   const toggleModule = async (id) => {
     if (id === "base") return; // socle always active
@@ -3441,7 +3482,8 @@ function SettingsTab({ restaurant, store, modules = ["base"], onModulesChange })
         <div style={{ marginTop: 8 }}>
           {field("ticket_address", "Adresse (affichée sur le ticket)")}
           {field("ticket_phone", "Téléphone")}
-          {field("ticket_tax_id", "SIRET / n° TVA")}
+          {field("ticket_tax_id", "SIRET")}
+          {field("ticket_vat_number", "N° TVA intracommunautaire")}
           {field("ticket_footer", "Message de fin de ticket (ex : Merci de votre visite !)")}
         </div>
         <Btn variant="primary" onClick={save}>Enregistrer</Btn>
@@ -3734,47 +3776,93 @@ function useRestaurantSettings(restaurantId, demoMode) {
   return settings;
 }
 
+// Ticket de caisse au format français : numéro fiscal séquentiel, ventilation
+// de TVA par taux, mentions légales de l'établissement. La ventilation vient
+// de la base (figée à l'encaissement par create_order_secure) et n'est jamais
+// recalculée à l'impression : réimprimer un ticket doit redonner exactement le
+// même document, même si les prix de la carte ont changé depuis.
 function ReceiptTicket({ order, restaurant, settings }) {
   if (!order) return null;
   const items = order.items || [];
-  const shortId = (order.id || "").slice(0, 8).toUpperCase();
   const when = order.created_at ? new Date(order.created_at) : new Date();
   const tableLabel = order.order_type === "takeaway"
     ? "À emporter"
     : (order.table?.label || (order.table?.number != null ? `Table ${order.table.number}` : ""));
   const line = { display: "flex", justifyContent: "space-between", gap: 8 };
+  const vat = Array.isArray(order.vat_breakdown) ? order.vat_breakdown : [];
+  const totalHt = vat.reduce((s, v) => s + Number(v.base_ht || 0), 0);
+  const totalVat = vat.reduce((s, v) => s + Number(v.vat || 0), 0);
+  const num = order.fiscal_number || (order.id || "").slice(0, 8).toUpperCase();
 
   return (
     <div style={{ width: "72mm", padding: "4mm", fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#000", background: "#fff" }}>
       <div style={{ textAlign: "center", marginBottom: 6 }}>
         <div style={{ fontSize: 16, fontWeight: 700 }}>{restaurant?.name}</div>
         {settings?.ticket_address && <div>{settings.ticket_address}</div>}
-        {settings?.ticket_phone && <div>{settings.ticket_phone}</div>}
-        {settings?.ticket_tax_id && <div>SIRET : {settings.ticket_tax_id}</div>}
+        {settings?.ticket_phone && <div>Tél. {settings.ticket_phone}</div>}
+        {settings?.ticket_tax_id && <div>SIRET {settings.ticket_tax_id}</div>}
+        {settings?.ticket_vat_number && <div>TVA {settings.ticket_vat_number}</div>}
       </div>
       <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
-      <div>N° {shortId}</div>
-      <div>{when.toLocaleDateString("fr-FR")} {when.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</div>
+      <div style={{ fontWeight: 700 }}>Ticket n° {num}</div>
+      <div>{when.toLocaleDateString("fr-FR")} à {when.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</div>
       {tableLabel && <div>{tableLabel}</div>}
       {order.customer_name && <div>Client : {order.customer_name}</div>}
       <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+
       {items.map((it, i) => (
         <div key={i} style={line}>
           <span>{it.quantity}× {it.name}{it.detail ? ` (${it.detail})` : ""}</span>
           <span>{eur(Number(it.price || 0) * it.quantity)}</span>
         </div>
       ))}
+
       <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
-      <div style={{ ...line, fontWeight: 700, fontSize: 14 }}>
-        <span>TOTAL</span><span>{eur(order.total)}</span>
+      {Number(order.discount) > 0 && (
+        <>
+          <div style={line}><span>Sous-total</span><span>{eur(order.subtotal)}</span></div>
+          <div style={line}><span>Remise</span><span>-{eur(order.discount)}</span></div>
+        </>
+      )}
+      <div style={{ ...line, fontWeight: 700, fontSize: 15 }}>
+        <span>TOTAL TTC</span><span>{eur(order.total)}</span>
       </div>
-      <div style={{ marginTop: 4 }}>
-        {order.payment_method === "cash" ? "Réglé — espèces"
-          : order.payment_method === "card" ? "Réglé — carte"
+
+      {/* Ventilation de TVA : obligatoire sur une note de restaurant. */}
+      {vat.length > 0 && (
+        <>
+          <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+          <div style={{ ...line, fontWeight: 700 }}>
+            <span style={{ flex: 1 }}>TVA</span>
+            <span style={{ width: 58, textAlign: "right" }}>Base HT</span>
+            <span style={{ width: 48, textAlign: "right" }}>Montant</span>
+          </div>
+          {vat.map((v, i) => (
+            <div key={i} style={line}>
+              <span style={{ flex: 1 }}>{Number(v.rate).toFixed(1).replace(".", ",")} %</span>
+              <span style={{ width: 58, textAlign: "right" }}>{eur(v.base_ht)}</span>
+              <span style={{ width: 48, textAlign: "right" }}>{eur(v.vat)}</span>
+            </div>
+          ))}
+          <div style={{ ...line, fontWeight: 700 }}>
+            <span style={{ flex: 1 }}>Total</span>
+            <span style={{ width: 58, textAlign: "right" }}>{eur(totalHt)}</span>
+            <span style={{ width: 48, textAlign: "right" }}>{eur(totalVat)}</span>
+          </div>
+        </>
+      )}
+
+      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+      <div>
+        {order.payment_method === "cash" ? "Réglé en espèces"
+          : order.payment_method === "card" ? "Réglé par carte bancaire"
             : order.payment_mode === "pay_at_counter" ? "À encaisser en caisse" : ""}
       </div>
       {order.note && <div>Note : {order.note}</div>}
       {settings?.ticket_footer && <div style={{ textAlign: "center", marginTop: 10 }}>{settings.ticket_footer}</div>}
+      <div style={{ textAlign: "center", marginTop: 8, fontSize: 10 }}>
+        Merci de votre visite — à bientôt !
+      </div>
     </div>
   );
 }
@@ -5580,6 +5668,10 @@ function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, p
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [cardIntent, setCardIntent] = useState(null); // { clientSecret, publishableKey }
+  // Jeton d'idempotence stable pour toute la durée du paiement : un double-tap
+  // ou une reprise réseau réutilise la commande déjà créée au lieu d'en ouvrir
+  // une seconde. Renouvelé uniquement à la commande suivante.
+  const clientToken = useRef(uid());
 
   const createOrder = useCallback(async (method) => {
     setBusy(true);
@@ -5594,44 +5686,63 @@ function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, p
       //   card → Stripe (PaymentIntent déjà confirmé avant d'arriver ici)
       //   cash → encaissement en caisse, transmis à la caisse via HubRise
       const paymentMode = method === "cash" ? "pay_at_counter" : "online_stripe";
-      const { data: order, error } = await supabase
-        .from("orders")
-        .insert({
-          restaurant_id: restaurant.id, table_id: tableId, total, payment_method: method,
-          order_type: orderType, customer_name: profile.name, customer_email: profile.email, status: "PENDING",
-          payment_mode: paymentMode,
-          pos_sync_status: paymentMode === "pay_at_counter" ? "pending" : "not_applicable",
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      const items = cart.map((c) => ({ order_id: order.id, menu_item_id: c.item.id, quantity: c.qty, detail: c.supplements.map((s) => s.name).join(", ") }));
-      await supabase.from("order_items").insert(items);
 
-      // Transmission à la caisse. Volontairement après l'insertion des lignes
-      // (la fonction les relit) et non bloquant : si la caisse est injoignable,
-      // la commande reste valide et visible dans la vue cuisine Wegemo, avec
-      // son pos_sync_status en échec pour que le restaurateur puisse relancer.
+      // Le montant n'est jamais transmis : create_order_secure relit les prix
+      // et les taux de TVA en base, décrémente le stock, valide la promo et
+      // attribue le numéro fiscal, le tout dans une seule transaction. Un
+      // total falsifié côté navigateur n'a donc aucun effet.
+      const { data: res, error } = await supabase.rpc("create_order_secure", {
+        p_restaurant: restaurant.id,
+        p_table: tableId,
+        p_order_type: orderType,
+        p_payment_method: method,
+        p_payment_mode: paymentMode,
+        p_customer_name: profile.name || "",
+        p_customer_email: profile.email || "",
+        p_note: "",
+        p_promo_code: promo?.code || null,
+        p_items: cart.map((c) => ({
+          menu_item_id: c.item.id,
+          quantity: c.qty,
+          supplements: c.supplements || [],
+          detail: (c.supplements || []).map((s) => s.name).join(", "),
+        })),
+        p_client_token: clientToken.current,
+      });
+      if (error) throw error;
+      const order = { id: res.order_id };
+
+      // Transmission à la caisse. Volontairement après la création (la fonction
+      // relit les lignes) et non bloquant : si la caisse est injoignable, la
+      // commande reste valide et visible dans la vue cuisine Wegemo, avec son
+      // pos_sync_status en échec pour que le restaurateur puisse relancer.
       if (paymentMode === "pay_at_counter") {
         callFunction("hubrise-push-order", { order_id: order.id }).catch(() => {});
       }
       if (promo?.code) {
-        await supabase.rpc("increment_promo_use", { p_code: promo.code });
-        // Attribute the order to any marketing tracker carrying this code.
-        supabase.rpc("track_redemption", { p_restaurant: restaurant.id, p_code: promo.code, p_revenue: total }).then(() => {}, () => {});
+        // L'usage du code est déjà consommé dans la transaction ci-dessus ;
+        // il ne reste que l'attribution marketing, non critique.
+        supabase.rpc("track_redemption", { p_restaurant: restaurant.id, p_code: promo.code, p_revenue: res.total }).then(() => {}, () => {});
       }
       // Fire-and-forget receipt email when the customer left an address.
       if (profile.email) {
         const rows = cart.map((c) => `<tr><td>${c.qty}× ${c.item.name}</td><td align="right">${eur(c.lineTotal)}</td></tr>`).join("");
-        const html = `<h2>Merci pour votre commande chez ${restaurant.name} !</h2><table style="width:100%">${rows}<tr><td><b>Total</b></td><td align="right"><b>${eur(total)}</b></td></tr></table>`;
-        callFunction("send-receipt-email", { restaurant_id: restaurant.id, to_email: profile.email, subject: `Reçu — ${restaurant.name}`, html_body: html }).catch(() => {});
+        const html = `<h2>Merci pour votre commande chez ${restaurant.name} !</h2><table style="width:100%">${rows}<tr><td><b>Total</b></td><td align="right"><b>${eur(res.total)}</b></td></tr></table>`;
+        callFunction("send-receipt-email", { restaurant_id: restaurant.id, to_email: profile.email, subject: `Reçu n° ${res.fiscal_number} — ${restaurant.name}`, html_body: html }).catch(() => {});
       }
       onDone(order.id);
     } catch (e) {
-      toast(e.message || "Erreur", "error");
+      // La rupture de stock est le seul échec que le client peut corriger
+      // lui-même : on nomme l'article plutôt que d'afficher un code brut.
+      const msg = String(e?.message || "");
+      if (msg.includes("rupture_stock")) {
+        toast(`Plus disponible : ${msg.split("rupture_stock:")[1]?.trim() || "un article"}`, "error");
+      } else {
+        toast(msg || "Erreur", "error");
+      }
       setBusy(false);
     }
-  }, [restaurant.id, tableId, total, orderType, profile, cart, promo, onDone, toast]);
+  }, [restaurant.id, tableId, orderType, profile, cart, promo, onDone, toast]);
 
   const payCard = async () => {
     // If the total is exactly 0 (e.g. 100% promo), skip Stripe entirely —

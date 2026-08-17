@@ -19,6 +19,7 @@ create table if not exists checkins (
   created_at timestamptz not null default now()
 );
 alter table checkins enable row level security;
+drop policy if exists "Owner manages checkins" on checkins;
 create policy "Owner manages checkins" on checkins for all using (
   exists (select 1 from restaurants r where r.id = checkins.restaurant_id and r.owner_id = auth.uid())
 ) with check (

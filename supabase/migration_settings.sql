@@ -23,6 +23,7 @@ create table if not exists restaurant_settings (
   updated_at timestamptz default now()
 );
 alter table restaurant_settings enable row level security;
+drop policy if exists "Owner manages settings" on restaurant_settings;
 create policy "Owner manages settings" on restaurant_settings for all using (
   exists (select 1 from restaurants r where r.id = restaurant_settings.restaurant_id and r.owner_id = auth.uid())
 ) with check (

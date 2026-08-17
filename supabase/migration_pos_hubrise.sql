@@ -101,6 +101,7 @@ create table if not exists pos_sync_log (
 );
 
 alter table pos_sync_log enable row level security;
+drop policy if exists "Owner reads their pos logs" on pos_sync_log;
 create policy "Owner reads their pos logs" on pos_sync_log for select using (
   exists (select 1 from restaurants r
           where r.id = pos_sync_log.restaurant_id and r.owner_id = auth.uid())

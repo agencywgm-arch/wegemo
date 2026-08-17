@@ -15,9 +15,11 @@ create table if not exists promotions (
   created_at timestamptz not null default now()
 );
 alter table promotions enable row level security;
+drop policy if exists "Owner manages promotions" on promotions;
 create policy "Owner manages promotions" on promotions for all using (
   exists (select 1 from restaurants r where r.id = promotions.restaurant_id and r.owner_id = auth.uid())
 );
+drop policy if exists "Anyone can read active promotions" on promotions;
 create policy "Anyone can read active promotions" on promotions for select using (active = true);
 
 -- Customer-facing promo codes (% or fixed amount)
@@ -36,9 +38,11 @@ create table if not exists promo_codes (
   unique(restaurant_id, code)
 );
 alter table promo_codes enable row level security;
+drop policy if exists "Owner manages promo_codes" on promo_codes;
 create policy "Owner manages promo_codes" on promo_codes for all using (
   exists (select 1 from restaurants r where r.id = promo_codes.restaurant_id and r.owner_id = auth.uid())
 );
+drop policy if exists "Anyone can read active promo codes" on promo_codes;
 create policy "Anyone can read active promo codes" on promo_codes for select using (active = true);
 
 -- Increment use_count without exposing direct UPDATE to anon clients.
