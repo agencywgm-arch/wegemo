@@ -1237,6 +1237,13 @@ function DashboardPage({ restaurant, onBack, onKitchen, onCustomerView, onFranch
   const tabs = dashTabsFor(V);
   const showFranchise = onFranchise && modules.includes("franchise") && (store.demoMode || restaurant.group_id);
 
+  // Impression automatique des commandes : montée ici (et non seulement dans
+  // l'écran Cuisine séparé) pour qu'un ticket sorte quel que soit l'onglet
+  // affiché — un restaurateur qui vit dans l'onglet Commandes plutôt que
+  // dans le kiosque Cuisine dédié doit obtenir le même résultat.
+  const printSettings = useRestaurantSettings(restaurant.id, store.demoMode);
+  const { printing, dequeue } = useAutoPrintQueue(store, printSettings.auto_print_enabled);
+
   const sidebar = (
     <div style={{ width: 220, background: C.surface, borderRight: `1px solid ${C.border}`, padding: 16, display: "flex", flexDirection: "column", gap: 4, height: "100%", overflow: "auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 8px 14px" }}>
@@ -1286,6 +1293,7 @@ function DashboardPage({ restaurant, onBack, onKitchen, onCustomerView, onFranch
           )}
         </div>
       </div>
+      <TicketPrintLayer job={printing} onDone={dequeue} restaurant={restaurant} settings={printSettings} />
     </div>
   );
 }
@@ -3827,6 +3835,39 @@ function useRestaurantSettings(restaurantId, demoMode) {
   return settings;
 }
 
+// File d'impression automatique, partagée entre l'écran Cuisine et le
+// dashboard (n'importe quel onglet) : dès qu'une commande jusque-là inconnue
+// apparaît dans `store.orders`, elle part à l'impression. Les ventes
+// comptoir (onglet Vente) sont exclues — elles ont déjà leur propre ticket
+// imprimé immédiatement à l'encaissement ; les réimprimer ici doublerait le
+// papier consommé pour la même commande.
+//
+// `store.orders` part de [] avant que le chargement initial (asynchrone)
+// n'arrive : sans la garde sur `store.loading`, ce passage de [] aux vraies
+// commandes serait lui-même vu comme "des commandes toutes neuves" et tout
+// imprimerait d'un coup à l'ouverture de l'écran.
+function useAutoPrintQueue(store, autoPrintEnabled) {
+  const prevIds = useRef(null);
+  const [printQueue, setPrintQueue] = useState([]);
+
+  useEffect(() => {
+    if (store.loading) return;
+    const ids = new Set(store.orders.map((o) => o.id));
+    if (prevIds.current === null) { prevIds.current = ids; return; }
+    if (autoPrintEnabled !== false) {
+      const fresh = store.orders.filter((o) => !prevIds.current.has(o.id) && o.customer_name !== "Comptoir");
+      if (fresh.length) setPrintQueue((q) => [...q, ...fresh]);
+    }
+    prevIds.current = ids;
+  }, [store.orders, store.loading, autoPrintEnabled]);
+
+  return {
+    printing: printQueue[0] ?? null,
+    dequeue: () => setPrintQueue((q) => q.slice(1)),
+    enqueue: (order) => setPrintQueue((q) => [...q, order]),
+  };
+}
+
 // Ticket de caisse au format français : numéro fiscal séquentiel, ventilation
 // de TVA par taux, mentions légales de l'établissement. La ventilation vient
 // de la base (figée à l'encaissement par create_order_secure) et n'est jamais
@@ -3858,14 +3899,14 @@ function ReceiptTicket({ order, restaurant, settings, detailed = true }) {
     // laisse le ticket se conformer au papier réel, `maxWidth` l'empêche de
     // s'étaler au-delà de la zone imprimable d'un rouleau 80mm standard, et
     // `border-box` évite que le padding s'ajoute à cette largeur.
-    <div style={{ width: "100%", maxWidth: "72mm", boxSizing: "border-box", padding: "2mm", fontFamily: "'Courier New', Courier, monospace", fontSize: 12, color: "#000", background: "#fff" }}>
+    <div style={{ width: "100%", maxWidth: "72mm", boxSizing: "border-box", padding: "2mm", fontFamily: "'Courier New', Courier, monospace", fontSize: 16, lineHeight: 1.35, color: "#000", background: "#fff" }}>
       {isTest && (
         <div style={{ textAlign: "center", fontWeight: 700, border: "2px solid #000", padding: "4px 0", marginBottom: 6 }}>
           *** TICKET TEST — NE PAS ENCAISSER ***
         </div>
       )}
       <div style={{ textAlign: "center", marginBottom: 6 }}>
-        <div style={{ fontSize: 16, fontWeight: 700 }}>{restaurant?.name}</div>
+        <div style={{ fontSize: 22, fontWeight: 700 }}>{restaurant?.name}</div>
         {settings?.ticket_address && <div>{settings.ticket_address}</div>}
         {settings?.ticket_phone && <div>Tél. {settings.ticket_phone}</div>}
         {settings?.ticket_tax_id && <div>SIRET {settings.ticket_tax_id}</div>}
@@ -3897,7 +3938,7 @@ function ReceiptTicket({ order, restaurant, settings, detailed = true }) {
           <div style={line}><span>Remise</span><span>-{eur(order.discount)}</span></div>
         </>
       )}
-      <div style={{ ...line, fontWeight: 700, fontSize: 15 }}>
+      <div style={{ ...line, fontWeight: 700, fontSize: 20 }}>
         <span>TOTAL TTC</span><span>{eur(order.total)}</span>
       </div>
 
@@ -3915,7 +3956,7 @@ function ReceiptTicket({ order, restaurant, settings, detailed = true }) {
           <div style={line}><span>Dont TVA</span><span>{eur(totalVat)}</span></div>
           <div style={line}><span>Total HT</span><span>{eur(totalHt)}</span></div>
           {vat.map((v, i) => (
-            <div key={i} style={{ fontSize: 11 }}>
+            <div key={i} style={{ fontSize: 14 }}>
               {Number(v.rate).toFixed(1).replace(".", ",")}% {eur(v.base_ht)} HT {eur(v.vat)} TVA {eur(v.total_ttc ?? v.base_ht + v.vat)} TTC
             </div>
           ))}
@@ -3930,7 +3971,7 @@ function ReceiptTicket({ order, restaurant, settings, detailed = true }) {
       </div>
       {order.note && <div>Note : {order.note}</div>}
       {settings?.ticket_footer && <div style={{ textAlign: "center", marginTop: 10 }}>{settings.ticket_footer}</div>}
-      <div style={{ textAlign: "center", marginTop: 8, fontSize: 10 }}>
+      <div style={{ textAlign: "center", marginTop: 8, fontSize: 13 }}>
         Merci de votre visite — à bientôt !
       </div>
     </div>
@@ -3992,9 +4033,7 @@ function KitchenView({ restaurant, onExit }) {
   const playSound = useOrderSound();
   const [alert, setAlert] = useState(false);
   const prevCount = useRef(0);
-  const prevIds = useRef(null);
-  const [printQueue, setPrintQueue] = useState([]);
-  const printing = printQueue[0] ?? null;
+  const { printing, dequeue, enqueue } = useAutoPrintQueue(store, settings.auto_print_enabled);
 
   useEffect(() => {
     const pending = store.orders.filter((o) => o.status === "PENDING").length;
@@ -4004,25 +4043,6 @@ function KitchenView({ restaurant, onExit }) {
     }
     prevCount.current = pending;
   }, [store.orders, playSound]);
-
-  // Ticket automatique : on n'imprime que les commandes qui n'existaient pas
-  // encore au dernier passage — le premier chargement de l'écran ne compte
-  // pas, sinon toutes les commandes déjà en cours s'imprimeraient d'un coup.
-  //
-  // `store.orders` part de [] avant que le chargement initial (asynchrone)
-  // n'arrive : sans la garde sur `store.loading`, ce passage de [] aux vraies
-  // commandes serait lui-même vu comme "des commandes toutes neuves" et tout
-  // imprimerait d'un coup à l'ouverture de l'écran.
-  useEffect(() => {
-    if (store.loading) return;
-    const ids = new Set(store.orders.map((o) => o.id));
-    if (prevIds.current === null) { prevIds.current = ids; return; }
-    if (settings.auto_print_enabled !== false) {
-      const fresh = store.orders.filter((o) => !prevIds.current.has(o.id));
-      if (fresh.length) setPrintQueue((q) => [...q, ...fresh]);
-    }
-    prevIds.current = ids;
-  }, [store.orders, store.loading, settings.auto_print_enabled]);
 
   const cols = [
     { status: "PENDING", title: "🆕 Nouvelles", color: C.accentOrange },
@@ -4074,8 +4094,8 @@ function KitchenView({ restaurant, onExit }) {
                       <Btn variant="primary" size="sm" style={{ flex: 1 }} onClick={() => advance(o)}>
                         {o.status === "PENDING" ? "Commencer" : o.status === "PREPARING" ? "Marquer prête" : "Servie"}
                       </Btn>
-                      <Btn variant="subtle" size="sm" title="Ticket détaillé" onClick={() => setPrintQueue((q) => [...q, { ...o, detailed: true }])}>🖨️</Btn>
-                      <Btn variant="subtle" size="sm" title="Note sans détail (justificatif)" onClick={() => setPrintQueue((q) => [...q, { ...o, detailed: false }])}>📄</Btn>
+                      <Btn variant="subtle" size="sm" title="Ticket détaillé" onClick={() => enqueue({ ...o, detailed: true })}>🖨️</Btn>
+                      <Btn variant="subtle" size="sm" title="Note sans détail (justificatif)" onClick={() => enqueue({ ...o, detailed: false })}>📄</Btn>
                     </div>
                   </div>
                 );
@@ -4085,7 +4105,7 @@ function KitchenView({ restaurant, onExit }) {
         ))}
       </div>
 
-      <TicketPrintLayer job={printing} onDone={() => setPrintQueue((q) => q.slice(1))} restaurant={restaurant} settings={settings} />
+      <TicketPrintLayer job={printing} onDone={dequeue} restaurant={restaurant} settings={settings} />
 
       {alert && (
         <div onClick={() => setAlert(false)} style={{ position: "fixed", inset: 0, background: "rgba(255,55,95,.92)", zIndex: 2000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
