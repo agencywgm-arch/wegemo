@@ -1,5 +1,13 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "rewrites": [
+    { "source": "/r/:token/clyo/prodNoClyoKey.php", "destination": "/api/clyo-products?token=:token&mapped=0" },
+    { "source": "/r/:token/clyo/prodClyoKey.php", "destination": "/api/clyo-products?token=:token&mapped=1" },
+    { "source": "/r/:token/clyo/prodInfoUpdate_KEY.php", "destination": "/api/clyo-product-link?token=:token&action=link" },
+    { "source": "/r/:token/clyo/delierProduit.php", "destination": "/api/clyo-product-link?token=:token&action=unlink" },
+    { "source": "/r/:token/clyo/customerListOrder.php", "destination": "/api/clyo-orders?token=:token" },
+    { "source": "/r/:token/clyo/updateOrder.php", "destination": "/api/clyo-order-update?token=:token" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

@@ -3612,6 +3612,7 @@ function SettingsTab({ restaurant, store, modules = ["base"], onModulesChange })
       <Surface style={{ padding: 18, marginBottom: 16 }}>
         <strong style={{ ...FF }}>📧 Connexion Gmail</strong>
         <PosConnectSection restaurant={restaurant} demoMode={store.demoMode} />
+        <ClyoNativeSection restaurant={restaurant} demoMode={store.demoMode} />
         <GmailConnectSection restaurant={restaurant} />
       </Surface>
 
@@ -3653,10 +3654,20 @@ const POS_SYNC_UI = {
   accepted: { label: "Acceptée en caisse", color: C.accentGreen },
   sent: { label: "Transmise", color: C.accentBlue },
   pending: { label: "En attente", color: C.accentOrange },
+  blocked: { label: "Bloquée (article non mappé)", color: C.accentOrange },
   rejected: { label: "Refusée", color: C.accent },
   failed: { label: "Échec", color: C.accent },
+  cancelled: { label: "Annulée", color: C.textTertiary },
   not_applicable: { label: "—", color: C.textTertiary },
 };
+
+// Actions journalisées par le connecteur natif — sert à ne montrer dans
+// chaque carte que SES propres échanges (le journal pos_sync_log est
+// partagé avec l'intégration HubRise, qui est un tout autre canal).
+const CLYO_NATIVE_ACTIONS = [
+  "customerListOrder", "updateOrder", "prodNoClyoKey", "prodClyoKey",
+  "prodInfoUpdate_KEY", "delierProduit", "cancel",
+];
 
 function PosConnectSection({ restaurant, demoMode }) {
   const toast = useToast();
@@ -3669,10 +3680,14 @@ function PosConnectSection({ restaurant, demoMode }) {
     if (demoMode || !hasSupabase) return;
     const { data } = await supabase.rpc("get_pos_connection_status", { p_restaurant_id: restaurant.id });
     setConn(Array.isArray(data) ? data[0] ?? null : data ?? null);
+    // pos_sync_log est partagé avec le connecteur CLYO natif : sans ce
+    // filtre, les sondages de la caisse s'affichent ici comme s'ils venaient
+    // de HubRise, ce qui laisse croire que HubRise transmet les commandes.
     const { data: l } = await supabase
       .from("pos_sync_log")
       .select("*")
       .eq("restaurant_id", restaurant.id)
+      .not("action", "in", `(${CLYO_NATIVE_ACTIONS.join(",")})`)
       .order("created_at", { ascending: false })
       .limit(8);
     setLogs(l || []);
@@ -3797,7 +3812,7 @@ function PosConnectSection({ restaurant, demoMode }) {
             <Btn variant="primary" size="sm" disabled={busy} onClick={syncCatalog}>
               {busy ? "…" : "Synchroniser le menu"}
             </Btn>
-            <Btn variant="secondary" size="sm" disabled={busy} onClick={disconnect}>Déconnecter</Btn>
+            <Btn variant="subtle" size="sm" disabled={busy} onClick={disconnect}>Déconnecter</Btn>
           </>
         ) : (
           <Btn variant="primary" size="sm" disabled={busy} onClick={connect}>
@@ -3829,6 +3844,283 @@ function PosConnectSection({ restaurant, demoMode }) {
             ))}
           </div>
         </div>
+      )}
+    </Surface>
+  );
+}
+
+/* ============================================================================
+ * INTÉGRATION CAISSE CLYO — CONNECTEUR NATIF (sans HubRise)
+ *
+ * Implémente directement le protocole documenté par CLYO pour interfacer un
+ * site de vente en ligne (prodNoClyoKey/prodClyoKey/prodInfoUpdate_KEY/
+ * delierProduit/customerListOrder/updateOrder). C'est la caisse qui sonde
+ * Wegemo, pas l'inverse : les 6 endpoints vivent en dehors de ce site
+ * (api/clyo-*.js, déployés sur Vercel car GitHub Pages ne peut pas router
+ * /clyo/*.php vers du code serveur). Le mapping produit se fait entièrement
+ * dans l'écran "Lien des Article E-Commerce" de la caisse — Wegemo ne fait
+ * qu'exposer la liste et enregistrer le résultat.
+ * ==========================================================================*/
+const CLYO_BRIDGE_BASE = (import.meta.env.VITE_CLYO_BRIDGE_URL || "").replace(/\/+$/, "");
+
+function ClyoNativeSection({ restaurant, demoMode }) {
+  const toast = useToast();
+  const [conn, setConn] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [unmappedCount, setUnmappedCount] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [cbLabel, setCbLabel] = useState("CARTE BLEUE");
+
+  // supabase.rpc() ne lève jamais : il renvoie { data, error }. Sans ce
+  // contrôle, un échec côté base s'affiche en « succès » dans l'interface.
+  const callRpc = useCallback(async (fn, args) => {
+    const { data, error } = await supabase.rpc(fn, args);
+    if (error) throw new Error(error.message || "Erreur base de données");
+    return data;
+  }, []);
+
+  const load = useCallback(async () => {
+    if (demoMode || !hasSupabase) return;
+    const { data } = await supabase.rpc("clyo_reveal_credentials", { p_restaurant_id: restaurant.id });
+    const row = Array.isArray(data) ? data[0] ?? null : data ?? null;
+    setConn(row);
+    if (row?.clyo_cb_label) setCbLabel(row.clyo_cb_label);
+
+    const { data: o } = await supabase
+      .from("orders")
+      .select("id, total, customer_name, pos_sync_status, pos_sync_error, created_at")
+      .eq("restaurant_id", restaurant.id)
+      .neq("pos_sync_status", "not_applicable")
+      .order("created_at", { ascending: false })
+      .limit(10);
+    setOrders(o || []);
+
+    const { data: l } = await supabase
+      .from("pos_sync_log")
+      .select("*")
+      .eq("restaurant_id", restaurant.id)
+      .in("action", CLYO_NATIVE_ACTIONS)
+      .order("created_at", { ascending: false })
+      .limit(8);
+    setLogs(l || []);
+
+    const { count } = await supabase
+      .from("menu_items")
+      .select("id", { count: "exact", head: true })
+      .eq("restaurant_id", restaurant.id)
+      .is("pos_ref", null);
+    setUnmappedCount(count || 0);
+  }, [restaurant.id, demoMode]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { load(); }, [load]);
+
+  const activate = async () => {
+    if (demoMode || !hasSupabase) return toast("(Démo) indisponible", "info");
+    setBusy(true);
+    try {
+      await callRpc("clyo_connect", { p_restaurant_id: restaurant.id });
+      toast("Connexion CLYO activée", "success");
+      await load();
+    } catch (e) { toast(e.message || "Erreur", "error"); }
+    finally { setBusy(false); }
+  };
+
+  const rotate = async () => {
+    if (!window.confirm("Régénérer le mot de passe ? Il faudra le recopier dans la caisse CLYO.")) return;
+    setBusy(true);
+    try {
+      await callRpc("clyo_rotate_password", { p_restaurant_id: restaurant.id });
+      toast("Mot de passe régénéré", "success");
+      await load();
+    } catch (e) { toast(e.message || "Erreur", "error"); }
+    finally { setBusy(false); }
+  };
+
+  const saveCbLabel = async () => {
+    setBusy(true);
+    try {
+      await callRpc("clyo_set_cb_label", { p_restaurant_id: restaurant.id, p_label: cbLabel });
+      toast("Libellé enregistré", "success");
+      await load();
+    } catch (e) { toast(e.message || "Erreur", "error"); }
+    finally { setBusy(false); }
+  };
+
+  const disconnect = async () => {
+    if (!window.confirm("Déconnecter le connecteur CLYO natif ?")) return;
+    setBusy(true);
+    try {
+      await callRpc("disconnect_pos", { p_restaurant_id: restaurant.id });
+      toast("Déconnecté", "success");
+      await load();
+    } catch (e) { toast(e.message || "Erreur", "error"); }
+    finally { setBusy(false); }
+  };
+
+  const resend = async (orderId) => {
+    try {
+      await callRpc("clyo_resend_order", { p_order_id: orderId });
+      toast("Commande remise en file", "success");
+      await load();
+    } catch (e) { toast(e.message || "Erreur", "error"); }
+  };
+
+  const cancelOrder = async (orderId) => {
+    if (!window.confirm("Annuler le suivi CLYO de cette commande ?")) return;
+    try {
+      const data = await callRpc("clyo_cancel_order", { p_order_id: orderId });
+      const row = Array.isArray(data) ? data[0] : data;
+      if (row?.needs_manual_clyo) {
+        toast("Annulée côté Wegemo — déjà transmise à CLYO, supprime-la aussi manuellement en caisse.", "info");
+      } else {
+        toast("Annulée", "success");
+      }
+      await load();
+    } catch (e) { toast(e.message || "Erreur", "error"); }
+  };
+
+  const toggleTestMode = async () => {
+    setBusy(true);
+    try {
+      await callRpc("clyo_set_test_mode", { p_restaurant_id: restaurant.id, p_enabled: !conn?.clyo_test_mode });
+      toast(conn?.clyo_test_mode ? "Mode test désactivé" : "Mode test activé — seules les commandes à 0€ seront transmises", "success");
+      await load();
+    } catch (e) { toast(e.message || "Erreur", "error"); }
+    finally { setBusy(false); }
+  };
+
+  const createTestOrder = async () => {
+    setBusy(true);
+    try {
+      await callRpc("clyo_create_test_order", { p_restaurant_id: restaurant.id });
+      toast("Commande test (0€) créée — visible ci-dessous, prête à être transmise", "success");
+      await load();
+    } catch (e) { toast(e.message || "Erreur", "error"); }
+    finally { setBusy(false); }
+  };
+
+  const status = conn?.status === "connected" ? "connected" : "disconnected";
+  const ui = POS_STATUS_UI[status] || POS_STATUS_UI.disconnected;
+  const siteUrl = conn?.clyo_site_token && CLYO_BRIDGE_BASE ? `${CLYO_BRIDGE_BASE}/r/${conn.clyo_site_token}` : "";
+
+  return (
+    <Surface style={{ padding: 20, marginTop: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <strong style={{ ...FF, fontSize: 16 }}>🔌 Caisse CLYO — connecteur direct</strong>
+          <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginTop: 4 }}>
+            Fait apparaître les commandes Wegemo dans CLYO via le protocole officiel "site de vente en ligne" — c'est la caisse qui vient chercher les commandes, pas HubRise.
+          </p>
+        </div>
+        <span style={{ ...FF, fontSize: 13, fontWeight: 700, color: ui.color }}>{ui.dot} {ui.label}</span>
+      </div>
+
+      {status !== "connected" ? (
+        <Btn variant="primary" size="sm" disabled={busy} onClick={activate} style={{ marginTop: 14 }}>
+          {busy ? "…" : "Activer le connecteur CLYO"}
+        </Btn>
+      ) : (
+        <>
+          {!CLYO_BRIDGE_BASE && (
+            <p style={{ ...FF, fontSize: 12, color: C.accent, marginTop: 10 }}>
+              VITE_CLYO_BRIDGE_URL n'est pas configuré au build — l'URL à coller dans la caisse ne peut pas être affichée. Renseigne l'URL de ton projet Vercel dédié dans les secrets de déploiement.
+            </p>
+          )}
+          {siteUrl && (
+            <div style={{ marginTop: 12, padding: 12, background: C.bgSecondary, borderRadius: 10 }}>
+              <div style={{ ...FF, fontSize: 11, color: C.textTertiary, marginBottom: 4 }}>
+                URL à coller dans Paramètre &gt; Paramètre &gt; Périphérique &gt; « Site Web e-Commerce » de la caisse :
+              </div>
+              <code style={{ ...FF, fontSize: 12, wordBreak: "break-all" }}>{siteUrl}</code>
+            </div>
+          )}
+
+          <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ ...FF, fontSize: 12, color: C.textSecondary }}>Mot de passe de récupération :</span>
+            <code style={{ ...FF, fontSize: 12 }}>{showPassword ? (conn?.clyo_password || "") : "••••••••••••"}</code>
+            <Btn variant="subtle" size="sm" onClick={() => setShowPassword((s) => !s)}>{showPassword ? "Masquer" : "Afficher"}</Btn>
+            <Btn variant="subtle" size="sm" disabled={busy} onClick={rotate}>Régénérer</Btn>
+          </div>
+
+          <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ ...FF, fontSize: 12, color: C.textSecondary }}>Libellé « Reglement C.B internet » dans la caisse :</span>
+            <input value={cbLabel} onChange={(e) => setCbLabel(e.target.value)}
+              style={{ ...FF, fontSize: 12, padding: "4px 8px", borderRadius: 6, border: `1px solid ${C.border}`, width: 160 }} />
+            <Btn variant="subtle" size="sm" disabled={busy} onClick={saveCbLabel}>Enregistrer</Btn>
+          </div>
+          <p style={{ ...FF, fontSize: 11, color: C.textTertiary, marginTop: 4 }}>
+            Doit correspondre exactement à ce qui est sélectionné dans ce menu déroulant côté caisse.
+          </p>
+
+          <div style={{ marginTop: 16, padding: 12, background: conn?.clyo_test_mode ? "#fff7ed" : C.bgSecondary, borderRadius: 10, border: conn?.clyo_test_mode ? `1px solid ${C.accentOrange}` : "none" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+              <div>
+                <strong style={{ ...FF, fontSize: 13 }}>🧪 Mode test</strong>
+                <p style={{ ...FF, fontSize: 11, color: C.textSecondary, marginTop: 2 }}>
+                  Actif : seules les commandes à 0€ sont transmises à CLYO — aucune vraie commande payante ne peut partir tant que c'est coché, même si tu testes l'URL toi-même. Pratique pour valider la config sans avoir la caisse sous la main.
+                </p>
+              </div>
+              <Btn variant={conn?.clyo_test_mode ? "blue" : "subtle"} size="sm" disabled={busy} onClick={toggleTestMode}>
+                {conn?.clyo_test_mode ? "Activé" : "Désactivé"}
+              </Btn>
+            </div>
+            <Btn variant="subtle" size="sm" disabled={busy} onClick={createTestOrder} style={{ marginTop: 10 }}>
+              Créer une commande test (0€)
+            </Btn>
+          </div>
+
+          {unmappedCount > 0 && (
+            <p style={{ ...FF, fontSize: 12, color: C.accentOrange, marginTop: 12 }}>
+              {unmappedCount} article(s) du menu sans correspondance CLYO — lie-les depuis Paramètre &gt; Article &gt; Gestion des claviers &gt; Lien des articles e-commerce dans la caisse. Les commandes contenant un article non mappé restent bloquées jusqu'à ce qu'il le soit.
+            </p>
+          )}
+
+          {orders.length > 0 && (
+            <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+              <strong style={{ ...FF, fontSize: 12, color: C.textSecondary }}>Dernières commandes</strong>
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                {orders.map((o) => {
+                  const oui = POS_SYNC_UI[o.pos_sync_status] || POS_SYNC_UI.not_applicable;
+                  const canResend = ["failed", "blocked", "rejected", "sent"].includes(o.pos_sync_status);
+                  const canCancel = !["cancelled", "accepted"].includes(o.pos_sync_status);
+                  return (
+                    <div key={o.id} style={{ ...FF, fontSize: 11, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <span style={{ color: C.textTertiary }}>{new Date(o.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span>
+                      <span style={{ color: C.textSecondary }}>{o.customer_name || "Comptoir"} — {eur(o.total)}</span>
+                      <span style={{ color: oui.color, fontWeight: 700 }}>{oui.label}</span>
+                      {o.pos_sync_error && <span style={{ color: C.accent }}>{o.pos_sync_error}</span>}
+                      {canResend && <Btn variant="subtle" size="sm" onClick={() => resend(o.id)}>Renvoyer</Btn>}
+                      {canCancel && <Btn variant="subtle" size="sm" onClick={() => cancelOrder(o.id)}>Annuler</Btn>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {logs.length > 0 && (
+            <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+              <strong style={{ ...FF, fontSize: 12, color: C.textSecondary }}>Appels reçus de la caisse</strong>
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                {logs.map((l) => (
+                  <div key={l.id} style={{ ...FF, fontSize: 11, display: "flex", gap: 8, alignItems: "baseline" }}>
+                    <span style={{ color: l.ok ? C.accentGreen : C.accent }}>{l.ok ? "✓" : "✕"}</span>
+                    <span style={{ color: C.textTertiary, whiteSpace: "nowrap" }}>
+                      {new Date(l.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    <span style={{ color: C.textSecondary, whiteSpace: "nowrap" }}>{l.action}</span>
+                    <span style={{ color: C.textTertiary, overflow: "hidden", textOverflow: "ellipsis" }}>{l.message}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <Btn variant="subtle" size="sm" disabled={busy} onClick={disconnect} style={{ marginTop: 14 }}>Déconnecter</Btn>
+        </>
       )}
     </Surface>
   );

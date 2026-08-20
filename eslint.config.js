@@ -36,4 +36,9 @@ export default [
     files: ["vite.config.js", "eslint.config.js", "postcss.config.js", "tailwind.config.js"],
     languageOptions: { globals: globals.node },
   },
+  {
+    // Vercel serverless functions (pont CLYO) : runtime Node, pas navigateur.
+    files: ["api/**/*.js"],
+    languageOptions: { globals: globals.node },
+  },
 ];

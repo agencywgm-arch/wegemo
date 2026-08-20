@@ -35,6 +35,10 @@ jobs:
           # Seul le client_id passe par le build : le client_secret reste un
           # secret d'edge function et ne doit jamais être préfixé VITE_.
           VITE_HUBRISE_CLIENT_ID: ${{ secrets.VITE_HUBRISE_CLIENT_ID }}
+          # URL du projet Vercel dédié au pont CLYO natif (api/clyo-*.js) —
+          # voir CLYO_INTEGRATION.md. Sert uniquement à afficher/construire
+          # l'URL à coller dans la caisse ; aucun secret ici.
+          VITE_CLYO_BRIDGE_URL: ${{ secrets.VITE_CLYO_BRIDGE_URL }}
         run: npm run build
 
       - name: SPA fallback
