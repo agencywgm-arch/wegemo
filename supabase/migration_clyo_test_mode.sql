@@ -92,9 +92,16 @@ grant execute on function clyo_set_test_mode(uuid, boolean) to authenticated;
 
 -- Crée une commande à 0,00 € pour tester le connecteur de bout en bout
 -- (mapping produit compris : l'article de test doit être lié en caisse
--- comme n'importe quel autre). Réutilise create_order_secure telle quelle
--- plutôt que de dupliquer sa logique — l'article étant à 0,00 €, le total
--- est nécessairement 0 sans rien avoir à forcer.
+-- comme n'importe quel autre).
+--
+-- Volontairement PAS via create_order_secure :
+--   1. celle-ci exige available = true, alors que l'article de test doit
+--      rester masqué du menu client (available = false) pour qu'aucun
+--      client ne puisse le commander ;
+--   2. une commande de test n'a rien à faire dans le journal fiscal, qui
+--      est append-only et ne pourra jamais être nettoyé.
+-- L'insertion directe suffit : le connecteur CLYO ne lit que orders,
+-- order_items et menu_items.pos_ref, jamais le numéro fiscal.
 create or replace function clyo_create_test_order(p_restaurant_id uuid)
 returns jsonb
 language plpgsql
@@ -104,7 +111,7 @@ as $$
 declare
   v_owner uuid;
   v_item_id uuid;
-  v_res jsonb;
+  v_order_id uuid;
 begin
   select owner_id into v_owner from restaurants where id = p_restaurant_id;
   if v_owner is null or v_owner <> auth.uid() then
@@ -123,14 +130,23 @@ begin
     returning id into v_item_id;
   end if;
 
-  v_res := create_order_secure(
-    p_restaurant_id, null, 'dine_in', 'cash', 'pay_at_counter',
-    'TEST CLYO 0€', '', 'Commande de test — mode test CLYO', null,
-    jsonb_build_array(jsonb_build_object('menu_item_id', v_item_id, 'quantity', 1)),
-    'clyo-test-' || gen_random_uuid()::text
-  );
+  -- pos_sync_status posé explicitement : le trigger ne touche qu'aux lignes
+  -- laissées à 'not_applicable', donc ceci le court-circuite proprement et
+  -- la commande de test part en file quel que soit l'état du mode test.
+  insert into orders (
+    restaurant_id, table_id, status, note, total, subtotal, discount,
+    payment_method, customer_name, customer_email, order_type,
+    pos_sync_status
+  ) values (
+    p_restaurant_id, null, 'PENDING', 'Commande de test — connecteur CLYO',
+    0, 0, 0, 'cash', 'TEST CLYO 0€', '', 'dine_in',
+    'pending'
+  ) returning id into v_order_id;
 
-  return v_res;
+  insert into order_items (order_id, menu_item_id, quantity, detail)
+  values (v_order_id, v_item_id, 1, '');
+
+  return jsonb_build_object('order_id', v_order_id, 'total', 0);
 end;
 $$;
 

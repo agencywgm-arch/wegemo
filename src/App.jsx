@@ -3661,6 +3661,14 @@ const POS_SYNC_UI = {
   not_applicable: { label: "—", color: C.textTertiary },
 };
 
+// Actions journalisées par le connecteur natif — sert à ne montrer dans
+// chaque carte que SES propres échanges (le journal pos_sync_log est
+// partagé avec l'intégration HubRise, qui est un tout autre canal).
+const CLYO_NATIVE_ACTIONS = [
+  "customerListOrder", "updateOrder", "prodNoClyoKey", "prodClyoKey",
+  "prodInfoUpdate_KEY", "delierProduit", "cancel",
+];
+
 function PosConnectSection({ restaurant, demoMode }) {
   const toast = useToast();
   const [conn, setConn] = useState(null);
@@ -3672,10 +3680,14 @@ function PosConnectSection({ restaurant, demoMode }) {
     if (demoMode || !hasSupabase) return;
     const { data } = await supabase.rpc("get_pos_connection_status", { p_restaurant_id: restaurant.id });
     setConn(Array.isArray(data) ? data[0] ?? null : data ?? null);
+    // pos_sync_log est partagé avec le connecteur CLYO natif : sans ce
+    // filtre, les sondages de la caisse s'affichent ici comme s'ils venaient
+    // de HubRise, ce qui laisse croire que HubRise transmet les commandes.
     const { data: l } = await supabase
       .from("pos_sync_log")
       .select("*")
       .eq("restaurant_id", restaurant.id)
+      .not("action", "in", `(${CLYO_NATIVE_ACTIONS.join(",")})`)
       .order("created_at", { ascending: false })
       .limit(8);
     setLogs(l || []);
@@ -3855,10 +3867,19 @@ function ClyoNativeSection({ restaurant, demoMode }) {
   const toast = useToast();
   const [conn, setConn] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [logs, setLogs] = useState([]);
   const [unmappedCount, setUnmappedCount] = useState(0);
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [cbLabel, setCbLabel] = useState("CARTE BLEUE");
+
+  // supabase.rpc() ne lève jamais : il renvoie { data, error }. Sans ce
+  // contrôle, un échec côté base s'affiche en « succès » dans l'interface.
+  const callRpc = useCallback(async (fn, args) => {
+    const { data, error } = await supabase.rpc(fn, args);
+    if (error) throw new Error(error.message || "Erreur base de données");
+    return data;
+  }, []);
 
   const load = useCallback(async () => {
     if (demoMode || !hasSupabase) return;
@@ -3876,6 +3897,15 @@ function ClyoNativeSection({ restaurant, demoMode }) {
       .limit(10);
     setOrders(o || []);
 
+    const { data: l } = await supabase
+      .from("pos_sync_log")
+      .select("*")
+      .eq("restaurant_id", restaurant.id)
+      .in("action", CLYO_NATIVE_ACTIONS)
+      .order("created_at", { ascending: false })
+      .limit(8);
+    setLogs(l || []);
+
     const { count } = await supabase
       .from("menu_items")
       .select("id", { count: "exact", head: true })
@@ -3891,7 +3921,7 @@ function ClyoNativeSection({ restaurant, demoMode }) {
     if (demoMode || !hasSupabase) return toast("(Démo) indisponible", "info");
     setBusy(true);
     try {
-      await supabase.rpc("clyo_connect", { p_restaurant_id: restaurant.id });
+      await callRpc("clyo_connect", { p_restaurant_id: restaurant.id });
       toast("Connexion CLYO activée", "success");
       await load();
     } catch (e) { toast(e.message || "Erreur", "error"); }
@@ -3902,7 +3932,7 @@ function ClyoNativeSection({ restaurant, demoMode }) {
     if (!window.confirm("Régénérer le mot de passe ? Il faudra le recopier dans la caisse CLYO.")) return;
     setBusy(true);
     try {
-      await supabase.rpc("clyo_rotate_password", { p_restaurant_id: restaurant.id });
+      await callRpc("clyo_rotate_password", { p_restaurant_id: restaurant.id });
       toast("Mot de passe régénéré", "success");
       await load();
     } catch (e) { toast(e.message || "Erreur", "error"); }
@@ -3912,7 +3942,7 @@ function ClyoNativeSection({ restaurant, demoMode }) {
   const saveCbLabel = async () => {
     setBusy(true);
     try {
-      await supabase.rpc("clyo_set_cb_label", { p_restaurant_id: restaurant.id, p_label: cbLabel });
+      await callRpc("clyo_set_cb_label", { p_restaurant_id: restaurant.id, p_label: cbLabel });
       toast("Libellé enregistré", "success");
       await load();
     } catch (e) { toast(e.message || "Erreur", "error"); }
@@ -3923,7 +3953,7 @@ function ClyoNativeSection({ restaurant, demoMode }) {
     if (!window.confirm("Déconnecter le connecteur CLYO natif ?")) return;
     setBusy(true);
     try {
-      await supabase.rpc("disconnect_pos", { p_restaurant_id: restaurant.id });
+      await callRpc("disconnect_pos", { p_restaurant_id: restaurant.id });
       toast("Déconnecté", "success");
       await load();
     } catch (e) { toast(e.message || "Erreur", "error"); }
@@ -3932,7 +3962,7 @@ function ClyoNativeSection({ restaurant, demoMode }) {
 
   const resend = async (orderId) => {
     try {
-      await supabase.rpc("clyo_resend_order", { p_order_id: orderId });
+      await callRpc("clyo_resend_order", { p_order_id: orderId });
       toast("Commande remise en file", "success");
       await load();
     } catch (e) { toast(e.message || "Erreur", "error"); }
@@ -3941,7 +3971,7 @@ function ClyoNativeSection({ restaurant, demoMode }) {
   const cancelOrder = async (orderId) => {
     if (!window.confirm("Annuler le suivi CLYO de cette commande ?")) return;
     try {
-      const { data } = await supabase.rpc("clyo_cancel_order", { p_order_id: orderId });
+      const data = await callRpc("clyo_cancel_order", { p_order_id: orderId });
       const row = Array.isArray(data) ? data[0] : data;
       if (row?.needs_manual_clyo) {
         toast("Annulée côté Wegemo — déjà transmise à CLYO, supprime-la aussi manuellement en caisse.", "info");
@@ -3955,7 +3985,7 @@ function ClyoNativeSection({ restaurant, demoMode }) {
   const toggleTestMode = async () => {
     setBusy(true);
     try {
-      await supabase.rpc("clyo_set_test_mode", { p_restaurant_id: restaurant.id, p_enabled: !conn?.clyo_test_mode });
+      await callRpc("clyo_set_test_mode", { p_restaurant_id: restaurant.id, p_enabled: !conn?.clyo_test_mode });
       toast(conn?.clyo_test_mode ? "Mode test désactivé" : "Mode test activé — seules les commandes à 0€ seront transmises", "success");
       await load();
     } catch (e) { toast(e.message || "Erreur", "error"); }
@@ -3965,7 +3995,7 @@ function ClyoNativeSection({ restaurant, demoMode }) {
   const createTestOrder = async () => {
     setBusy(true);
     try {
-      await supabase.rpc("clyo_create_test_order", { p_restaurant_id: restaurant.id });
+      await callRpc("clyo_create_test_order", { p_restaurant_id: restaurant.id });
       toast("Commande test (0€) créée — visible ci-dessous, prête à être transmise", "success");
       await load();
     } catch (e) { toast(e.message || "Erreur", "error"); }
@@ -4067,6 +4097,24 @@ function ClyoNativeSection({ restaurant, demoMode }) {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {logs.length > 0 && (
+            <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+              <strong style={{ ...FF, fontSize: 12, color: C.textSecondary }}>Appels reçus de la caisse</strong>
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                {logs.map((l) => (
+                  <div key={l.id} style={{ ...FF, fontSize: 11, display: "flex", gap: 8, alignItems: "baseline" }}>
+                    <span style={{ color: l.ok ? C.accentGreen : C.accent }}>{l.ok ? "✓" : "✕"}</span>
+                    <span style={{ color: C.textTertiary, whiteSpace: "nowrap" }}>
+                      {new Date(l.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    <span style={{ color: C.textSecondary, whiteSpace: "nowrap" }}>{l.action}</span>
+                    <span style={{ color: C.textTertiary, overflow: "hidden", textOverflow: "ellipsis" }}>{l.message}</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
