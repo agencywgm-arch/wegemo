@@ -40,8 +40,11 @@ $$;
 -- Le trigger existant pointe déjà vers cette fonction (create or replace
 -- suffit, pas besoin de le recréer).
 
--- Ajoute clyo_test_mode à ce que le dashboard peut lire (le reste de la
--- fonction est inchangé, juste une colonne de plus dans le SELECT/RETURNS).
+-- Ajoute clyo_test_mode à ce que le dashboard peut lire. Postgres refuse de
+-- changer le type de retour d'une fonction existante via create or replace
+-- (ERREUR 42P13) : il faut la supprimer d'abord.
+drop function if exists clyo_reveal_credentials(uuid);
+
 create or replace function clyo_reveal_credentials(p_restaurant_id uuid)
 returns table (clyo_site_token text, clyo_password text, clyo_cb_label text, status text, clyo_test_mode boolean)
 language sql
