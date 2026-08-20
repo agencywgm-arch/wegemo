@@ -3849,7 +3849,7 @@ function PosConnectSection({ restaurant, demoMode }) {
  * dans l'écran "Lien des Article E-Commerce" de la caisse — Wegemo ne fait
  * qu'exposer la liste et enregistrer le résultat.
  * ==========================================================================*/
-const CLYO_BRIDGE_BASE = import.meta.env.VITE_CLYO_BRIDGE_URL || "";
+const CLYO_BRIDGE_BASE = (import.meta.env.VITE_CLYO_BRIDGE_URL || "").replace(/\/+$/, "");
 
 function ClyoNativeSection({ restaurant, demoMode }) {
   const toast = useToast();
