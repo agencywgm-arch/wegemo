@@ -73,7 +73,7 @@ export async function authenticateClyoRequest(req, action) {
 
   const { data: conn, error } = await supabase
     .from("pos_connections")
-    .select("id, restaurant_id, clyo_password, clyo_cb_label, status")
+    .select("id, restaurant_id, clyo_password, clyo_cb_label, status, clyo_test_mode")
     .eq("clyo_site_token", token)
     .eq("provider", "clyo_native")
     .maybeSingle();

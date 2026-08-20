@@ -3952,6 +3952,26 @@ function ClyoNativeSection({ restaurant, demoMode }) {
     } catch (e) { toast(e.message || "Erreur", "error"); }
   };
 
+  const toggleTestMode = async () => {
+    setBusy(true);
+    try {
+      await supabase.rpc("clyo_set_test_mode", { p_restaurant_id: restaurant.id, p_enabled: !conn?.clyo_test_mode });
+      toast(conn?.clyo_test_mode ? "Mode test désactivé" : "Mode test activé — seules les commandes à 0€ seront transmises", "success");
+      await load();
+    } catch (e) { toast(e.message || "Erreur", "error"); }
+    finally { setBusy(false); }
+  };
+
+  const createTestOrder = async () => {
+    setBusy(true);
+    try {
+      await supabase.rpc("clyo_create_test_order", { p_restaurant_id: restaurant.id });
+      toast("Commande test (0€) créée — visible ci-dessous, prête à être transmise", "success");
+      await load();
+    } catch (e) { toast(e.message || "Erreur", "error"); }
+    finally { setBusy(false); }
+  };
+
   const status = conn?.status === "connected" ? "connected" : "disconnected";
   const ui = POS_STATUS_UI[status] || POS_STATUS_UI.disconnected;
   const siteUrl = conn?.clyo_site_token && CLYO_BRIDGE_BASE ? `${CLYO_BRIDGE_BASE}/r/${conn.clyo_site_token}` : "";
@@ -4004,6 +4024,23 @@ function ClyoNativeSection({ restaurant, demoMode }) {
           <p style={{ ...FF, fontSize: 11, color: C.textTertiary, marginTop: 4 }}>
             Doit correspondre exactement à ce qui est sélectionné dans ce menu déroulant côté caisse.
           </p>
+
+          <div style={{ marginTop: 16, padding: 12, background: conn?.clyo_test_mode ? "#fff7ed" : C.bgSecondary, borderRadius: 10, border: conn?.clyo_test_mode ? `1px solid ${C.accentOrange}` : "none" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+              <div>
+                <strong style={{ ...FF, fontSize: 13 }}>🧪 Mode test</strong>
+                <p style={{ ...FF, fontSize: 11, color: C.textSecondary, marginTop: 2 }}>
+                  Actif : seules les commandes à 0€ sont transmises à CLYO — aucune vraie commande payante ne peut partir tant que c'est coché, même si tu testes l'URL toi-même. Pratique pour valider la config sans avoir la caisse sous la main.
+                </p>
+              </div>
+              <Btn variant={conn?.clyo_test_mode ? "blue" : "subtle"} size="sm" disabled={busy} onClick={toggleTestMode}>
+                {conn?.clyo_test_mode ? "Activé" : "Désactivé"}
+              </Btn>
+            </div>
+            <Btn variant="subtle" size="sm" disabled={busy} onClick={createTestOrder} style={{ marginTop: 10 }}>
+              Créer une commande test (0€)
+            </Btn>
+          </div>
 
           {unmappedCount > 0 && (
             <p style={{ ...FF, fontSize: 12, color: C.accentOrange, marginTop: 12 }}>

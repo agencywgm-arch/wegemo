@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   const { supabase, connection, error } = await authenticateClyoRequest(req, "customerListOrder");
   if (error) return res.status(error.status).send(error.body);
 
-  const { data: candidates, error: qErr } = await supabase
+  let query = supabase
     .from("orders")
     .select(`
       id, table_id, total, discount, payment_method, customer_name, customer_email,
@@ -27,6 +27,11 @@ export default async function handler(req, res) {
     .eq("restaurant_id", connection.restaurant_id)
     .in("pos_sync_status", ["pending", "blocked"])
     .order("created_at", { ascending: true });
+  // Mode test : ne jamais transmettre une commande payante, même si elle a
+  // été mise en file avant l'activation du mode test.
+  if (connection.clyo_test_mode) query = query.eq("total", 0);
+
+  const { data: candidates, error: qErr } = await query;
 
   if (qErr) {
     await logSync(supabase, { restaurant_id: connection.restaurant_id, direction: "inbound", action: "customerListOrder", ok: false, http_status: 500, message: qErr.message });
