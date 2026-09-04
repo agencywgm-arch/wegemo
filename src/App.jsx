@@ -1576,7 +1576,24 @@ function OrdersTab({ restaurant, store }) {
     toast("Commande supprimée", "info");
   };
 
-  const list = store.orders.filter((o) => filter === "ALL" || o.status === filter);
+  const sessionsById = new Map((store.sessions || []).map((s) => [s.id, s]));
+  const allOrdersEverywhere = [...store.orders, ...store.doneOrders];
+
+  // Les commandes d'une même session doivent apparaître ensemble dans la
+  // liste plutôt que dispersées par date — sinon rien ne les relie
+  // visuellement, même avec le badge de session sur chacune.
+  const list = store.orders
+    .filter((o) => filter === "ALL" || o.status === filter)
+    .slice()
+    .sort((a, b) => {
+      const ka = a.session_id || a.id;
+      const kb = b.session_id || b.id;
+      if (ka === kb) return 0;
+      // Le groupe se positionne à la place de sa commande la plus récente,
+      // pour ne pas perturber le tri par fraîcheur habituel de la liste.
+      const latest = (key) => Math.max(...store.orders.filter((o) => (o.session_id || o.id) === key).map((o) => new Date(o.created_at).getTime()));
+      return latest(kb) - latest(ka);
+    });
 
   return (
     <div>
@@ -1593,14 +1610,27 @@ function OrdersTab({ restaurant, store }) {
         <Surface style={{ padding: 30, textAlign: "center", color: C.textSecondary, ...FF }}>Aucune commande.</Surface>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {list.map((o) => (
-            <Surface key={o.id} style={{ padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          {list.map((o) => {
+            const session = o.session_id ? sessionsById.get(o.session_id) : null;
+            const sessionOrders = session ? allOrdersEverywhere.filter((x) => x.session_id === session.id) : [];
+            const positionInSession = session ? sessionOrders.findIndex((x) => x.id === o.id) + 1 : 0;
+            return (
+            <Surface key={o.id} style={session ? { padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", borderLeft: `3px solid ${C.accentPurple}` } : { padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <strong style={{ ...FF }}>Table {o.table?.number ?? "?"}</strong>
                   <Tag color={STATUS_META[o.status].color}>{STATUS_META[o.status].label}</Tag>
                   <Tag color={o.order_type === "takeaway" ? C.accentPurple : C.accentBlue}>{o.order_type === "takeaway" ? "À emporter" : "Sur place"}</Tag>
                   {o.covers > 1 && <Tag color={C.accentOrange}>👥 {o.covers}</Tag>}
+                  {/* Relie visuellement les commandes d'une même session — sans
+                      ce badge, deux commandes de la même table scannée deux
+                      fois n'ont rien qui les rattache l'une à l'autre dans
+                      cette liste, seul le panneau du haut le montrait. */}
+                  {session && (
+                    <Tag color={C.accentPurple}>
+                      🔗 {positionInSession}/{session.covers}{session.kitchen_sent_at ? " · envoyée" : ""}
+                    </Tag>
+                  )}
                   {/* Suivi de transmission à la caisse, masqué si le restaurant
                       n'a pas d'intégration POS (statut not_applicable). */}
                   {o.pos_sync_status && o.pos_sync_status !== "not_applicable" && (
@@ -1624,11 +1654,19 @@ function OrdersTab({ restaurant, store }) {
                 {o.status === "READY" && <Btn variant="subtle" size="sm" onClick={() => updateStatus(o, "DONE")}>Servie</Btn>}
                 <Btn variant="ghost" size="sm" title="Ticket détaillé" onClick={() => setPrinting({ ...o, detailed: true })}>🖨️</Btn>
                 <Btn variant="ghost" size="sm" title="Note sans détail (justificatif)" onClick={() => setPrinting({ ...o, detailed: false })}>📄</Btn>
-                <Btn variant="ghost" size="sm" title="Bon de cuisine" onClick={() => setPrinting({ ...o, kind: "kitchen" })}>🍳</Btn>
+                {session ? (
+                  <Btn variant="ghost" size="sm" title={`Ticket cuisine groupé de la session (${sessionOrders.length} commande${sessionOrders.length > 1 ? "s" : ""})`}
+                    onClick={() => setPrinting({ ...session, kind: "kitchen_session", orders: sessionOrders })}>
+                    👥🍳
+                  </Btn>
+                ) : (
+                  <Btn variant="ghost" size="sm" title="Bon de cuisine" onClick={() => setPrinting({ ...o, kind: "kitchen" })}>🍳</Btn>
+                )}
                 <Btn variant="ghost" size="sm" onClick={() => setEditing(o)}>✏️</Btn>
               </div>
             </Surface>
-          ))}
+            );
+          })}
         </div>
       )}
       {editing && <EditOrderModal order={editing} onClose={() => setEditing(null)} onSave={updateStatus} onDelete={remove} />}
