@@ -1502,6 +1502,20 @@ function TableSessionsPanel({ store }) {
     toast("Session fermée", "success");
   };
 
+  // Filet de sécurité manuel : l'envoi automatique se déclenche quand le
+  // nombre de commandes atteint le nombre de couverts déclarés — un
+  // déclencheur imparfait (une personne peut commander pour deux, ou ne
+  // rien commander) donc toujours disponible tant que la session n'a pas
+  // déjà été envoyée.
+  const sendToKitchen = async (session) => {
+    if (!store.demoMode && hasSupabase) {
+      const { error } = await supabase.rpc("send_session_to_kitchen", { p_session_id: session.id });
+      if (error) return toast(error.message || "Échec de l'envoi", "error");
+      store.reload();
+    }
+    toast("Session envoyée en cuisine", "success");
+  };
+
   return (
     <Surface style={{ padding: 16, marginBottom: 18 }}>
       <strong style={{ ...FF, fontSize: 15 }}>🪑 Sessions de table en cours</strong>
@@ -1510,14 +1524,20 @@ function TableSessionsPanel({ store }) {
           const linked = allOrders.filter((o) => o.session_id === s.id);
           const total = linked.reduce((sum, o) => sum + Number(o.total || 0), 0);
           const mins = Math.max(0, Math.round((Date.now() - new Date(s.opened_at).getTime()) / 60000));
+          const sent = !!s.kitchen_sent_at;
           return (
             <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: C.surfaceAlt, borderRadius: 12 }}>
               <strong style={{ ...FF, fontSize: 14 }}>Table {s.table?.number ?? "?"}</strong>
               <Tag color={C.accentOrange}>👥 {s.covers}</Tag>
               <span style={{ ...FF, fontSize: 13, color: C.textSecondary }}>
-                {linked.length} commande{linked.length > 1 ? "s" : ""} · {eur(total)}
+                {linked.length}/{s.covers} commande{linked.length > 1 ? "s" : ""} · {eur(total)}
               </span>
               <span style={{ ...FF, fontSize: 12, color: C.textTertiary }}>ouverte depuis {mins} min</span>
+              {sent ? (
+                <Tag color={C.accentGreen}>🍳 Envoyée en cuisine</Tag>
+              ) : (
+                <Btn variant="blue" size="sm" onClick={() => sendToKitchen(s)}>🍳 Envoyer en cuisine</Btn>
+              )}
               <Btn variant="subtle" size="sm" style={{ marginLeft: "auto" }} onClick={() => close(s)}>Fermer la session</Btn>
             </div>
           );
@@ -3967,23 +3987,59 @@ function useRestaurantSettings(restaurantId, demoMode) {
 // imprimerait d'un coup à l'ouverture de l'écran.
 function useAutoPrintQueue(store, autoPrintEnabled) {
   const prevIds = useRef(null);
+  const prevSentSessionIds = useRef(null);
   const [printQueue, setPrintQueue] = useState([]);
 
   useEffect(() => {
     if (store.loading) return;
+    const sessions = store.sessions || [];
     const ids = new Set(store.orders.map((o) => o.id));
-    if (prevIds.current === null) { prevIds.current = ids; return; }
+    const sentIds = new Set(sessions.filter((s) => s.kitchen_sent_at).map((s) => s.id));
+
+    if (prevIds.current === null) {
+      prevIds.current = ids;
+      prevSentSessionIds.current = sentIds;
+      return;
+    }
+
     if (autoPrintEnabled !== false) {
+      const sessionsById = new Map(sessions.map((s) => [s.id, s]));
       const fresh = store.orders.filter((o) => !prevIds.current.has(o.id) && o.customer_name !== "Comptoir");
-      // Deux documents par commande, l'un après l'autre : le ticket client
-      // (avec prix et TVA) puis le bon de cuisine juste derrière (sans prix,
-      // pour la brigade) — imprimés en deux temps sur la même imprimante.
-      if (fresh.length) {
-        setPrintQueue((q) => [...q, ...fresh.flatMap((o) => [o, { ...o, kind: "kitchen" }])]);
+      const jobs = [];
+      for (const o of fresh) {
+        // Ticket client (prix + TVA) : toujours immédiat, une session ne
+        // change rien pour lui — seul le bon de cuisine est concerné.
+        jobs.push(o);
+        const session = o.session_id ? sessionsById.get(o.session_id) : null;
+        if (!session) {
+          // Pas de session (comptoir déjà exclu plus haut, à emporter,
+          // sur place hors session) : comportement inchangé, un bon par
+          // commande.
+          jobs.push({ ...o, kind: "kitchen" });
+        } else if (session.kitchen_sent_at) {
+          // La session a déjà été envoyée en cuisine avant l'arrivée de
+          // cette commande (retardataire) : repli sur un bon individuel
+          // plutôt que de la perdre.
+          jobs.push({ ...o, kind: "kitchen" });
+        }
+        // Sinon : commande rattachée à une session pas encore envoyée —
+        // elle partira dans le ticket groupé, pas ici.
       }
+
+      // Sessions qui viennent de passer à "envoyée en cuisine" (seuil de
+      // couverts atteint automatiquement, ou bouton staff) : un seul bon
+      // groupé pour toutes les commandes déjà rattachées.
+      const newlySent = sessions.filter((s) => s.kitchen_sent_at && !prevSentSessionIds.current.has(s.id));
+      for (const session of newlySent) {
+        const sessionOrders = [...store.orders, ...store.doneOrders].filter((o) => o.session_id === session.id);
+        if (sessionOrders.length) jobs.push({ ...session, kind: "kitchen_session", orders: sessionOrders });
+      }
+
+      if (jobs.length) setPrintQueue((q) => [...q, ...jobs]);
     }
     prevIds.current = ids;
-  }, [store.orders, store.loading, autoPrintEnabled]);
+    prevSentSessionIds.current = sentIds;
+  }, [store.orders, store.doneOrders, store.sessions, store.loading, autoPrintEnabled]);
 
   return {
     printing: printQueue[0] ?? null,
@@ -4176,6 +4232,45 @@ function KitchenTicket({ order }) {
   );
 }
 
+// Un seul ticket pour toutes les commandes d'une session de table, imprimé
+// une fois la session envoyée en cuisine (voir useAutoPrintQueue et
+// TableSessionsPanel) — plutôt qu'un bon dispersé par commande.
+function KitchenSessionTicket({ session, orders = [] }) {
+  if (!session) return null;
+  const tableLabel = (session.table?.label || (session.table?.number != null ? `TABLE ${session.table.number}` : "")).toString().toUpperCase();
+  const when = session.kitchen_sent_at ? new Date(session.kitchen_sent_at) : new Date();
+  const sorted = [...orders].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+
+  return (
+    <div style={{ width: "100%", maxWidth: "72mm", boxSizing: "border-box", padding: "2mm", fontFamily: "'Courier New', Courier, monospace", fontSize: 18, fontWeight: 700, lineHeight: 1.4, color: "#000", background: "#fff" }}>
+      <div style={{ textAlign: "center", fontWeight: 700, fontSize: 20 }}>🍳 BON DE CUISINE — SESSION</div>
+      <div style={{ borderTop: "2px dashed #000", margin: "6px 0" }} />
+      {tableLabel && <div style={{ textAlign: "center", fontWeight: 700, fontSize: 26 }}>{tableLabel}</div>}
+      <div style={{ textAlign: "center" }}>
+        {session.covers} couvert{session.covers > 1 ? "s" : ""} — {sorted.length} commande{sorted.length > 1 ? "s" : ""}
+      </div>
+      <div style={{ textAlign: "center" }}>Envoyé à {when.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</div>
+      {sorted.map((o, oi) => (
+        <div key={o.id || oi}>
+          <div style={{ borderTop: "1px dashed #000", margin: "8px 0" }} />
+          <div style={{ fontSize: 15, fontWeight: 400 }}>
+            Commande {oi + 1}{o.created_at ? ` — ${new Date(o.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}` : ""}
+          </div>
+          {(o.items || []).map((it, i) => (
+            <div key={i} style={{ marginTop: 4 }}>
+              <div style={{ fontWeight: 700, fontSize: 20 }}>{it.quantity}× {it.name}</div>
+              {it.detail && <div style={{ fontStyle: "italic", marginLeft: 8 }}>↳ {it.detail}</div>}
+            </div>
+          ))}
+          {o.note && <div style={{ fontWeight: 700, marginTop: 4 }}>📝 {o.note}</div>}
+        </div>
+      ))}
+      {/* Marge de papier vierge avant la coupe, voir ReceiptTicket. */}
+      <PaperFeed lines={12} />
+    </div>
+  );
+}
+
 // Monté une fois par écran (Cuisine ou Commandes) : reçoit une commande à
 // imprimer via `job`, déclenche window.print() scopé au ticket, et prévient
 // `onDone` une fois l'impression terminée (ou annulée) pour libérer la file.
@@ -4220,9 +4315,11 @@ function TicketPrintLayer({ job, onDone, restaurant, settings }) {
         }
         @media screen { #wegemo-ticket-print { position: fixed; left: -9999px; top: 0; } }
       `}</style>
-      {job.kind === "kitchen"
-        ? <KitchenTicket order={job} />
-        : <ReceiptTicket order={job} restaurant={restaurant} settings={settings} detailed={job.detailed !== false} />}
+      {job.kind === "kitchen_session"
+        ? <KitchenSessionTicket session={job} orders={job.orders} />
+        : job.kind === "kitchen"
+          ? <KitchenTicket order={job} />
+          : <ReceiptTicket order={job} restaurant={restaurant} settings={settings} detailed={job.detailed !== false} />}
     </div>
   );
 }
