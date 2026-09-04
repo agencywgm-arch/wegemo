@@ -41,6 +41,7 @@ const CUSTOMER_LANGS = [
 const CT = {
   fr: {
     orderTypeTitle: "Comment souhaitez-vous commander ?", orderTypeConfirm: "Continuer",
+    coversTitle: "Combien de couverts ?", coversSub: "Nombre de personnes pour cette commande",
     dineIn: "Sur place", dineInSub: "Je mange au restaurant",
     takeaway: "À emporter", takeawaySub: "Je récupère ma commande",
     all: "Tous", back: "Retour", search: "Rechercher un plat…",
@@ -54,6 +55,7 @@ const CT = {
   },
   en: {
     orderTypeTitle: "How would you like to order?", orderTypeConfirm: "Continue",
+    coversTitle: "How many guests?", coversSub: "Number of people for this order",
     dineIn: "Dine in", dineInSub: "I'm eating at the restaurant",
     takeaway: "Takeaway", takeawaySub: "I'm picking up my order",
     all: "All", back: "Back", search: "Search a dish…",
@@ -67,6 +69,7 @@ const CT = {
   },
   ar: {
     orderTypeTitle: "كيف ترغب في الطلب؟", orderTypeConfirm: "متابعة",
+    coversTitle: "كم عدد الأشخاص؟", coversSub: "عدد الأشخاص لهذا الطلب",
     dineIn: "في المطعم", dineInSub: "سآكل في المطعم",
     takeaway: "للأخذ", takeawaySub: "سأستلم طلبي",
     all: "الكل", back: "رجوع", search: "ابحث عن طبق…",
@@ -80,6 +83,7 @@ const CT = {
   },
   es: {
     orderTypeTitle: "¿Cómo desea pedir?", orderTypeConfirm: "Continuar",
+    coversTitle: "¿Cuántos comensales?", coversSub: "Número de personas para este pedido",
     dineIn: "En el local", dineInSub: "Como en el restaurante",
     takeaway: "Para llevar", takeawaySub: "Recojo mi pedido",
     all: "Todos", back: "Volver", search: "Buscar un plato…",
@@ -93,6 +97,7 @@ const CT = {
   },
   pt: {
     orderTypeTitle: "Como deseja pedir?", orderTypeConfirm: "Continuar",
+    coversTitle: "Quantos talheres?", coversSub: "Número de pessoas para este pedido",
     dineIn: "No local", dineInSub: "Vou comer no restaurante",
     takeaway: "Para levar", takeawaySub: "Vou buscar o meu pedido",
     all: "Todos", back: "Voltar", search: "Procurar um prato…",
@@ -1523,6 +1528,7 @@ function OrdersTab({ restaurant, store }) {
                   <strong style={{ ...FF }}>Table {o.table?.number ?? "?"}</strong>
                   <Tag color={STATUS_META[o.status].color}>{STATUS_META[o.status].label}</Tag>
                   <Tag color={o.order_type === "takeaway" ? C.accentPurple : C.accentBlue}>{o.order_type === "takeaway" ? "À emporter" : "Sur place"}</Tag>
+                  {o.covers > 1 && <Tag color={C.accentOrange}>👥 {o.covers}</Tag>}
                   {/* Suivi de transmission à la caisse, masqué si le restaurant
                       n'a pas d'intégration POS (statut not_applicable). */}
                   {o.pos_sync_status && o.pos_sync_status !== "not_applicable" && (
@@ -4227,6 +4233,7 @@ function KitchenView({ restaurant, onExit }) {
                     </div>
                     <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
                       <Tag color={o.order_type === "takeaway" ? C.accentPurple : C.accentBlue}>{o.order_type === "takeaway" ? "À emporter" : "Sur place"}</Tag>
+                  {o.covers > 1 && <Tag color={C.accentOrange}>👥 {o.covers}</Tag>}
                       {o.payment_method === "cash" && <Tag color={o.cash_collected ? C.accentGreen : C.accentOrange}>{o.cash_collected ? "Encaissé" : "À encaisser"}</Tag>}
                     </div>
                     <ul style={{ ...FF, fontSize: 14, margin: "8px 0", paddingLeft: 18 }}>
@@ -5194,6 +5201,7 @@ function CustomerPage({ slug, tableNum }) {
   const [tableLabel, setTableLabel] = useState(null);
   const [lang, setLang] = useState("fr");
   const [orderType, setOrderType] = useState("dine_in");
+  const [covers, setCovers] = useState(1);
   const [cart, setCart] = useState([]);
   const [promo, setPromo] = useState(null);
   const [profile, setProfile] = useState({ name: "", email: "" });
@@ -5270,7 +5278,32 @@ function CustomerPage({ slug, tableNum }) {
                 </div>
               </button>
             ))}
-            <Btn variant="primary" size="lg" style={{ marginTop: 16 }} onClick={() => setStep("menu")}>{t(lang, "orderTypeConfirm")}</Btn>
+            <Btn variant="primary" size="lg" style={{ marginTop: 16 }} onClick={() => setStep(orderType === "dine_in" ? "covers" : "menu")}>{t(lang, "orderTypeConfirm")}</Btn>
+          </div>
+        </div>
+      )}
+
+      {step === "covers" && (
+        <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 24 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
+            <button onClick={() => setStep("ordertype")} style={{ ...FF, color: C.textSecondary, fontSize: 14, background: "none", border: "none" }}>← {t(lang, "back")}</button>
+            <LangPicker lang={lang} setLang={setLang} />
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
+            <h1 style={{ ...FF, fontSize: 24, fontWeight: 900, textAlign: "center", marginBottom: 4 }}>{t(lang, "coversTitle")}</h1>
+            <p style={{ ...FF, textAlign: "center", color: C.textSecondary, marginBottom: 32 }}>{t(lang, "coversSub")}</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+              <button
+                onClick={() => setCovers((c) => Math.max(1, c - 1))}
+                style={{ ...FF, width: 52, height: 52, borderRadius: 16, border: `1px solid ${C.border}`, background: C.surface, fontSize: 24, fontWeight: 700, color: C.text }}
+              >−</button>
+              <span style={{ ...FF, fontSize: 40, fontWeight: 900, minWidth: 60, textAlign: "center" }}>{covers}</span>
+              <button
+                onClick={() => setCovers((c) => Math.min(30, c + 1))}
+                style={{ ...FF, width: 52, height: 52, borderRadius: 16, border: `1px solid ${C.border}`, background: C.surface, fontSize: 24, fontWeight: 700, color: C.text }}
+              >+</button>
+            </div>
+            <Btn variant="primary" size="lg" style={{ marginTop: 40, width: "100%" }} onClick={() => setStep("menu")}>{t(lang, "orderTypeConfirm")}</Btn>
           </div>
         </div>
       )}
@@ -5298,7 +5331,7 @@ function CustomerPage({ slug, tableNum }) {
       )}
 
       {step === "payment" && (
-        <CustomerPayment restaurant={restaurant} tableId={tableId} orderType={orderType} cart={cart} total={total} promo={promo} profile={profile} lang={lang} onBack={() => setStep("cart")} onDone={(id) => { setOrderId(id); setStep("done"); }} />
+        <CustomerPayment restaurant={restaurant} tableId={tableId} orderType={orderType} covers={covers} cart={cart} total={total} promo={promo} profile={profile} lang={lang} onBack={() => setStep("cart")} onDone={(id) => { setOrderId(id); setStep("done"); }} />
       )}
 
       {step === "done" && (
@@ -5920,7 +5953,7 @@ function StripeCardForm({ clientSecret, publishableKey, total, lang, onSuccess, 
   );
 }
 
-function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, profile, lang, onBack, onDone }) {
+function CustomerPayment({ restaurant, tableId, orderType, covers, cart, total, promo, profile, lang, onBack, onDone }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [cardIntent, setCardIntent] = useState(null); // { clientSecret, publishableKey }
@@ -5964,6 +5997,7 @@ function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, p
           detail: (c.supplements || []).map((s) => s.name).join(", "),
         })),
         p_client_token: clientToken.current,
+        p_covers: orderType === "dine_in" ? covers : 1,
       });
       if (error) throw error;
       const order = { id: res.order_id };
