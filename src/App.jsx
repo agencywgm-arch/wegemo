@@ -422,6 +422,7 @@ function useStore(restaurantId) {
   const [promos, setPromos] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   // `reload()` est aussi appelé en tâche de fond (nouvelle commande via le
   // realtime, encaissement au comptoir, changement de statut...) — pas
@@ -452,7 +453,7 @@ function useStore(restaurantId) {
       return;
     }
     if (!loadedOnce.current) setLoading(true);
-    const [m, o, tb, ing, pr, cu, rv] = await Promise.all([
+    const [m, o, tb, ing, pr, cu, rv, ts] = await Promise.all([
       supabase.from("menu_items").select("*").eq("restaurant_id", restaurantId).order("sort_order", { ascending: true }),
       supabase.from("orders").select("*, table:tables(number, label), order_items(quantity, detail, menu_items(name, emoji, price))").eq("restaurant_id", restaurantId).order("created_at", { ascending: false }).limit(200),
       supabase.from("tables").select("*").eq("restaurant_id", restaurantId).order("number"),
@@ -460,6 +461,7 @@ function useStore(restaurantId) {
       supabase.from("promotions").select("*").eq("restaurant_id", restaurantId),
       supabase.from("customers").select("*").eq("restaurant_id", restaurantId),
       supabase.from("reviews").select("*").eq("restaurant_id", restaurantId).order("created_at", { ascending: false }),
+      supabase.from("table_sessions").select("*, table:tables(number, label)").eq("restaurant_id", restaurantId).eq("status", "open").order("opened_at", { ascending: true }),
     ]);
     // order_items est jointe pour reconstituer `items` (nom, emoji, prix) tel
     // qu'attendu par la vue Cuisine, la liste Commandes et le ticket imprimé.
@@ -481,6 +483,7 @@ function useStore(restaurantId) {
     setPromos(pr.data || []);
     setCustomers(cu.data || []);
     setReviews(rv.data || []);
+    setSessions(ts.data || []);
     setLoading(false);
     loadedOnce.current = true;
   }, [restaurantId, demoMode]);
@@ -491,12 +494,13 @@ function useStore(restaurantId) {
     const channel = supabase
       .channel(`orders-${restaurantId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `restaurant_id=eq.${restaurantId}` }, () => reload())
+      .on("postgres_changes", { event: "*", schema: "public", table: "table_sessions", filter: `restaurant_id=eq.${restaurantId}` }, () => reload())
       .subscribe();
     return () => supabase.removeChannel(channel);
   }, [reload, restaurantId, demoMode]);
 
   return {
-    demoMode, loading, menu, orders, doneOrders, tables, ingredients, promos, customers, reviews,
+    demoMode, loading, menu, orders, doneOrders, tables, ingredients, promos, customers, reviews, sessions,
     setMenu, setOrders, setIngredients, setPromos, reload,
   };
 }
@@ -1476,6 +1480,53 @@ const STATUS_META = {
   DONE: { label: "Terminée", color: C.textTertiary },
 };
 
+// Une session groupe les scans successifs du QR d'une même table tant
+// qu'elle n'a pas été explicitement fermée par le staff — voir
+// get_or_open_table_session (migration_table_sessions.sql). Ce panneau lui
+// donne une existence visible côté staff : qui est à quelle table, combien
+// de commandes sont déjà rattachées, depuis combien de temps.
+function TableSessionsPanel({ store }) {
+  const toast = useToast();
+  const sessions = store.sessions || [];
+  if (!sessions.length) return null;
+
+  const allOrders = [...store.orders, ...store.doneOrders];
+
+  const close = async (session) => {
+    if (!window.confirm(`Fermer la session de la table ${session.table?.number ?? "?"} ?`)) return;
+    if (!store.demoMode && hasSupabase) {
+      const { error } = await supabase.rpc("close_table_session", { p_session_id: session.id });
+      if (error) return toast(error.message || "Échec de la fermeture", "error");
+      store.reload();
+    }
+    toast("Session fermée", "success");
+  };
+
+  return (
+    <Surface style={{ padding: 16, marginBottom: 18 }}>
+      <strong style={{ ...FF, fontSize: 15 }}>🪑 Sessions de table en cours</strong>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+        {sessions.map((s) => {
+          const linked = allOrders.filter((o) => o.session_id === s.id);
+          const total = linked.reduce((sum, o) => sum + Number(o.total || 0), 0);
+          const mins = Math.max(0, Math.round((Date.now() - new Date(s.opened_at).getTime()) / 60000));
+          return (
+            <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: C.surfaceAlt, borderRadius: 12 }}>
+              <strong style={{ ...FF, fontSize: 14 }}>Table {s.table?.number ?? "?"}</strong>
+              <Tag color={C.accentOrange}>👥 {s.covers}</Tag>
+              <span style={{ ...FF, fontSize: 13, color: C.textSecondary }}>
+                {linked.length} commande{linked.length > 1 ? "s" : ""} · {eur(total)}
+              </span>
+              <span style={{ ...FF, fontSize: 12, color: C.textTertiary }}>ouverte depuis {mins} min</span>
+              <Btn variant="subtle" size="sm" style={{ marginLeft: "auto" }} onClick={() => close(s)}>Fermer la session</Btn>
+            </div>
+          );
+        })}
+      </div>
+    </Surface>
+  );
+}
+
 function OrdersTab({ restaurant, store }) {
   const toast = useToast();
   const [filter, setFilter] = useState("ALL");
@@ -1510,6 +1561,7 @@ function OrdersTab({ restaurant, store }) {
   return (
     <div>
       <h2 style={{ ...FF, fontSize: 22, fontWeight: 800, marginBottom: 14 }}>🧾 Commandes en cours</h2>
+      <TableSessionsPanel store={store} />
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
         {["ALL", "PENDING", "PREPARING", "READY"].map((f) => (
           <button key={f} onClick={() => setFilter(f)} style={{ ...FF, padding: "7px 13px", borderRadius: 10, fontWeight: 600, fontSize: 13, border: `1px solid ${filter === f ? C.text : C.border}`, background: filter === f ? C.text : C.surface, color: filter === f ? C.white : C.text }}>
@@ -5202,6 +5254,12 @@ function CustomerPage({ slug, tableNum }) {
   const [lang, setLang] = useState("fr");
   const [orderType, setOrderType] = useState("dine_in");
   const [covers, setCovers] = useState(1);
+  // Session de table déjà ouverte par un scan précédent sur la même table
+  // (voir get_or_open_table_session) : si elle existe, on saute l'étape
+  // couverts et on rejoint directement cette session au lieu d'en ouvrir
+  // une nouvelle.
+  const [sessionId, setSessionId] = useState(null);
+  const [openingSession, setOpeningSession] = useState(false);
   const [cart, setCart] = useState([]);
   const [promo, setPromo] = useState(null);
   const [profile, setProfile] = useState({ name: "", email: "" });
@@ -5239,9 +5297,47 @@ function CustomerPage({ slug, tableNum }) {
       setTableId(tb?.id || null);
       setTableLabel(tb?.label || null);
       setSettings(st || {});
+
+      // Une session ouverte sur cette table (par un scan précédent) rend
+      // l'étape couverts inutile pour ce scan-ci — on rejoint directement.
+      if (tb?.id) {
+        const { data: existing } = await supabase
+          .from("table_sessions")
+          .select("id, covers")
+          .eq("table_id", tb.id)
+          .eq("status", "open")
+          .maybeSingle();
+        if (existing) {
+          setSessionId(existing.id);
+          setCovers(existing.covers);
+        }
+      }
+
       setStep("ordertype");
     })();
   }, [slug, tableNum]);
+
+  // Ouvre une nouvelle session (ou rejoint celle qu'un autre scan vient tout
+  // juste d'ouvrir, si la course a lieu au même instant) puis avance au menu.
+  const confirmCovers = async () => {
+    if (!hasSupabase || restaurant.id === "demo") {
+      setStep("menu");
+      return;
+    }
+    setOpeningSession(true);
+    try {
+      const { data, error } = await supabase.rpc("get_or_open_table_session", {
+        p_restaurant_id: restaurant.id, p_table_id: tableId, p_covers: covers,
+      });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      setSessionId(row.session_id);
+      setCovers(row.covers); // une autre personne a peut-être ouvert la session entre-temps
+    } finally {
+      setOpeningSession(false);
+      setStep("menu");
+    }
+  };
 
   const subtotal = cart.reduce((s, c) => s + c.lineTotal, 0);
   const discount = promo ? (promo.discount_percent ? subtotal * (promo.discount_percent / 100) : Math.min(promo.discount_amount || 0, subtotal)) : 0;
@@ -5278,7 +5374,7 @@ function CustomerPage({ slug, tableNum }) {
                 </div>
               </button>
             ))}
-            <Btn variant="primary" size="lg" style={{ marginTop: 16 }} onClick={() => setStep(orderType === "dine_in" ? "covers" : "menu")}>{t(lang, "orderTypeConfirm")}</Btn>
+            <Btn variant="primary" size="lg" style={{ marginTop: 16 }} onClick={() => setStep(orderType === "dine_in" ? (sessionId ? "menu" : "covers") : "menu")}>{t(lang, "orderTypeConfirm")}</Btn>
           </div>
         </div>
       )}
@@ -5303,7 +5399,7 @@ function CustomerPage({ slug, tableNum }) {
                 style={{ ...FF, width: 52, height: 52, borderRadius: 16, border: `1px solid ${C.border}`, background: C.surface, fontSize: 24, fontWeight: 700, color: C.text }}
               >+</button>
             </div>
-            <Btn variant="primary" size="lg" style={{ marginTop: 40, width: "100%" }} onClick={() => setStep("menu")}>{t(lang, "orderTypeConfirm")}</Btn>
+            <Btn variant="primary" size="lg" style={{ marginTop: 40, width: "100%" }} disabled={openingSession} onClick={confirmCovers}>{openingSession ? "…" : t(lang, "orderTypeConfirm")}</Btn>
           </div>
         </div>
       )}
@@ -5331,7 +5427,7 @@ function CustomerPage({ slug, tableNum }) {
       )}
 
       {step === "payment" && (
-        <CustomerPayment restaurant={restaurant} tableId={tableId} orderType={orderType} covers={covers} cart={cart} total={total} promo={promo} profile={profile} lang={lang} onBack={() => setStep("cart")} onDone={(id) => { setOrderId(id); setStep("done"); }} />
+        <CustomerPayment restaurant={restaurant} tableId={tableId} orderType={orderType} covers={covers} sessionId={sessionId} cart={cart} total={total} promo={promo} profile={profile} lang={lang} onBack={() => setStep("cart")} onDone={(id) => { setOrderId(id); setStep("done"); }} />
       )}
 
       {step === "done" && (
@@ -5953,7 +6049,7 @@ function StripeCardForm({ clientSecret, publishableKey, total, lang, onSuccess, 
   );
 }
 
-function CustomerPayment({ restaurant, tableId, orderType, covers, cart, total, promo, profile, lang, onBack, onDone }) {
+function CustomerPayment({ restaurant, tableId, orderType, covers, sessionId, cart, total, promo, profile, lang, onBack, onDone }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [cardIntent, setCardIntent] = useState(null); // { clientSecret, publishableKey }
@@ -5998,6 +6094,7 @@ function CustomerPayment({ restaurant, tableId, orderType, covers, cart, total, 
         })),
         p_client_token: clientToken.current,
         p_covers: orderType === "dine_in" ? covers : 1,
+        p_session_id: orderType === "dine_in" ? sessionId : null,
       });
       if (error) throw error;
       const order = { id: res.order_id };
@@ -6032,7 +6129,7 @@ function CustomerPayment({ restaurant, tableId, orderType, covers, cart, total, 
       }
       setBusy(false);
     }
-  }, [restaurant.id, tableId, orderType, profile, cart, promo, onDone, toast]);
+  }, [restaurant.id, tableId, orderType, covers, sessionId, profile, cart, promo, onDone, toast]);
 
   const payCard = async () => {
     // If the total is exactly 0 (e.g. 100% promo), skip Stripe entirely —
