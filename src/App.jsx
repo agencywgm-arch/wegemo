@@ -41,6 +41,7 @@ const CUSTOMER_LANGS = [
 const CT = {
   fr: {
     orderTypeTitle: "Comment souhaitez-vous commander ?", orderTypeConfirm: "Continuer",
+    coversTitle: "Combien de couverts ?", coversSub: "Nombre de personnes pour cette commande",
     dineIn: "Sur place", dineInSub: "Je mange au restaurant",
     takeaway: "À emporter", takeawaySub: "Je récupère ma commande",
     all: "Tous", back: "Retour", search: "Rechercher un plat…",
@@ -51,9 +52,15 @@ const CT = {
     orderConfirmed: "Commande confirmée !", orderTracking: "Suivi de commande",
     rateOrder: "Notez votre expérience", leaveGoogleReview: "Laisser un avis Google",
     popular: "Populaire", supplements: "Suppléments", extras: "Garnitures", askAI: "Poser une question",
+    payOnline: "Payer en ligne", paymentPending: "Paiement en cours…",
+    paymentConfirmedTitle: "✓ Paiement confirmé", paymentConfirmedOrder: "Commande",
+    paymentConfirmedThanks: "Merci pour votre commande.",
+    paymentFailedTitle: "Paiement non effectué.", paymentFailedSub: "Votre commande n'a pas été débitée.",
+    retryPayment: "Réessayer",
   },
   en: {
     orderTypeTitle: "How would you like to order?", orderTypeConfirm: "Continue",
+    coversTitle: "How many guests?", coversSub: "Number of people for this order",
     dineIn: "Dine in", dineInSub: "I'm eating at the restaurant",
     takeaway: "Takeaway", takeawaySub: "I'm picking up my order",
     all: "All", back: "Back", search: "Search a dish…",
@@ -64,9 +71,15 @@ const CT = {
     orderConfirmed: "Order confirmed!", orderTracking: "Order tracking",
     rateOrder: "Rate your experience", leaveGoogleReview: "Leave a Google review",
     popular: "Popular", supplements: "Add-ons", extras: "Sides", askAI: "Ask a question",
+    payOnline: "Pay online", paymentPending: "Payment in progress…",
+    paymentConfirmedTitle: "✓ Payment confirmed", paymentConfirmedOrder: "Order",
+    paymentConfirmedThanks: "Thank you for your order.",
+    paymentFailedTitle: "Payment not completed.", paymentFailedSub: "Your order has not been charged.",
+    retryPayment: "Try again",
   },
   ar: {
     orderTypeTitle: "كيف ترغب في الطلب؟", orderTypeConfirm: "متابعة",
+    coversTitle: "كم عدد الأشخاص؟", coversSub: "عدد الأشخاص لهذا الطلب",
     dineIn: "في المطعم", dineInSub: "سآكل في المطعم",
     takeaway: "للأخذ", takeawaySub: "سأستلم طلبي",
     all: "الكل", back: "رجوع", search: "ابحث عن طبق…",
@@ -77,9 +90,15 @@ const CT = {
     orderConfirmed: "تم تأكيد الطلب!", orderTracking: "تتبع الطلب",
     rateOrder: "قيّم تجربتك", leaveGoogleReview: "اترك تقييماً على جوجل",
     popular: "شائع", supplements: "إضافات", extras: "أطباق جانبية", askAI: "اطرح سؤالاً",
+    payOnline: "الدفع عبر الإنترنت", paymentPending: "جارٍ الدفع…",
+    paymentConfirmedTitle: "✓ تم تأكيد الدفع", paymentConfirmedOrder: "الطلب",
+    paymentConfirmedThanks: "شكراً لطلبك.",
+    paymentFailedTitle: "لم يتم الدفع.", paymentFailedSub: "لم يتم خصم أي مبلغ من طلبك.",
+    retryPayment: "إعادة المحاولة",
   },
   es: {
     orderTypeTitle: "¿Cómo desea pedir?", orderTypeConfirm: "Continuar",
+    coversTitle: "¿Cuántos comensales?", coversSub: "Número de personas para este pedido",
     dineIn: "En el local", dineInSub: "Como en el restaurante",
     takeaway: "Para llevar", takeawaySub: "Recojo mi pedido",
     all: "Todos", back: "Volver", search: "Buscar un plato…",
@@ -90,9 +109,15 @@ const CT = {
     orderConfirmed: "¡Pedido confirmado!", orderTracking: "Seguimiento del pedido",
     rateOrder: "Califica tu experiencia", leaveGoogleReview: "Dejar una reseña en Google",
     popular: "Popular", supplements: "Extras", extras: "Guarniciones", askAI: "Hacer una pregunta",
+    payOnline: "Pagar en línea", paymentPending: "Pago en curso…",
+    paymentConfirmedTitle: "✓ Pago confirmado", paymentConfirmedOrder: "Pedido",
+    paymentConfirmedThanks: "Gracias por su pedido.",
+    paymentFailedTitle: "Pago no realizado.", paymentFailedSub: "No se ha realizado ningún cargo.",
+    retryPayment: "Reintentar",
   },
   pt: {
     orderTypeTitle: "Como deseja pedir?", orderTypeConfirm: "Continuar",
+    coversTitle: "Quantos talheres?", coversSub: "Número de pessoas para este pedido",
     dineIn: "No local", dineInSub: "Vou comer no restaurante",
     takeaway: "Para levar", takeawaySub: "Vou buscar o meu pedido",
     all: "Todos", back: "Voltar", search: "Procurar um prato…",
@@ -103,6 +128,11 @@ const CT = {
     orderConfirmed: "Pedido confirmado!", orderTracking: "Acompanhamento do pedido",
     rateOrder: "Avalie a sua experiência", leaveGoogleReview: "Deixar uma avaliação Google",
     popular: "Popular", supplements: "Adicionais", extras: "Acompanhamentos", askAI: "Fazer uma pergunta",
+    payOnline: "Pagar online", paymentPending: "Pagamento em curso…",
+    paymentConfirmedTitle: "✓ Pagamento confirmado", paymentConfirmedOrder: "Pedido",
+    paymentConfirmedThanks: "Obrigado pelo seu pedido.",
+    paymentFailedTitle: "Pagamento não efetuado.", paymentFailedSub: "O seu pedido não foi debitado.",
+    retryPayment: "Tentar novamente",
   },
 };
 const t = (lang, key) => (CT[lang] && CT[lang][key]) || CT.fr[key] || key;
@@ -417,6 +447,7 @@ function useStore(restaurantId) {
   const [promos, setPromos] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   // `reload()` est aussi appelé en tâche de fond (nouvelle commande via le
   // realtime, encaissement au comptoir, changement de statut...) — pas
@@ -447,7 +478,7 @@ function useStore(restaurantId) {
       return;
     }
     if (!loadedOnce.current) setLoading(true);
-    const [m, o, tb, ing, pr, cu, rv] = await Promise.all([
+    const [m, o, tb, ing, pr, cu, rv, ts] = await Promise.all([
       supabase.from("menu_items").select("*").eq("restaurant_id", restaurantId).order("sort_order", { ascending: true }),
       supabase.from("orders").select("*, table:tables(number, label), order_items(quantity, detail, menu_items(name, emoji, price))").eq("restaurant_id", restaurantId).order("created_at", { ascending: false }).limit(200),
       supabase.from("tables").select("*").eq("restaurant_id", restaurantId).order("number"),
@@ -455,6 +486,7 @@ function useStore(restaurantId) {
       supabase.from("promotions").select("*").eq("restaurant_id", restaurantId),
       supabase.from("customers").select("*").eq("restaurant_id", restaurantId),
       supabase.from("reviews").select("*").eq("restaurant_id", restaurantId).order("created_at", { ascending: false }),
+      supabase.from("table_sessions").select("*, table:tables(number, label)").eq("restaurant_id", restaurantId).eq("status", "open").order("opened_at", { ascending: true }),
     ]);
     // order_items est jointe pour reconstituer `items` (nom, emoji, prix) tel
     // qu'attendu par la vue Cuisine, la liste Commandes et le ticket imprimé.
@@ -476,6 +508,7 @@ function useStore(restaurantId) {
     setPromos(pr.data || []);
     setCustomers(cu.data || []);
     setReviews(rv.data || []);
+    setSessions(ts.data || []);
     setLoading(false);
     loadedOnce.current = true;
   }, [restaurantId, demoMode]);
@@ -486,12 +519,13 @@ function useStore(restaurantId) {
     const channel = supabase
       .channel(`orders-${restaurantId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `restaurant_id=eq.${restaurantId}` }, () => reload())
+      .on("postgres_changes", { event: "*", schema: "public", table: "table_sessions", filter: `restaurant_id=eq.${restaurantId}` }, () => reload())
       .subscribe();
     return () => supabase.removeChannel(channel);
   }, [reload, restaurantId, demoMode]);
 
   return {
-    demoMode, loading, menu, orders, doneOrders, tables, ingredients, promos, customers, reviews,
+    demoMode, loading, menu, orders, doneOrders, tables, ingredients, promos, customers, reviews, sessions,
     setMenu, setOrders, setIngredients, setPromos, reload,
   };
 }
@@ -1471,6 +1505,73 @@ const STATUS_META = {
   DONE: { label: "Terminée", color: C.textTertiary },
 };
 
+// Une session groupe les scans successifs du QR d'une même table tant
+// qu'elle n'a pas été explicitement fermée par le staff — voir
+// get_or_open_table_session (migration_table_sessions.sql). Ce panneau lui
+// donne une existence visible côté staff : qui est à quelle table, combien
+// de commandes sont déjà rattachées, depuis combien de temps.
+function TableSessionsPanel({ store }) {
+  const toast = useToast();
+  const sessions = store.sessions || [];
+  if (!sessions.length) return null;
+
+  const allOrders = [...store.orders, ...store.doneOrders];
+
+  const close = async (session) => {
+    if (!window.confirm(`Fermer la session de la table ${session.table?.number ?? "?"} ?`)) return;
+    if (!store.demoMode && hasSupabase) {
+      const { error } = await supabase.rpc("close_table_session", { p_session_id: session.id });
+      if (error) return toast(error.message || "Échec de la fermeture", "error");
+      store.reload();
+    }
+    toast("Session fermée", "success");
+  };
+
+  // Filet de sécurité manuel : l'envoi automatique se déclenche quand le
+  // nombre de commandes atteint le nombre de couverts déclarés — un
+  // déclencheur imparfait (une personne peut commander pour deux, ou ne
+  // rien commander) donc toujours disponible tant que la session n'a pas
+  // déjà été envoyée.
+  const sendToKitchen = async (session) => {
+    if (!store.demoMode && hasSupabase) {
+      const { error } = await supabase.rpc("send_session_to_kitchen", { p_session_id: session.id });
+      if (error) return toast(error.message || "Échec de l'envoi", "error");
+      store.reload();
+    }
+    toast("Session envoyée en cuisine", "success");
+  };
+
+  return (
+    <Surface style={{ padding: 16, marginBottom: 18 }}>
+      <strong style={{ ...FF, fontSize: 15 }}>🪑 Sessions de table en cours</strong>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+        {sessions.map((s) => {
+          const linked = allOrders.filter((o) => o.session_id === s.id);
+          const total = linked.reduce((sum, o) => sum + Number(o.total || 0), 0);
+          const mins = Math.max(0, Math.round((Date.now() - new Date(s.opened_at).getTime()) / 60000));
+          const sent = !!s.kitchen_sent_at;
+          return (
+            <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: C.surfaceAlt, borderRadius: 12 }}>
+              <strong style={{ ...FF, fontSize: 14 }}>Table {s.table?.number ?? "?"}</strong>
+              <Tag color={C.accentOrange}>👥 {s.covers}</Tag>
+              <span style={{ ...FF, fontSize: 13, color: C.textSecondary }}>
+                {linked.length}/{s.covers} commande{linked.length > 1 ? "s" : ""} · {eur(total)}
+              </span>
+              <span style={{ ...FF, fontSize: 12, color: C.textTertiary }}>ouverte depuis {mins} min</span>
+              {sent ? (
+                <Tag color={C.accentGreen}>🍳 Envoyée en cuisine</Tag>
+              ) : (
+                <Btn variant="blue" size="sm" onClick={() => sendToKitchen(s)}>🍳 Envoyer en cuisine</Btn>
+              )}
+              <Btn variant="subtle" size="sm" style={{ marginLeft: "auto" }} onClick={() => close(s)}>Fermer la session</Btn>
+            </div>
+          );
+        })}
+      </div>
+    </Surface>
+  );
+}
+
 function OrdersTab({ restaurant, store }) {
   const toast = useToast();
   const [filter, setFilter] = useState("ALL");
@@ -1500,11 +1601,29 @@ function OrdersTab({ restaurant, store }) {
     toast("Commande supprimée", "info");
   };
 
-  const list = store.orders.filter((o) => filter === "ALL" || o.status === filter);
+  const sessionsById = new Map((store.sessions || []).map((s) => [s.id, s]));
+  const allOrdersEverywhere = [...store.orders, ...store.doneOrders];
+
+  // Les commandes d'une même session doivent apparaître ensemble dans la
+  // liste plutôt que dispersées par date — sinon rien ne les relie
+  // visuellement, même avec le badge de session sur chacune.
+  const list = store.orders
+    .filter((o) => filter === "ALL" || o.status === filter)
+    .slice()
+    .sort((a, b) => {
+      const ka = a.session_id || a.id;
+      const kb = b.session_id || b.id;
+      if (ka === kb) return 0;
+      // Le groupe se positionne à la place de sa commande la plus récente,
+      // pour ne pas perturber le tri par fraîcheur habituel de la liste.
+      const latest = (key) => Math.max(...store.orders.filter((o) => (o.session_id || o.id) === key).map((o) => new Date(o.created_at).getTime()));
+      return latest(kb) - latest(ka);
+    });
 
   return (
     <div>
       <h2 style={{ ...FF, fontSize: 22, fontWeight: 800, marginBottom: 14 }}>🧾 Commandes en cours</h2>
+      <TableSessionsPanel store={store} />
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
         {["ALL", "PENDING", "PREPARING", "READY"].map((f) => (
           <button key={f} onClick={() => setFilter(f)} style={{ ...FF, padding: "7px 13px", borderRadius: 10, fontWeight: 600, fontSize: 13, border: `1px solid ${filter === f ? C.text : C.border}`, background: filter === f ? C.text : C.surface, color: filter === f ? C.white : C.text }}>
@@ -1516,13 +1635,27 @@ function OrdersTab({ restaurant, store }) {
         <Surface style={{ padding: 30, textAlign: "center", color: C.textSecondary, ...FF }}>Aucune commande.</Surface>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {list.map((o) => (
-            <Surface key={o.id} style={{ padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          {list.map((o) => {
+            const session = o.session_id ? sessionsById.get(o.session_id) : null;
+            const sessionOrders = session ? allOrdersEverywhere.filter((x) => x.session_id === session.id) : [];
+            const positionInSession = session ? sessionOrders.findIndex((x) => x.id === o.id) + 1 : 0;
+            return (
+            <Surface key={o.id} style={session ? { padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", borderLeft: `3px solid ${C.accentPurple}` } : { padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <strong style={{ ...FF }}>Table {o.table?.number ?? "?"}</strong>
                   <Tag color={STATUS_META[o.status].color}>{STATUS_META[o.status].label}</Tag>
                   <Tag color={o.order_type === "takeaway" ? C.accentPurple : C.accentBlue}>{o.order_type === "takeaway" ? "À emporter" : "Sur place"}</Tag>
+                  {o.covers > 1 && <Tag color={C.accentOrange}>👥 {o.covers}</Tag>}
+                  {/* Relie visuellement les commandes d'une même session — sans
+                      ce badge, deux commandes de la même table scannée deux
+                      fois n'ont rien qui les rattache l'une à l'autre dans
+                      cette liste, seul le panneau du haut le montrait. */}
+                  {session && (
+                    <Tag color={C.accentPurple}>
+                      🔗 {positionInSession}/{session.covers}{session.kitchen_sent_at ? " · envoyée" : ""}
+                    </Tag>
+                  )}
                   {/* Suivi de transmission à la caisse, masqué si le restaurant
                       n'a pas d'intégration POS (statut not_applicable). */}
                   {o.pos_sync_status && o.pos_sync_status !== "not_applicable" && (
@@ -1546,11 +1679,19 @@ function OrdersTab({ restaurant, store }) {
                 {o.status === "READY" && <Btn variant="subtle" size="sm" onClick={() => updateStatus(o, "DONE")}>Servie</Btn>}
                 <Btn variant="ghost" size="sm" title="Ticket détaillé" onClick={() => setPrinting({ ...o, detailed: true })}>🖨️</Btn>
                 <Btn variant="ghost" size="sm" title="Note sans détail (justificatif)" onClick={() => setPrinting({ ...o, detailed: false })}>📄</Btn>
-                <Btn variant="ghost" size="sm" title="Bon de cuisine" onClick={() => setPrinting({ ...o, kind: "kitchen" })}>🍳</Btn>
+                {session ? (
+                  <Btn variant="ghost" size="sm" title={`Ticket cuisine groupé de la session (${sessionOrders.length} commande${sessionOrders.length > 1 ? "s" : ""})`}
+                    onClick={() => setPrinting({ ...session, kind: "kitchen_session", orders: sessionOrders })}>
+                    👥🍳
+                  </Btn>
+                ) : (
+                  <Btn variant="ghost" size="sm" title="Bon de cuisine" onClick={() => setPrinting({ ...o, kind: "kitchen" })}>🍳</Btn>
+                )}
                 <Btn variant="ghost" size="sm" onClick={() => setEditing(o)}>✏️</Btn>
               </div>
             </Surface>
-          ))}
+            );
+          })}
         </div>
       )}
       {editing && <EditOrderModal order={editing} onClose={() => setEditing(null)} onSave={updateStatus} onDelete={remove} />}
@@ -3575,6 +3716,24 @@ function SettingsTab({ restaurant, store, modules = ["base"], onModulesChange })
       </Surface>
 
       <Surface style={{ padding: 18, marginBottom: 16 }}>
+        <strong style={{ ...FF }}>💳 Paiement en ligne</strong>
+        <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginTop: 6 }}>
+          Provider utilisé pour le paiement en ligne côté client (bouton "Payer par carte" sur le menu). Stripe reste actif tant que vous ne changez pas ce réglage.
+        </p>
+        <div style={{ display: "flex", gap: 8, marginTop: 10, marginBottom: 4 }}>
+          {[["stripe", "Stripe"], ["flatpay", "Flatpay"]].map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => setSettings({ ...settings, payment_provider: val })}
+              style={{ ...FF, flex: 1, padding: 12, borderRadius: 12, border: `2px solid ${(settings.payment_provider || "stripe") === val ? C.accent : C.border}`, background: (settings.payment_provider || "stripe") === val ? `${C.accent}0D` : C.surface, fontWeight: 700, fontSize: 14 }}
+            >{label}</button>
+          ))}
+        </div>
+        <Btn variant="primary" size="sm" onClick={save}>Enregistrer le provider</Btn>
+        <PaymentProviderSection restaurant={restaurant} demoMode={store.demoMode} />
+      </Surface>
+
+      <Surface style={{ padding: 18, marginBottom: 16 }}>
         <strong style={{ ...FF }}>⭐ Avis Google</strong>
         <div style={{ marginTop: 10 }}>
           {field("google_review_url", "Lien d'avis Google")}
@@ -3834,6 +3993,101 @@ function PosConnectSection({ restaurant, demoMode }) {
   );
 }
 
+/* ============================================================================
+ * PAIEMENT EN LIGNE — FLATPAY
+ *
+ * Même principe que PosConnectSection : la clé API Flatpay ne transite
+ * qu'une fois par l'edge function flatpay-save-credentials, écrit dans
+ * payment_connections (table sans policy RLS), et cet écran ne lit ensuite
+ * que l'état via get_payment_connection_status() — jamais la clé elle-même,
+ * même pour le propriétaire.
+ * ==========================================================================*/
+function PaymentProviderSection({ restaurant, demoMode }) {
+  const toast = useToast();
+  const [conn, setConn] = useState(null);
+  const [apiKey, setApiKey] = useState("");
+  const [environment, setEnvironment] = useState("test");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    if (demoMode || !hasSupabase) return;
+    const { data } = await supabase.rpc("get_payment_connection_status", { p_restaurant_id: restaurant.id });
+    setConn(Array.isArray(data) ? data[0] ?? null : data ?? null);
+  }, [restaurant.id, demoMode]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    if (demoMode || !hasSupabase) return toast("(Démo) Connexion Flatpay indisponible", "info");
+    if (!apiKey.trim()) return toast("Clé API requise", "error");
+    setBusy(true);
+    try {
+      await callFunction("flatpay-save-credentials", { restaurant_id: restaurant.id, api_key: apiKey.trim(), environment });
+      setApiKey("");
+      toast("Flatpay connecté", "success");
+      await load();
+    } catch (e) {
+      toast(e.message || "Échec de la connexion", "error");
+    } finally { setBusy(false); }
+  };
+
+  const disconnect = async () => {
+    if (!window.confirm("Déconnecter Flatpay ? Le paiement en ligne Flatpay ne fonctionnera plus.")) return;
+    setBusy(true);
+    try {
+      await supabase.rpc("disconnect_payment_provider", { p_restaurant_id: restaurant.id });
+      toast("Flatpay déconnecté", "success");
+      await load();
+    } catch (e) {
+      toast(e.message || "Erreur", "error");
+    } finally { setBusy(false); }
+  };
+
+  const status = conn?.status || "disconnected";
+  const ui = POS_STATUS_UI[status] || POS_STATUS_UI.disconnected;
+
+  return (
+    <Surface style={{ padding: 20, marginTop: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <strong style={{ ...FF, fontSize: 16 }}>💳 Flatpay</strong>
+          <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginTop: 4 }}>
+            Clé API du compte marchand Flatpay — jamais transmise au navigateur après enregistrement.
+          </p>
+        </div>
+        <span style={{ ...FF, fontSize: 13, fontWeight: 700, color: ui.color }}>
+          {ui.dot} {ui.label} {conn?.environment ? `(${conn.environment})` : ""}
+        </span>
+      </div>
+
+      {status === "error" && conn?.last_error && (
+        <p style={{ ...FF, fontSize: 12, color: C.accent, marginTop: 10, wordBreak: "break-word" }}>{conn.last_error}</p>
+      )}
+
+      {status === "connected" ? (
+        <div style={{ marginTop: 14 }}>
+          <Btn variant="secondary" size="sm" disabled={busy} onClick={disconnect}>Déconnecter</Btn>
+        </div>
+      ) : (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            {["test", "production"].map((env) => (
+              <button
+                key={env}
+                onClick={() => setEnvironment(env)}
+                style={{ ...FF, flex: 1, padding: 10, borderRadius: 10, border: `2px solid ${environment === env ? C.accent : C.border}`, background: environment === env ? `${C.accent}0D` : C.surface, fontSize: 13, fontWeight: 700 }}
+              >{env === "test" ? "Test" : "Production"}</button>
+            ))}
+          </div>
+          <InputField label="Clé API Flatpay" type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
+          <Btn variant="primary" size="sm" disabled={busy} onClick={save}>{busy ? "…" : "Connecter Flatpay"}</Btn>
+        </div>
+      )}
+    </Surface>
+  );
+}
+
 function GmailConnectSection({ restaurant }) {
   const toast = useToast();
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -3909,23 +4163,59 @@ function useRestaurantSettings(restaurantId, demoMode) {
 // imprimerait d'un coup à l'ouverture de l'écran.
 function useAutoPrintQueue(store, autoPrintEnabled) {
   const prevIds = useRef(null);
+  const prevSentSessionIds = useRef(null);
   const [printQueue, setPrintQueue] = useState([]);
 
   useEffect(() => {
     if (store.loading) return;
+    const sessions = store.sessions || [];
     const ids = new Set(store.orders.map((o) => o.id));
-    if (prevIds.current === null) { prevIds.current = ids; return; }
+    const sentIds = new Set(sessions.filter((s) => s.kitchen_sent_at).map((s) => s.id));
+
+    if (prevIds.current === null) {
+      prevIds.current = ids;
+      prevSentSessionIds.current = sentIds;
+      return;
+    }
+
     if (autoPrintEnabled !== false) {
+      const sessionsById = new Map(sessions.map((s) => [s.id, s]));
       const fresh = store.orders.filter((o) => !prevIds.current.has(o.id) && o.customer_name !== "Comptoir");
-      // Deux documents par commande, l'un après l'autre : le ticket client
-      // (avec prix et TVA) puis le bon de cuisine juste derrière (sans prix,
-      // pour la brigade) — imprimés en deux temps sur la même imprimante.
-      if (fresh.length) {
-        setPrintQueue((q) => [...q, ...fresh.flatMap((o) => [o, { ...o, kind: "kitchen" }])]);
+      const jobs = [];
+      for (const o of fresh) {
+        // Ticket client (prix + TVA) : toujours immédiat, une session ne
+        // change rien pour lui — seul le bon de cuisine est concerné.
+        jobs.push(o);
+        const session = o.session_id ? sessionsById.get(o.session_id) : null;
+        if (!session) {
+          // Pas de session (comptoir déjà exclu plus haut, à emporter,
+          // sur place hors session) : comportement inchangé, un bon par
+          // commande.
+          jobs.push({ ...o, kind: "kitchen" });
+        } else if (session.kitchen_sent_at) {
+          // La session a déjà été envoyée en cuisine avant l'arrivée de
+          // cette commande (retardataire) : repli sur un bon individuel
+          // plutôt que de la perdre.
+          jobs.push({ ...o, kind: "kitchen" });
+        }
+        // Sinon : commande rattachée à une session pas encore envoyée —
+        // elle partira dans le ticket groupé, pas ici.
       }
+
+      // Sessions qui viennent de passer à "envoyée en cuisine" (seuil de
+      // couverts atteint automatiquement, ou bouton staff) : un seul bon
+      // groupé pour toutes les commandes déjà rattachées.
+      const newlySent = sessions.filter((s) => s.kitchen_sent_at && !prevSentSessionIds.current.has(s.id));
+      for (const session of newlySent) {
+        const sessionOrders = [...store.orders, ...store.doneOrders].filter((o) => o.session_id === session.id);
+        if (sessionOrders.length) jobs.push({ ...session, kind: "kitchen_session", orders: sessionOrders });
+      }
+
+      if (jobs.length) setPrintQueue((q) => [...q, ...jobs]);
     }
     prevIds.current = ids;
-  }, [store.orders, store.loading, autoPrintEnabled]);
+    prevSentSessionIds.current = sentIds;
+  }, [store.orders, store.doneOrders, store.sessions, store.loading, autoPrintEnabled]);
 
   return {
     printing: printQueue[0] ?? null,
@@ -4118,6 +4408,45 @@ function KitchenTicket({ order }) {
   );
 }
 
+// Un seul ticket pour toutes les commandes d'une session de table, imprimé
+// une fois la session envoyée en cuisine (voir useAutoPrintQueue et
+// TableSessionsPanel) — plutôt qu'un bon dispersé par commande.
+function KitchenSessionTicket({ session, orders = [] }) {
+  if (!session) return null;
+  const tableLabel = (session.table?.label || (session.table?.number != null ? `TABLE ${session.table.number}` : "")).toString().toUpperCase();
+  const when = session.kitchen_sent_at ? new Date(session.kitchen_sent_at) : new Date();
+  const sorted = [...orders].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+
+  return (
+    <div style={{ width: "100%", maxWidth: "72mm", boxSizing: "border-box", padding: "2mm", fontFamily: "'Courier New', Courier, monospace", fontSize: 18, fontWeight: 700, lineHeight: 1.4, color: "#000", background: "#fff" }}>
+      <div style={{ textAlign: "center", fontWeight: 700, fontSize: 20 }}>🍳 BON DE CUISINE — SESSION</div>
+      <div style={{ borderTop: "2px dashed #000", margin: "6px 0" }} />
+      {tableLabel && <div style={{ textAlign: "center", fontWeight: 700, fontSize: 26 }}>{tableLabel}</div>}
+      <div style={{ textAlign: "center" }}>
+        {session.covers} couvert{session.covers > 1 ? "s" : ""} — {sorted.length} commande{sorted.length > 1 ? "s" : ""}
+      </div>
+      <div style={{ textAlign: "center" }}>Envoyé à {when.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</div>
+      {sorted.map((o, oi) => (
+        <div key={o.id || oi}>
+          <div style={{ borderTop: "1px dashed #000", margin: "8px 0" }} />
+          <div style={{ fontSize: 15, fontWeight: 400 }}>
+            Commande {oi + 1}{o.created_at ? ` — ${new Date(o.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}` : ""}
+          </div>
+          {(o.items || []).map((it, i) => (
+            <div key={i} style={{ marginTop: 4 }}>
+              <div style={{ fontWeight: 700, fontSize: 20 }}>{it.quantity}× {it.name}</div>
+              {it.detail && <div style={{ fontStyle: "italic", marginLeft: 8 }}>↳ {it.detail}</div>}
+            </div>
+          ))}
+          {o.note && <div style={{ fontWeight: 700, marginTop: 4 }}>📝 {o.note}</div>}
+        </div>
+      ))}
+      {/* Marge de papier vierge avant la coupe, voir ReceiptTicket. */}
+      <PaperFeed lines={12} />
+    </div>
+  );
+}
+
 // Monté une fois par écran (Cuisine ou Commandes) : reçoit une commande à
 // imprimer via `job`, déclenche window.print() scopé au ticket, et prévient
 // `onDone` une fois l'impression terminée (ou annulée) pour libérer la file.
@@ -4162,9 +4491,11 @@ function TicketPrintLayer({ job, onDone, restaurant, settings }) {
         }
         @media screen { #wegemo-ticket-print { position: fixed; left: -9999px; top: 0; } }
       `}</style>
-      {job.kind === "kitchen"
-        ? <KitchenTicket order={job} />
-        : <ReceiptTicket order={job} restaurant={restaurant} settings={settings} detailed={job.detailed !== false} />}
+      {job.kind === "kitchen_session"
+        ? <KitchenSessionTicket session={job} orders={job.orders} />
+        : job.kind === "kitchen"
+          ? <KitchenTicket order={job} />
+          : <ReceiptTicket order={job} restaurant={restaurant} settings={settings} detailed={job.detailed !== false} />}
     </div>
   );
 }
@@ -4227,6 +4558,7 @@ function KitchenView({ restaurant, onExit }) {
                     </div>
                     <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
                       <Tag color={o.order_type === "takeaway" ? C.accentPurple : C.accentBlue}>{o.order_type === "takeaway" ? "À emporter" : "Sur place"}</Tag>
+                  {o.covers > 1 && <Tag color={C.accentOrange}>👥 {o.covers}</Tag>}
                       {o.payment_method === "cash" && <Tag color={o.cash_collected ? C.accentGreen : C.accentOrange}>{o.cash_collected ? "Encaissé" : "À encaisser"}</Tag>}
                     </div>
                     <ul style={{ ...FF, fontSize: 14, margin: "8px 0", paddingLeft: 18 }}>
@@ -5194,6 +5526,13 @@ function CustomerPage({ slug, tableNum }) {
   const [tableLabel, setTableLabel] = useState(null);
   const [lang, setLang] = useState("fr");
   const [orderType, setOrderType] = useState("dine_in");
+  const [covers, setCovers] = useState(1);
+  // Session de table déjà ouverte par un scan précédent sur la même table
+  // (voir get_or_open_table_session) : si elle existe, on saute l'étape
+  // couverts et on rejoint directement cette session au lieu d'en ouvrir
+  // une nouvelle.
+  const [sessionId, setSessionId] = useState(null);
+  const [openingSession, setOpeningSession] = useState(false);
   const [cart, setCart] = useState([]);
   const [promo, setPromo] = useState(null);
   const [profile, setProfile] = useState({ name: "", email: "" });
@@ -5231,9 +5570,47 @@ function CustomerPage({ slug, tableNum }) {
       setTableId(tb?.id || null);
       setTableLabel(tb?.label || null);
       setSettings(st || {});
+
+      // Une session ouverte sur cette table (par un scan précédent) rend
+      // l'étape couverts inutile pour ce scan-ci — on rejoint directement.
+      if (tb?.id) {
+        const { data: existing } = await supabase
+          .from("table_sessions")
+          .select("id, covers")
+          .eq("table_id", tb.id)
+          .eq("status", "open")
+          .maybeSingle();
+        if (existing) {
+          setSessionId(existing.id);
+          setCovers(existing.covers);
+        }
+      }
+
       setStep("ordertype");
     })();
   }, [slug, tableNum]);
+
+  // Ouvre une nouvelle session (ou rejoint celle qu'un autre scan vient tout
+  // juste d'ouvrir, si la course a lieu au même instant) puis avance au menu.
+  const confirmCovers = async () => {
+    if (!hasSupabase || restaurant.id === "demo") {
+      setStep("menu");
+      return;
+    }
+    setOpeningSession(true);
+    try {
+      const { data, error } = await supabase.rpc("get_or_open_table_session", {
+        p_restaurant_id: restaurant.id, p_table_id: tableId, p_covers: covers,
+      });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      setSessionId(row.session_id);
+      setCovers(row.covers); // une autre personne a peut-être ouvert la session entre-temps
+    } finally {
+      setOpeningSession(false);
+      setStep("menu");
+    }
+  };
 
   const subtotal = cart.reduce((s, c) => s + c.lineTotal, 0);
   const discount = promo ? (promo.discount_percent ? subtotal * (promo.discount_percent / 100) : Math.min(promo.discount_amount || 0, subtotal)) : 0;
@@ -5270,7 +5647,32 @@ function CustomerPage({ slug, tableNum }) {
                 </div>
               </button>
             ))}
-            <Btn variant="primary" size="lg" style={{ marginTop: 16 }} onClick={() => setStep("menu")}>{t(lang, "orderTypeConfirm")}</Btn>
+            <Btn variant="primary" size="lg" style={{ marginTop: 16 }} onClick={() => setStep(orderType === "dine_in" ? (sessionId ? "menu" : "covers") : "menu")}>{t(lang, "orderTypeConfirm")}</Btn>
+          </div>
+        </div>
+      )}
+
+      {step === "covers" && (
+        <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 24 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
+            <button onClick={() => setStep("ordertype")} style={{ ...FF, color: C.textSecondary, fontSize: 14, background: "none", border: "none" }}>← {t(lang, "back")}</button>
+            <LangPicker lang={lang} setLang={setLang} />
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
+            <h1 style={{ ...FF, fontSize: 24, fontWeight: 900, textAlign: "center", marginBottom: 4 }}>{t(lang, "coversTitle")}</h1>
+            <p style={{ ...FF, textAlign: "center", color: C.textSecondary, marginBottom: 32 }}>{t(lang, "coversSub")}</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+              <button
+                onClick={() => setCovers((c) => Math.max(1, c - 1))}
+                style={{ ...FF, width: 52, height: 52, borderRadius: 16, border: `1px solid ${C.border}`, background: C.surface, fontSize: 24, fontWeight: 700, color: C.text }}
+              >−</button>
+              <span style={{ ...FF, fontSize: 40, fontWeight: 900, minWidth: 60, textAlign: "center" }}>{covers}</span>
+              <button
+                onClick={() => setCovers((c) => Math.min(30, c + 1))}
+                style={{ ...FF, width: 52, height: 52, borderRadius: 16, border: `1px solid ${C.border}`, background: C.surface, fontSize: 24, fontWeight: 700, color: C.text }}
+              >+</button>
+            </div>
+            <Btn variant="primary" size="lg" style={{ marginTop: 40, width: "100%" }} disabled={openingSession} onClick={confirmCovers}>{openingSession ? "…" : t(lang, "orderTypeConfirm")}</Btn>
           </div>
         </div>
       )}
@@ -5298,7 +5700,7 @@ function CustomerPage({ slug, tableNum }) {
       )}
 
       {step === "payment" && (
-        <CustomerPayment restaurant={restaurant} tableId={tableId} orderType={orderType} cart={cart} total={total} promo={promo} profile={profile} lang={lang} onBack={() => setStep("cart")} onDone={(id) => { setOrderId(id); setStep("done"); }} />
+        <CustomerPayment restaurant={restaurant} tableId={tableId} tableNum={tableNum} orderType={orderType} covers={covers} sessionId={sessionId} cart={cart} total={total} promo={promo} profile={profile} lang={lang} onBack={() => setStep("cart")} onDone={(id) => { setOrderId(id); setStep("done"); }} />
       )}
 
       {step === "done" && (
@@ -5920,14 +6322,21 @@ function StripeCardForm({ clientSecret, publishableKey, total, lang, onSuccess, 
   );
 }
 
-function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, profile, lang, onBack, onDone }) {
+function CustomerPayment({ restaurant, tableId, tableNum, orderType, covers, sessionId, cart, total, promo, profile, lang, onBack, onDone }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [cardIntent, setCardIntent] = useState(null); // { clientSecret, publishableKey }
+  const [paymentProvider, setPaymentProvider] = useState("stripe");
   // Jeton d'idempotence stable pour toute la durée du paiement : un double-tap
   // ou une reprise réseau réutilise la commande déjà créée au lieu d'en ouvrir
   // une seconde. Renouvelé uniquement à la commande suivante.
   const clientToken = useRef(uid());
+
+  useEffect(() => {
+    if (!hasSupabase || restaurant.id === "demo") return;
+    supabase.rpc("get_payment_provider", { p_restaurant_id: restaurant.id })
+      .then(({ data }) => { if (data) setPaymentProvider(data); });
+  }, [restaurant.id]);
 
   const createOrder = useCallback(async (method) => {
     setBusy(true);
@@ -5964,6 +6373,8 @@ function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, p
           detail: (c.supplements || []).map((s) => s.name).join(", "),
         })),
         p_client_token: clientToken.current,
+        p_covers: orderType === "dine_in" ? covers : 1,
+        p_session_id: orderType === "dine_in" ? sessionId : null,
       });
       if (error) throw error;
       const order = { id: res.order_id };
@@ -5998,7 +6409,7 @@ function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, p
       }
       setBusy(false);
     }
-  }, [restaurant.id, tableId, orderType, profile, cart, promo, onDone, toast]);
+  }, [restaurant.id, tableId, orderType, covers, sessionId, profile, cart, promo, onDone, toast]);
 
   const payCard = async () => {
     // If the total is exactly 0 (e.g. 100% promo), skip Stripe entirely —
@@ -6027,6 +6438,44 @@ function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, p
     }
   };
 
+  // Flatpay : paiement hébergé par redirection (contrairement à Stripe,
+  // embarqué via Elements). Le client quitte Wegemo, paie chez Flatpay
+  // (carte / Apple Pay selon l'appareil — géré entièrement par Flatpay, pas
+  // de logique Apple Pay ici), puis revient sur /payment/success|cancel, où
+  // FlatpayPaymentReturn revérifie le statut côté serveur avant de considérer
+  // la commande comme payée.
+  const payFlatpay = async () => {
+    if (total <= 0) return createOrder("card");
+    if (!hasSupabase || restaurant.id === "demo") {
+      await new Promise((r) => setTimeout(r, 600));
+      onDone(uid());
+      return;
+    }
+    setBusy(true);
+    try {
+      const returnBaseUrl = `${siteBase()}/r/${restaurant.slug}/t/${tableNum}`;
+      const data = await callFunction("flatpay-create-payment", {
+        restaurant_id: restaurant.id, table_id: tableId, order_type: orderType,
+        covers: orderType === "dine_in" ? covers : 1, session_id: orderType === "dine_in" ? sessionId : null,
+        items: cart.map((c) => ({
+          menu_item_id: c.item.id, quantity: c.qty,
+          supplements: c.supplements || [], detail: (c.supplements || []).map((s) => s.name).join(", "),
+        })),
+        promo_code: promo?.code || null, customer_name: profile.name || "", customer_email: profile.email || "",
+        client_token: clientToken.current, return_base_url: returnBaseUrl,
+      });
+      if (data?.error || !data?.redirect_url) {
+        toast(data?.error || "Paiement en ligne indisponible.", "error");
+        setBusy(false);
+        return;
+      }
+      window.location.href = data.redirect_url;
+    } catch (e) {
+      toast(e.message || "Erreur", "error");
+      setBusy(false);
+    }
+  };
+
   return (
     <div style={{ padding: 20, minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
@@ -6045,7 +6494,11 @@ function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, p
       ) : (
         <>
           <Btn variant="primary" size="lg" style={{ marginBottom: 12 }} disabled={busy} onClick={() => createOrder("cash")}>💵 {t(lang, "payCash")}</Btn>
-          <Btn variant="blue" size="lg" disabled={busy} onClick={payCard}>💳 {t(lang, "payCard")}</Btn>
+          {paymentProvider === "flatpay" ? (
+            <Btn variant="blue" size="lg" disabled={busy} onClick={payFlatpay}>💳 {t(lang, "payOnline")}</Btn>
+          ) : (
+            <Btn variant="blue" size="lg" disabled={busy} onClick={payCard}>💳 {t(lang, "payCard")}</Btn>
+          )}
           {busy && <p style={{ ...FF, textAlign: "center", marginTop: 16, color: C.textSecondary }}>…</p>}
         </>
       )}
@@ -6121,6 +6574,82 @@ function CustomerDone({ orderId, restaurant, settings, lang }) {
 }
 
 /* ============================================================================
+ * RETOUR PAIEMENT FLATPAY — /r/{slug}/t/{table}/payment/{success|cancel|pending}
+ *
+ * Le segment d'URL (success/cancel/pending) est purement informatif : l'état
+ * réellement affiché vient TOUJOURS de flatpay-payment-status, qui revérifie
+ * le statut auprès de Flatpay. Revenir sur "success" ne suffit jamais à
+ * afficher "payé" — voir finalizePaymentAttempt côté serveur.
+ * ==========================================================================*/
+function FlatpayPaymentReturn({ slug, tableNum, attemptId }) {
+  const [phase, setPhase] = useState("checking"); // checking | paid | failed | cancelled
+  const [restaurant, setRestaurant] = useState(null);
+  const [settings, setSettings] = useState({});
+  const [lang, setLang] = useState("fr");
+  const [orderId, setOrderId] = useState(null);
+
+  useEffect(() => {
+    if (!hasSupabase) return;
+    (async () => {
+      const byUuid = /^[0-9a-f-]{36}$/i.test(slug);
+      const { data: r } = await supabase.from("restaurants").select("*").eq(byUuid ? "id" : "slug", slug).maybeSingle();
+      setRestaurant(r || null);
+      if (r) {
+        const { data: st } = await supabase.from("restaurant_settings").select("*").eq("restaurant_id", r.id).maybeSingle();
+        setSettings(st || {});
+      }
+    })();
+  }, [slug]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!hasSupabase || !attemptId) { setPhase("failed"); return; }
+    let cancelled = false;
+    let timer = null;
+
+    const check = async () => {
+      try {
+        const res = await callFunction("flatpay-payment-status", { payment_attempt_id: attemptId });
+        if (cancelled) return;
+        if (res.status === "PAID") {
+          setOrderId(res.orderId);
+          setPhase("paid");
+          return;
+        }
+        if (res.status === "PAYMENT_FAILED") { setPhase("failed"); return; }
+        if (res.status === "PAYMENT_CANCELLED") { setPhase("cancelled"); return; }
+        // PAYMENT_PROCESSING : on retente sous peu — le client peut tout juste
+        // revenir de Flatpay avant que le webhook n'ait été livré.
+        timer = setTimeout(check, 2500);
+      } catch {
+        if (!cancelled) timer = setTimeout(check, 2500);
+      }
+    };
+    check();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [attemptId]);
+
+  const retryUrl = restaurant ? `${siteBase()}/r/${restaurant.slug}/t/${tableNum}` : "#";
+
+  if (phase === "paid" && restaurant) {
+    return <CustomerDone orderId={orderId} restaurant={restaurant} settings={settings} lang={lang} />;
+  }
+
+  if (phase === "failed" || phase === "cancelled") {
+    return (
+      <div style={{ padding: 24, minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center" }}>
+        <div style={{ fontSize: 56, marginBottom: 12 }}>✕</div>
+        <h1 style={{ ...FF, fontWeight: 900, fontSize: 22, marginBottom: 6 }}>{t(lang, "paymentFailedTitle")}</h1>
+        <p style={{ ...FF, color: C.textSecondary, marginBottom: 24 }}>{t(lang, "paymentFailedSub")}</p>
+        <Btn variant="primary" size="lg" onClick={() => { window.location.href = retryUrl; }}>{t(lang, "retryPayment")}</Btn>
+      </div>
+    );
+  }
+
+  return <CenterMsg emoji="⏳" text={t(lang, "paymentPending")} />;
+}
+
+/* ============================================================================
  * GMAIL OAUTH CALLBACK
  * ==========================================================================*/
 function GmailCallback() {
@@ -6153,6 +6682,10 @@ function AppInner() {
   const { user, loading, demoUser, setDemoUser, signOut, passwordRecovery } = useAuth();
   const path = window.location.pathname;
 
+  // Retour paiement Flatpay: /r/{slug}/t/{tableNum}/payment/{success|cancel|pending}
+  // — vérifié AVANT customerMatch (plus spécifique) pour ne pas retomber sur
+  // le menu client, qui reprendrait au début du parcours.
+  const paymentReturnMatch = path.match(/\/r\/([^/]+)\/t\/(\d+)\/payment\/(success|cancel|pending)/);
   // Customer route: /r/{slug}/t/{tableNum}
   const customerMatch = path.match(/\/r\/([^/]+)\/t\/(\d+)/);
   const goMatch = path.match(/\/go\/([^/?#]+)/);
@@ -6166,6 +6699,16 @@ function AppInner() {
   if (path.includes("/oauth/gmail")) return <GmailCallback />;
   if (passwordRecovery) return <NewPasswordPage />;
   if (goMatch) return <GoRedirect slug={decodeURIComponent(goMatch[1])} />;
+  if (paymentReturnMatch) {
+    const params = new URLSearchParams(window.location.search);
+    return (
+      <FlatpayPaymentReturn
+        slug={decodeURIComponent(paymentReturnMatch[1])}
+        tableNum={paymentReturnMatch[2]}
+        attemptId={params.get("attempt")}
+      />
+    );
+  }
   if (customerMatch) {
     const cSlug = decodeURIComponent(customerMatch[1]);
     // Hotel rooms open the guest portal (hub), not the restaurant menu flow.
