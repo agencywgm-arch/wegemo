@@ -52,6 +52,11 @@ const CT = {
     orderConfirmed: "Commande confirmée !", orderTracking: "Suivi de commande",
     rateOrder: "Notez votre expérience", leaveGoogleReview: "Laisser un avis Google",
     popular: "Populaire", supplements: "Suppléments", extras: "Garnitures", askAI: "Poser une question",
+    payOnline: "Payer en ligne", paymentPending: "Paiement en cours…",
+    paymentConfirmedTitle: "✓ Paiement confirmé", paymentConfirmedOrder: "Commande",
+    paymentConfirmedThanks: "Merci pour votre commande.",
+    paymentFailedTitle: "Paiement non effectué.", paymentFailedSub: "Votre commande n'a pas été débitée.",
+    retryPayment: "Réessayer",
   },
   en: {
     orderTypeTitle: "How would you like to order?", orderTypeConfirm: "Continue",
@@ -66,6 +71,11 @@ const CT = {
     orderConfirmed: "Order confirmed!", orderTracking: "Order tracking",
     rateOrder: "Rate your experience", leaveGoogleReview: "Leave a Google review",
     popular: "Popular", supplements: "Add-ons", extras: "Sides", askAI: "Ask a question",
+    payOnline: "Pay online", paymentPending: "Payment in progress…",
+    paymentConfirmedTitle: "✓ Payment confirmed", paymentConfirmedOrder: "Order",
+    paymentConfirmedThanks: "Thank you for your order.",
+    paymentFailedTitle: "Payment not completed.", paymentFailedSub: "Your order has not been charged.",
+    retryPayment: "Try again",
   },
   ar: {
     orderTypeTitle: "كيف ترغب في الطلب؟", orderTypeConfirm: "متابعة",
@@ -80,6 +90,11 @@ const CT = {
     orderConfirmed: "تم تأكيد الطلب!", orderTracking: "تتبع الطلب",
     rateOrder: "قيّم تجربتك", leaveGoogleReview: "اترك تقييماً على جوجل",
     popular: "شائع", supplements: "إضافات", extras: "أطباق جانبية", askAI: "اطرح سؤالاً",
+    payOnline: "الدفع عبر الإنترنت", paymentPending: "جارٍ الدفع…",
+    paymentConfirmedTitle: "✓ تم تأكيد الدفع", paymentConfirmedOrder: "الطلب",
+    paymentConfirmedThanks: "شكراً لطلبك.",
+    paymentFailedTitle: "لم يتم الدفع.", paymentFailedSub: "لم يتم خصم أي مبلغ من طلبك.",
+    retryPayment: "إعادة المحاولة",
   },
   es: {
     orderTypeTitle: "¿Cómo desea pedir?", orderTypeConfirm: "Continuar",
@@ -94,6 +109,11 @@ const CT = {
     orderConfirmed: "¡Pedido confirmado!", orderTracking: "Seguimiento del pedido",
     rateOrder: "Califica tu experiencia", leaveGoogleReview: "Dejar una reseña en Google",
     popular: "Popular", supplements: "Extras", extras: "Guarniciones", askAI: "Hacer una pregunta",
+    payOnline: "Pagar en línea", paymentPending: "Pago en curso…",
+    paymentConfirmedTitle: "✓ Pago confirmado", paymentConfirmedOrder: "Pedido",
+    paymentConfirmedThanks: "Gracias por su pedido.",
+    paymentFailedTitle: "Pago no realizado.", paymentFailedSub: "No se ha realizado ningún cargo.",
+    retryPayment: "Reintentar",
   },
   pt: {
     orderTypeTitle: "Como deseja pedir?", orderTypeConfirm: "Continuar",
@@ -108,6 +128,11 @@ const CT = {
     orderConfirmed: "Pedido confirmado!", orderTracking: "Acompanhamento do pedido",
     rateOrder: "Avalie a sua experiência", leaveGoogleReview: "Deixar uma avaliação Google",
     popular: "Popular", supplements: "Adicionais", extras: "Acompanhamentos", askAI: "Fazer uma pergunta",
+    payOnline: "Pagar online", paymentPending: "Pagamento em curso…",
+    paymentConfirmedTitle: "✓ Pagamento confirmado", paymentConfirmedOrder: "Pedido",
+    paymentConfirmedThanks: "Obrigado pelo seu pedido.",
+    paymentFailedTitle: "Pagamento não efetuado.", paymentFailedSub: "O seu pedido não foi debitado.",
+    retryPayment: "Tentar novamente",
   },
 };
 const t = (lang, key) => (CT[lang] && CT[lang][key]) || CT.fr[key] || key;
@@ -3691,6 +3716,24 @@ function SettingsTab({ restaurant, store, modules = ["base"], onModulesChange })
       </Surface>
 
       <Surface style={{ padding: 18, marginBottom: 16 }}>
+        <strong style={{ ...FF }}>💳 Paiement en ligne</strong>
+        <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginTop: 6 }}>
+          Provider utilisé pour le paiement en ligne côté client (bouton "Payer par carte" sur le menu). Stripe reste actif tant que vous ne changez pas ce réglage.
+        </p>
+        <div style={{ display: "flex", gap: 8, marginTop: 10, marginBottom: 4 }}>
+          {[["stripe", "Stripe"], ["flatpay", "Flatpay"]].map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => setSettings({ ...settings, payment_provider: val })}
+              style={{ ...FF, flex: 1, padding: 12, borderRadius: 12, border: `2px solid ${(settings.payment_provider || "stripe") === val ? C.accent : C.border}`, background: (settings.payment_provider || "stripe") === val ? `${C.accent}0D` : C.surface, fontWeight: 700, fontSize: 14 }}
+            >{label}</button>
+          ))}
+        </div>
+        <Btn variant="primary" size="sm" onClick={save}>Enregistrer le provider</Btn>
+        <PaymentProviderSection restaurant={restaurant} demoMode={store.demoMode} />
+      </Surface>
+
+      <Surface style={{ padding: 18, marginBottom: 16 }}>
         <strong style={{ ...FF }}>⭐ Avis Google</strong>
         <div style={{ marginTop: 10 }}>
           {field("google_review_url", "Lien d'avis Google")}
@@ -3944,6 +3987,101 @@ function PosConnectSection({ restaurant, demoMode }) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+    </Surface>
+  );
+}
+
+/* ============================================================================
+ * PAIEMENT EN LIGNE — FLATPAY
+ *
+ * Même principe que PosConnectSection : la clé API Flatpay ne transite
+ * qu'une fois par l'edge function flatpay-save-credentials, écrit dans
+ * payment_connections (table sans policy RLS), et cet écran ne lit ensuite
+ * que l'état via get_payment_connection_status() — jamais la clé elle-même,
+ * même pour le propriétaire.
+ * ==========================================================================*/
+function PaymentProviderSection({ restaurant, demoMode }) {
+  const toast = useToast();
+  const [conn, setConn] = useState(null);
+  const [apiKey, setApiKey] = useState("");
+  const [environment, setEnvironment] = useState("test");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    if (demoMode || !hasSupabase) return;
+    const { data } = await supabase.rpc("get_payment_connection_status", { p_restaurant_id: restaurant.id });
+    setConn(Array.isArray(data) ? data[0] ?? null : data ?? null);
+  }, [restaurant.id, demoMode]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    if (demoMode || !hasSupabase) return toast("(Démo) Connexion Flatpay indisponible", "info");
+    if (!apiKey.trim()) return toast("Clé API requise", "error");
+    setBusy(true);
+    try {
+      await callFunction("flatpay-save-credentials", { restaurant_id: restaurant.id, api_key: apiKey.trim(), environment });
+      setApiKey("");
+      toast("Flatpay connecté", "success");
+      await load();
+    } catch (e) {
+      toast(e.message || "Échec de la connexion", "error");
+    } finally { setBusy(false); }
+  };
+
+  const disconnect = async () => {
+    if (!window.confirm("Déconnecter Flatpay ? Le paiement en ligne Flatpay ne fonctionnera plus.")) return;
+    setBusy(true);
+    try {
+      await supabase.rpc("disconnect_payment_provider", { p_restaurant_id: restaurant.id });
+      toast("Flatpay déconnecté", "success");
+      await load();
+    } catch (e) {
+      toast(e.message || "Erreur", "error");
+    } finally { setBusy(false); }
+  };
+
+  const status = conn?.status || "disconnected";
+  const ui = POS_STATUS_UI[status] || POS_STATUS_UI.disconnected;
+
+  return (
+    <Surface style={{ padding: 20, marginTop: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <strong style={{ ...FF, fontSize: 16 }}>💳 Flatpay</strong>
+          <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginTop: 4 }}>
+            Clé API du compte marchand Flatpay — jamais transmise au navigateur après enregistrement.
+          </p>
+        </div>
+        <span style={{ ...FF, fontSize: 13, fontWeight: 700, color: ui.color }}>
+          {ui.dot} {ui.label} {conn?.environment ? `(${conn.environment})` : ""}
+        </span>
+      </div>
+
+      {status === "error" && conn?.last_error && (
+        <p style={{ ...FF, fontSize: 12, color: C.accent, marginTop: 10, wordBreak: "break-word" }}>{conn.last_error}</p>
+      )}
+
+      {status === "connected" ? (
+        <div style={{ marginTop: 14 }}>
+          <Btn variant="secondary" size="sm" disabled={busy} onClick={disconnect}>Déconnecter</Btn>
+        </div>
+      ) : (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            {["test", "production"].map((env) => (
+              <button
+                key={env}
+                onClick={() => setEnvironment(env)}
+                style={{ ...FF, flex: 1, padding: 10, borderRadius: 10, border: `2px solid ${environment === env ? C.accent : C.border}`, background: environment === env ? `${C.accent}0D` : C.surface, fontSize: 13, fontWeight: 700 }}
+              >{env === "test" ? "Test" : "Production"}</button>
+            ))}
+          </div>
+          <InputField label="Clé API Flatpay" type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
+          <Btn variant="primary" size="sm" disabled={busy} onClick={save}>{busy ? "…" : "Connecter Flatpay"}</Btn>
         </div>
       )}
     </Surface>
@@ -5562,7 +5700,7 @@ function CustomerPage({ slug, tableNum }) {
       )}
 
       {step === "payment" && (
-        <CustomerPayment restaurant={restaurant} tableId={tableId} orderType={orderType} covers={covers} sessionId={sessionId} cart={cart} total={total} promo={promo} profile={profile} lang={lang} onBack={() => setStep("cart")} onDone={(id) => { setOrderId(id); setStep("done"); }} />
+        <CustomerPayment restaurant={restaurant} tableId={tableId} tableNum={tableNum} orderType={orderType} covers={covers} sessionId={sessionId} cart={cart} total={total} promo={promo} profile={profile} lang={lang} onBack={() => setStep("cart")} onDone={(id) => { setOrderId(id); setStep("done"); }} />
       )}
 
       {step === "done" && (
@@ -6184,14 +6322,21 @@ function StripeCardForm({ clientSecret, publishableKey, total, lang, onSuccess, 
   );
 }
 
-function CustomerPayment({ restaurant, tableId, orderType, covers, sessionId, cart, total, promo, profile, lang, onBack, onDone }) {
+function CustomerPayment({ restaurant, tableId, tableNum, orderType, covers, sessionId, cart, total, promo, profile, lang, onBack, onDone }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [cardIntent, setCardIntent] = useState(null); // { clientSecret, publishableKey }
+  const [paymentProvider, setPaymentProvider] = useState("stripe");
   // Jeton d'idempotence stable pour toute la durée du paiement : un double-tap
   // ou une reprise réseau réutilise la commande déjà créée au lieu d'en ouvrir
   // une seconde. Renouvelé uniquement à la commande suivante.
   const clientToken = useRef(uid());
+
+  useEffect(() => {
+    if (!hasSupabase || restaurant.id === "demo") return;
+    supabase.rpc("get_payment_provider", { p_restaurant_id: restaurant.id })
+      .then(({ data }) => { if (data) setPaymentProvider(data); });
+  }, [restaurant.id]);
 
   const createOrder = useCallback(async (method) => {
     setBusy(true);
@@ -6293,6 +6438,44 @@ function CustomerPayment({ restaurant, tableId, orderType, covers, sessionId, ca
     }
   };
 
+  // Flatpay : paiement hébergé par redirection (contrairement à Stripe,
+  // embarqué via Elements). Le client quitte Wegemo, paie chez Flatpay
+  // (carte / Apple Pay selon l'appareil — géré entièrement par Flatpay, pas
+  // de logique Apple Pay ici), puis revient sur /payment/success|cancel, où
+  // FlatpayPaymentReturn revérifie le statut côté serveur avant de considérer
+  // la commande comme payée.
+  const payFlatpay = async () => {
+    if (total <= 0) return createOrder("card");
+    if (!hasSupabase || restaurant.id === "demo") {
+      await new Promise((r) => setTimeout(r, 600));
+      onDone(uid());
+      return;
+    }
+    setBusy(true);
+    try {
+      const returnBaseUrl = `${siteBase()}/r/${restaurant.slug}/t/${tableNum}`;
+      const data = await callFunction("flatpay-create-payment", {
+        restaurant_id: restaurant.id, table_id: tableId, order_type: orderType,
+        covers: orderType === "dine_in" ? covers : 1, session_id: orderType === "dine_in" ? sessionId : null,
+        items: cart.map((c) => ({
+          menu_item_id: c.item.id, quantity: c.qty,
+          supplements: c.supplements || [], detail: (c.supplements || []).map((s) => s.name).join(", "),
+        })),
+        promo_code: promo?.code || null, customer_name: profile.name || "", customer_email: profile.email || "",
+        client_token: clientToken.current, return_base_url: returnBaseUrl,
+      });
+      if (data?.error || !data?.redirect_url) {
+        toast(data?.error || "Paiement en ligne indisponible.", "error");
+        setBusy(false);
+        return;
+      }
+      window.location.href = data.redirect_url;
+    } catch (e) {
+      toast(e.message || "Erreur", "error");
+      setBusy(false);
+    }
+  };
+
   return (
     <div style={{ padding: 20, minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
@@ -6311,7 +6494,11 @@ function CustomerPayment({ restaurant, tableId, orderType, covers, sessionId, ca
       ) : (
         <>
           <Btn variant="primary" size="lg" style={{ marginBottom: 12 }} disabled={busy} onClick={() => createOrder("cash")}>💵 {t(lang, "payCash")}</Btn>
-          <Btn variant="blue" size="lg" disabled={busy} onClick={payCard}>💳 {t(lang, "payCard")}</Btn>
+          {paymentProvider === "flatpay" ? (
+            <Btn variant="blue" size="lg" disabled={busy} onClick={payFlatpay}>💳 {t(lang, "payOnline")}</Btn>
+          ) : (
+            <Btn variant="blue" size="lg" disabled={busy} onClick={payCard}>💳 {t(lang, "payCard")}</Btn>
+          )}
           {busy && <p style={{ ...FF, textAlign: "center", marginTop: 16, color: C.textSecondary }}>…</p>}
         </>
       )}
@@ -6387,6 +6574,82 @@ function CustomerDone({ orderId, restaurant, settings, lang }) {
 }
 
 /* ============================================================================
+ * RETOUR PAIEMENT FLATPAY — /r/{slug}/t/{table}/payment/{success|cancel|pending}
+ *
+ * Le segment d'URL (success/cancel/pending) est purement informatif : l'état
+ * réellement affiché vient TOUJOURS de flatpay-payment-status, qui revérifie
+ * le statut auprès de Flatpay. Revenir sur "success" ne suffit jamais à
+ * afficher "payé" — voir finalizePaymentAttempt côté serveur.
+ * ==========================================================================*/
+function FlatpayPaymentReturn({ slug, tableNum, attemptId }) {
+  const [phase, setPhase] = useState("checking"); // checking | paid | failed | cancelled
+  const [restaurant, setRestaurant] = useState(null);
+  const [settings, setSettings] = useState({});
+  const [lang, setLang] = useState("fr");
+  const [orderId, setOrderId] = useState(null);
+
+  useEffect(() => {
+    if (!hasSupabase) return;
+    (async () => {
+      const byUuid = /^[0-9a-f-]{36}$/i.test(slug);
+      const { data: r } = await supabase.from("restaurants").select("*").eq(byUuid ? "id" : "slug", slug).maybeSingle();
+      setRestaurant(r || null);
+      if (r) {
+        const { data: st } = await supabase.from("restaurant_settings").select("*").eq("restaurant_id", r.id).maybeSingle();
+        setSettings(st || {});
+      }
+    })();
+  }, [slug]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!hasSupabase || !attemptId) { setPhase("failed"); return; }
+    let cancelled = false;
+    let timer = null;
+
+    const check = async () => {
+      try {
+        const res = await callFunction("flatpay-payment-status", { payment_attempt_id: attemptId });
+        if (cancelled) return;
+        if (res.status === "PAID") {
+          setOrderId(res.orderId);
+          setPhase("paid");
+          return;
+        }
+        if (res.status === "PAYMENT_FAILED") { setPhase("failed"); return; }
+        if (res.status === "PAYMENT_CANCELLED") { setPhase("cancelled"); return; }
+        // PAYMENT_PROCESSING : on retente sous peu — le client peut tout juste
+        // revenir de Flatpay avant que le webhook n'ait été livré.
+        timer = setTimeout(check, 2500);
+      } catch {
+        if (!cancelled) timer = setTimeout(check, 2500);
+      }
+    };
+    check();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [attemptId]);
+
+  const retryUrl = restaurant ? `${siteBase()}/r/${restaurant.slug}/t/${tableNum}` : "#";
+
+  if (phase === "paid" && restaurant) {
+    return <CustomerDone orderId={orderId} restaurant={restaurant} settings={settings} lang={lang} />;
+  }
+
+  if (phase === "failed" || phase === "cancelled") {
+    return (
+      <div style={{ padding: 24, minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center" }}>
+        <div style={{ fontSize: 56, marginBottom: 12 }}>✕</div>
+        <h1 style={{ ...FF, fontWeight: 900, fontSize: 22, marginBottom: 6 }}>{t(lang, "paymentFailedTitle")}</h1>
+        <p style={{ ...FF, color: C.textSecondary, marginBottom: 24 }}>{t(lang, "paymentFailedSub")}</p>
+        <Btn variant="primary" size="lg" onClick={() => { window.location.href = retryUrl; }}>{t(lang, "retryPayment")}</Btn>
+      </div>
+    );
+  }
+
+  return <CenterMsg emoji="⏳" text={t(lang, "paymentPending")} />;
+}
+
+/* ============================================================================
  * GMAIL OAUTH CALLBACK
  * ==========================================================================*/
 function GmailCallback() {
@@ -6419,6 +6682,10 @@ function AppInner() {
   const { user, loading, demoUser, setDemoUser, signOut, passwordRecovery } = useAuth();
   const path = window.location.pathname;
 
+  // Retour paiement Flatpay: /r/{slug}/t/{tableNum}/payment/{success|cancel|pending}
+  // — vérifié AVANT customerMatch (plus spécifique) pour ne pas retomber sur
+  // le menu client, qui reprendrait au début du parcours.
+  const paymentReturnMatch = path.match(/\/r\/([^/]+)\/t\/(\d+)\/payment\/(success|cancel|pending)/);
   // Customer route: /r/{slug}/t/{tableNum}
   const customerMatch = path.match(/\/r\/([^/]+)\/t\/(\d+)/);
   const goMatch = path.match(/\/go\/([^/?#]+)/);
@@ -6432,6 +6699,16 @@ function AppInner() {
   if (path.includes("/oauth/gmail")) return <GmailCallback />;
   if (passwordRecovery) return <NewPasswordPage />;
   if (goMatch) return <GoRedirect slug={decodeURIComponent(goMatch[1])} />;
+  if (paymentReturnMatch) {
+    const params = new URLSearchParams(window.location.search);
+    return (
+      <FlatpayPaymentReturn
+        slug={decodeURIComponent(paymentReturnMatch[1])}
+        tableNum={paymentReturnMatch[2]}
+        attemptId={params.get("attempt")}
+      />
+    );
+  }
   if (customerMatch) {
     const cSlug = decodeURIComponent(customerMatch[1]);
     // Hotel rooms open the guest portal (hub), not the restaurant menu flow.
