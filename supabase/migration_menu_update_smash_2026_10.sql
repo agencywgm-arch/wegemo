@@ -41,15 +41,15 @@ begin
   -- dashboard dès qu'elles sont disponibles).
   insert into menu_items (restaurant_id, name, description, price, category, emoji, photo_url, is_popular, available, sort_order, is_menu)
   values
-    (v_rest, 'Smash Braisé', 'Steak smashé, bœuf braisé effiloché, sauce maison, bun vapeur', 14.90, 'Smash Bao', '🍽️', '/menu/smash-bao-burger.jpg', false, true, 50, false),
-    (v_rest, 'Smash Chèvre Miel', 'Steak smashé, chèvre fondant, miel, roquette, bun vapeur', 14.90, 'Smash Bao', '🍽️', '/menu/smash-bao-burger.jpg', false, true, 51, false),
-    (v_rest, 'Smash Bacon', 'Steak smashé, bacon grillé, cheddar fondu, sauce maison, bun vapeur', 14.90, 'Smash Bao', '🍽️', '/menu/smash-bao-burger.jpg', false, true, 52, false),
-    (v_rest, 'Smash Oignon', 'Steak smashé, oignons confits, oignons frits croustillants, sauce maison, bun vapeur', 14.90, 'Smash Bao', '🍽️', '/menu/smash-bao-burger.jpg', false, true, 53, false);
+    (v_rest, 'Smash Braisé', 'Steak smashé, bœuf braisé effiloché, sauce maison, bun vapeur', 14.90, 'Smash Burger', '🍽️', '/menu/smash-bao-burger.jpg', false, true, 50, false),
+    (v_rest, 'Smash Chèvre Miel', 'Steak smashé, chèvre fondant, miel, roquette, bun vapeur', 14.90, 'Smash Burger', '🍽️', '/menu/smash-bao-burger.jpg', false, true, 51, false),
+    (v_rest, 'Smash Bacon', 'Steak smashé, bacon grillé, cheddar fondu, sauce maison, bun vapeur', 14.90, 'Smash Burger', '🍽️', '/menu/smash-bao-burger.jpg', false, true, 52, false),
+    (v_rest, 'Smash Oignon', 'Steak smashé, oignons confits, oignons frits croustillants, sauce maison, bun vapeur', 14.90, 'Smash Burger', '🍽️', '/menu/smash-bao-burger.jpg', false, true, 53, false);
 end $$;
 
--- Vérification : la carte Smash Bao après exécution.
-select name, price, available
+-- Vérification : les deux familles Smash après exécution.
+select category, name, price, available
   from menu_items
  where restaurant_id = (select id from restaurants where slug = 'baoma')
-   and category = 'Smash Bao'
- order by sort_order;
+   and category in ('Smash Bao', 'Smash Burger')
+ order by category, sort_order;
