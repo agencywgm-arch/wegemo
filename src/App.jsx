@@ -5628,8 +5628,14 @@ function CustomerPage({ slug, tableNum }) {
   const dir = lang === "ar" ? "rtl" : "ltr";
 
   return (
-    <div dir={dir} style={{ minHeight: "100vh", background: BAOMA_THEME_SLUGS.includes(restaurant.slug) ? BAOMA_THEME.offwhite : C.bg, maxWidth: 480, margin: "0 auto", position: "relative" }}>
+    <div dir={dir} style={{ minHeight: "100vh", background: BAOMA_THEME_SLUGS.includes(restaurant.slug) ? BAOMA_THEME.ink : C.bg, maxWidth: 480, margin: "0 auto", position: "relative" }}>
       {step === "ordertype" && (
+        BAOMA_THEME_SLUGS.includes(restaurant.slug) ? (
+          <BaomaOrderType
+            restaurant={restaurant} lang={lang} setLang={setLang} orderType={orderType} setOrderType={setOrderType}
+            onConfirm={() => setStep(orderType === "dine_in" ? (sessionId ? "menu" : "covers") : "menu")}
+          />
+        ) : (
         <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
             <span style={{ fontSize: 32 }}>{restaurant.logo_emoji}</span>
@@ -5650,9 +5656,16 @@ function CustomerPage({ slug, tableNum }) {
             <Btn variant="primary" size="lg" style={{ marginTop: 16 }} onClick={() => setStep(orderType === "dine_in" ? (sessionId ? "menu" : "covers") : "menu")}>{t(lang, "orderTypeConfirm")}</Btn>
           </div>
         </div>
+        )
       )}
 
       {step === "covers" && (
+        BAOMA_THEME_SLUGS.includes(restaurant.slug) ? (
+          <BaomaCovers
+            lang={lang} setLang={setLang} covers={covers} setCovers={setCovers}
+            onBack={() => setStep("ordertype")} onConfirm={confirmCovers} opening={openingSession}
+          />
+        ) : (
         <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
             <button onClick={() => setStep("ordertype")} style={{ ...FF, color: C.textSecondary, fontSize: 14, background: "none", border: "none" }}>← {t(lang, "back")}</button>
@@ -5675,6 +5688,7 @@ function CustomerPage({ slug, tableNum }) {
             <Btn variant="primary" size="lg" style={{ marginTop: 40, width: "100%" }} disabled={openingSession} onClick={confirmCovers}>{openingSession ? "…" : t(lang, "orderTypeConfirm")}</Btn>
           </div>
         </div>
+        )
       )}
 
       {step === "menu" && (
@@ -5905,7 +5919,7 @@ function BaomaCard({ item, onPick, onZoom }) {
         transformStyle: "preserve-3d", perspective: 900,
         transform: `perspective(900px) rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg) translateY(${on ? -8 : 0}px)`,
         boxShadow: on ? "0 0 40px -5px rgba(255,90,31,0.35)" : "none",
-        outline: `1px solid ${on ? "rgba(255,90,31,0.6)" : "rgba(10,10,10,0.06)"}`,
+        outline: `1px solid ${on ? "rgba(255,90,31,0.6)" : "rgba(242,236,224,0.1)"}`,
         outlineOffset: -1,
         transition: "transform .35s cubic-bezier(.16,1,.3,1), box-shadow .3s ease, outline-color .3s ease",
       }}
@@ -5991,13 +6005,13 @@ function BaomaCard({ item, onPick, onZoom }) {
       </div>
 
       <div style={{ padding: "10px 12px 12px" }}>
-        <h3 style={{ ...BDISPLAY, fontSize: 13, lineHeight: 1.15, letterSpacing: 0.3, color: BK.ink }}>{item.name}</h3>
+        <h3 style={{ ...BDISPLAY, fontSize: 13, lineHeight: 1.15, letterSpacing: 0.3, color: BK.offwhite }}>{item.name}</h3>
         {item.description && (
-          <p style={{ ...BFF, fontSize: 11, lineHeight: 1.3, color: "rgba(10,10,10,.62)", marginTop: 3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          <p style={{ ...BFF, fontSize: 11, lineHeight: 1.3, color: "rgba(242,236,224,.55)", marginTop: 3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
             {item.description}
           </p>
         )}
-        <strong style={{ ...BFF, display: "block", marginTop: 5, fontSize: 13, fontWeight: 800, color: on ? BK.orange : BK.ink, transition: "color .3s ease" }}>
+        <strong style={{ ...BFF, display: "block", marginTop: 5, fontSize: 13, fontWeight: 800, color: on ? BK.orange : BK.offwhite, transition: "color .3s ease" }}>
           {eur(item.price)}
         </strong>
       </div>
@@ -6030,7 +6044,7 @@ function BaomaPhotoZoom({ item, onClose }) {
         onClick={(e) => e.stopPropagation()}
         style={{
           position: "relative", width: "100%", maxWidth: 420, maxHeight: "90vh",
-          overflow: "hidden", borderRadius: 18, background: BK.offwhite, animation: "slideup .25s ease",
+          overflow: "hidden", borderRadius: 18, background: BK.charcoal, animation: "slideup .25s ease",
         }}
       >
         <button
@@ -6052,13 +6066,86 @@ function BaomaPhotoZoom({ item, onClose }) {
         )}
         <div style={{ padding: 18 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-            <h3 style={{ ...BDISPLAY, fontSize: 18, letterSpacing: 0.4, color: BK.ink }}>{item.name}</h3>
+            <h3 style={{ ...BDISPLAY, fontSize: 18, letterSpacing: 0.4, color: BK.offwhite }}>{item.name}</h3>
             <strong style={{ ...BFF, fontSize: 18, fontWeight: 800, color: BK.orange, flexShrink: 0 }}>{eur(item.price)}</strong>
           </div>
           {item.description && (
-            <p style={{ ...BFF, fontSize: 13, lineHeight: 1.4, color: "rgba(10,10,10,.65)", marginTop: 8 }}>{item.description}</p>
+            <p style={{ ...BFF, fontSize: 13, lineHeight: 1.4, color: "rgba(242,236,224,.6)", marginTop: 8 }}>{item.description}</p>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function BaomaKicker({ children }) {
+  return (
+    <div style={{ ...BFF, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, color: BK.orange, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 3 }}>
+      <span aria-hidden style={{ width: 24, height: 1, background: "rgba(255,90,31,.35)" }} />
+      <span>{children}</span>
+      <span aria-hidden style={{ width: 24, height: 1, background: "rgba(255,90,31,.35)" }} />
+    </div>
+  );
+}
+
+function BaomaOrderType({ restaurant, lang, setLang, orderType, setOrderType, onConfirm }) {
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 24, background: BK.ink }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
+        <span style={{ fontSize: 32 }}>{restaurant.logo_emoji}</span>
+        <LangPicker lang={lang} setLang={setLang} dark />
+      </div>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <BaomaKicker>Bienvenue</BaomaKicker>
+        <h1 style={{ ...BDISPLAY, fontSize: 34, fontStyle: "italic", textAlign: "center", color: BK.offwhite, marginTop: 10, marginBottom: 6 }}>{restaurant.name}</h1>
+        <p style={{ ...BFF, textAlign: "center", color: "rgba(242,236,224,.55)", marginBottom: 28 }}>{t(lang, "orderTypeTitle")}</p>
+        {[["dine_in", "dineIn", "dineInSub", "🍽️"], ["takeaway", "takeaway", "takeawaySub", "🥡"]].map(([val, k, sub, em]) => (
+          <button
+            key={val}
+            onClick={() => setOrderType(val)}
+            style={{
+              ...BFF, display: "flex", alignItems: "center", gap: 14, padding: 18, marginBottom: 12, borderRadius: 16,
+              border: `1px solid ${orderType === val ? BK.orange : "rgba(242,236,224,.14)"}`,
+              background: orderType === val ? "rgba(255,90,31,.08)" : BK.charcoal,
+              textAlign: "left", width: "100%",
+            }}
+          >
+            <span style={{ fontSize: 30 }}>{em}</span>
+            <div>
+              <strong style={{ ...BFF, fontSize: 17, color: BK.offwhite }}>{t(lang, k)}</strong>
+              <div style={{ ...BFF, fontSize: 13, color: "rgba(242,236,224,.5)" }}>{t(lang, sub)}</div>
+            </div>
+          </button>
+        ))}
+        <Btn variant="primary" size="lg" style={{ marginTop: 16, background: BK.orange, color: BK.ink }} onClick={onConfirm}>{t(lang, "orderTypeConfirm")}</Btn>
+      </div>
+    </div>
+  );
+}
+
+function BaomaCovers({ lang, setLang, covers, setCovers, onBack, onConfirm, opening }) {
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 24, background: BK.ink }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
+        <button onClick={onBack} style={{ ...BFF, color: "rgba(242,236,224,.6)", fontSize: 14, background: "none", border: "none" }}>← {t(lang, "back")}</button>
+        <LangPicker lang={lang} setLang={setLang} dark />
+      </div>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
+        <BaomaKicker>Sur place</BaomaKicker>
+        <h1 style={{ ...BDISPLAY, fontSize: 28, fontStyle: "italic", textAlign: "center", color: BK.offwhite, marginTop: 10, marginBottom: 6 }}>{t(lang, "coversTitle")}</h1>
+        <p style={{ ...BFF, textAlign: "center", color: "rgba(242,236,224,.55)", marginBottom: 32 }}>{t(lang, "coversSub")}</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+          <button
+            onClick={() => setCovers((c) => Math.max(1, c - 1))}
+            style={{ ...BFF, width: 52, height: 52, borderRadius: 16, border: "1px solid rgba(242,236,224,.14)", background: BK.charcoal, fontSize: 24, fontWeight: 700, color: BK.offwhite }}
+          >−</button>
+          <span style={{ ...BDISPLAY, fontSize: 40, minWidth: 60, textAlign: "center", color: BK.offwhite }}>{covers}</span>
+          <button
+            onClick={() => setCovers((c) => Math.min(30, c + 1))}
+            style={{ ...BFF, width: 52, height: 52, borderRadius: 16, border: "1px solid rgba(242,236,224,.14)", background: BK.charcoal, fontSize: 24, fontWeight: 700, color: BK.offwhite }}
+          >+</button>
+        </div>
+        <Btn variant="primary" size="lg" style={{ marginTop: 40, width: "100%", background: BK.orange, color: BK.ink }} disabled={opening} onClick={onConfirm}>{opening ? "…" : t(lang, "orderTypeConfirm")}</Btn>
       </div>
     </div>
   );
@@ -6129,26 +6216,26 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
   const count = cart.reduce((s, c) => s + (c.qty || 1), 0);
 
   return (
-    <div ref={rootRef} style={{ background: BK.offwhite, minHeight: "100vh", paddingBottom: cart.length ? 92 : 24 }}>
+    <div ref={rootRef} style={{ background: BK.ink, minHeight: "100vh", paddingBottom: cart.length ? 92 : 24 }}>
       {/* En-tête */}
-      <div style={{ background: BK.offwhite, padding: "16px 16px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(10,10,10,.07)" }}>
+      <div style={{ background: BK.ink, padding: "16px 16px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(242,236,224,.08)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <img
             src={bImg("/logo-baoma.png")}
             alt="Baoma"
-            style={{ height: 34, width: "auto", display: "block" }}
+            style={{ height: 34, width: "auto", display: "block", filter: "brightness(0) invert(1)" }}
             onError={(e) => { e.currentTarget.style.display = "none"; }}
           />
           <div>
-            <div style={{ ...BDISPLAY, fontSize: 17, letterSpacing: 0.5, color: BK.ink, lineHeight: 1 }}>{restaurant.name}</div>
-            <div style={{ ...BFF, fontSize: 11, color: "rgba(10,10,10,.55)", marginTop: 2 }}>{tableLabel || `Table ${tableNum}`}</div>
+            <div style={{ ...BDISPLAY, fontSize: 17, letterSpacing: 0.5, color: BK.offwhite, lineHeight: 1 }}>{restaurant.name}</div>
+            <div style={{ ...BFF, fontSize: 11, color: "rgba(242,236,224,.5)", marginTop: 2 }}>{tableLabel || `Table ${tableNum}`}</div>
           </div>
         </div>
-        <LangPicker lang={lang} setLang={setLang} />
+        <LangPicker lang={lang} setLang={setLang} dark />
       </div>
 
       {/* Frise de catégories collante */}
-      <div style={{ position: "sticky", top: 0, zIndex: 20, background: "rgba(245,245,240,.94)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", borderBottom: "1px solid rgba(10,10,10,.06)" }}>
+      <div style={{ position: "sticky", top: 0, zIndex: 20, background: "rgba(10,10,10,.92)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", borderBottom: "1px solid rgba(242,236,224,.07)" }}>
         <div
           ref={stripRef}
           style={{ display: "flex", gap: 8, overflowX: "auto", padding: "10px 16px", scrollbarWidth: "none" }}
@@ -6162,9 +6249,9 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
                 ...BFF, flexShrink: 0, whiteSpace: "nowrap", borderRadius: 999,
                 padding: "7px 15px", fontSize: 11, fontWeight: 800,
                 textTransform: "uppercase", letterSpacing: 0.6,
-                background: activeKey === g.key ? BK.orange : "rgba(10,10,10,.05)",
-                color: activeKey === g.key ? BK.ink : "rgba(10,10,10,.62)",
-                outline: activeKey === g.key ? "none" : "1px solid rgba(10,10,10,.1)",
+                background: activeKey === g.key ? "rgba(255,90,31,.1)" : "rgba(242,236,224,.05)",
+                color: activeKey === g.key ? BK.orange : "rgba(242,236,224,.6)",
+                outline: activeKey === g.key ? "1px solid " + BK.orange : "1px solid rgba(242,236,224,.14)",
                 outlineOffset: -1,
                 transition: "background .3s ease, color .3s ease",
               }}
@@ -6180,8 +6267,8 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
         {groups.map((g) => (
           <section key={g.key} id={`bcat-${g.key}`} style={{ scrollMarginTop: 118, marginTop: 30 }}>
             <div className="baoma-reveal">
-              <h2 style={{ ...BDISPLAY, fontSize: 24, letterSpacing: 0.5, color: BK.ink, lineHeight: 1.05 }}>{g.name}</h2>
-              {g.tagline && <p style={{ ...BFF, fontSize: 12, color: "rgba(10,10,10,.55)", marginTop: 3 }}>{g.tagline}</p>}
+              <h2 style={{ ...BDISPLAY, fontSize: 24, letterSpacing: 0.5, color: BK.offwhite, lineHeight: 1.05 }}>{g.name}</h2>
+              {g.tagline && <p style={{ ...BFF, fontSize: 12, color: "rgba(242,236,224,.5)", marginTop: 3 }}>{g.tagline}</p>}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginTop: 14 }}>
               {g.items.map((it) => (
@@ -6194,7 +6281,7 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
 
       {/* Barre panier */}
       {cart.length > 0 && (
-        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 480, margin: "0 auto", padding: 12, background: "linear-gradient(to top, rgba(245,245,240,.98) 60%, transparent)" }}>
+        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 480, margin: "0 auto", padding: 12, background: "linear-gradient(to top, rgba(10,10,10,.98) 60%, transparent)" }}>
           <button
             onClick={onCart}
             style={{

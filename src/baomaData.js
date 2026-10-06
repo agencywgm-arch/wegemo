@@ -5,10 +5,11 @@
 export const BAOMA_SLUG = "baoma";
 
 // Palette et typo reprises du site vitrine Baoma (src/index.css @theme).
+// ink = fond sombre, charcoal = fond des cartes, offwhite = texte clair.
 export const BAOMA_THEME = {
-  ink: "#0a0a0a", charcoal: "#efe8da", orange: "#ff5a1f",
-  orangeDeep: "#c2410c", offwhite: "#f5f5f0",
-  display: "'Anton', 'Archivo Black', sans-serif",
+  ink: "#0a0a0a", charcoal: "#161310", orange: "#ff5a1f",
+  orangeDeep: "#c2410c", offwhite: "#f2ece0",
+  display: "'Cormorant Garamond', 'Playfair Display', serif",
 };
 
 // Ordre d'affichage + accroche de chaque catégorie (pas de table dédiée :
