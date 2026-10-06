@@ -5900,68 +5900,36 @@ function useBaomaReveal(rootRef, deps = []) {
 }
 
 function BaomaCard({ item, onPick, onZoom }) {
-  const { ref, tilt, on, handlers } = useBaomaTilt(8);
   const [failed, setFailed] = useState(false);
-  const kb = kbTiming(item.id || item.name);
+  const [hover, setHover] = useState(false);
   const out = item.stock != null && Number(item.stock) <= 0;
   const photo = bImg(item.photo_url);
 
   return (
     <div
-      ref={ref}
-      {...handlers}
-      onClick={() => !out && onPick(item)}
       className="baoma-reveal"
-      style={{
-        position: "relative", overflow: "hidden", borderRadius: 16,
-        background: BK.charcoal, cursor: out ? "default" : "pointer",
-        opacity: out ? 0.45 : 1,
-        transformStyle: "preserve-3d", perspective: 900,
-        transform: `perspective(900px) rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg) translateY(${on ? -8 : 0}px)`,
-        boxShadow: on ? "0 0 40px -5px rgba(255,90,31,0.35)" : "none",
-        outline: `1px solid ${on ? "rgba(255,90,31,0.6)" : "rgba(242,236,224,0.1)"}`,
-        outlineOffset: -1,
-        transition: "transform .35s cubic-bezier(.16,1,.3,1), box-shadow .3s ease, outline-color .3s ease",
-      }}
+      onClick={() => !out && onPick(item)}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ cursor: out ? "default" : "pointer", opacity: out ? 0.45 : 1 }}
     >
-      <div style={{ position: "relative", aspectRatio: "1 / 1", overflow: "hidden" }}>
+      <div style={{ position: "relative", aspectRatio: "3 / 2", overflow: "hidden", borderRadius: 10 }}>
         {photo && !failed ? (
-          <div
+          <img
+            src={photo}
+            alt={item.name}
+            loading="lazy"
+            onError={() => setFailed(true)}
             style={{
-              position: "absolute", inset: 0,
-              transform: `translate(${tilt.px * -4}%, ${tilt.py * -4}%)`,
-              transition: "transform .4s cubic-bezier(.16,1,.3,1)",
+              width: "100%", height: "100%", objectFit: "cover", display: "block",
+              transform: hover ? "scale(1.04)" : "scale(1)", transition: "transform .6s ease-out",
             }}
-          >
-            <img
-              src={photo}
-              alt={item.name}
-              loading="lazy"
-              onError={() => setFailed(true)}
-              className={`baoma-kb${on ? " baoma-kb-paused" : ""}`}
-              style={{
-                width: "100%", height: "100%", objectFit: "cover", display: "block",
-                animationName: `baoma-kb-${kb.dir}`,
-                animationDelay: `${kb.delay}s`,
-                animationDuration: `${kb.duration}s`,
-              }}
-            />
-          </div>
+          />
         ) : (
           <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", fontSize: 40, background: `linear-gradient(135deg, ${BK.charcoal}, rgba(255,90,31,0.18))` }}>
             {item.emoji || "🍽️"}
           </div>
         )}
-
-        {/* balayage lumineux au survol / à l'appui */}
-        <div
-          style={{
-            position: "absolute", inset: 0, pointerEvents: "none",
-            transform: `skewX(-12deg) translateX(${on ? 130 : -130}%)`,
-            background: "linear-gradient(90deg, transparent, rgba(245,245,240,0.4), transparent)",
-            transition: "transform .7s ease-out",
-          }}
-        />
 
         {item.is_popular && (
           <span style={{ ...BFF, position: "absolute", top: 8, left: 8, background: BK.orange, color: BK.ink, fontSize: 10, fontWeight: 800, padding: "3px 8px", borderRadius: 999, letterSpacing: 0.4 }}>
@@ -6004,17 +5972,14 @@ function BaomaCard({ item, onPick, onZoom }) {
         </span>
       </div>
 
-      <div style={{ padding: "10px 12px 12px" }}>
-        <h3 style={{ ...BDISPLAY, fontSize: 13, lineHeight: 1.15, letterSpacing: 0.3, color: BK.offwhite }}>{item.name}</h3>
-        {item.description && (
-          <p style={{ ...BFF, fontSize: 11, lineHeight: 1.3, color: "rgba(242,236,224,.55)", marginTop: 3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-            {item.description}
-          </p>
-        )}
-        <strong style={{ ...BFF, display: "block", marginTop: 5, fontSize: 13, fontWeight: 800, color: on ? BK.orange : BK.offwhite, transition: "color .3s ease" }}>
-          {eur(item.price)}
-        </strong>
+      <div style={{ marginTop: 14, display: "flex", alignItems: "baseline", gap: 10 }}>
+        <h3 style={{ ...BDISPLAY, fontSize: 15, letterSpacing: 0.4, color: BK.offwhite, flexShrink: 0 }}>{item.name}</h3>
+        <span style={{ flex: 1, borderBottom: "1px dotted rgba(242,236,224,.25)", transform: "translateY(-3px)" }} />
+        <strong style={{ ...BFF, fontSize: 15, fontWeight: 700, color: BK.offwhite, flexShrink: 0 }}>{eur(item.price)}</strong>
       </div>
+      {item.description && (
+        <p style={{ ...BFF, fontSize: 12.5, lineHeight: 1.45, color: "rgba(242,236,224,.5)", marginTop: 6 }}>{item.description}</p>
+      )}
     </div>
   );
 }
@@ -6270,7 +6235,7 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
               <h2 style={{ ...BDISPLAY, fontSize: 24, letterSpacing: 0.5, color: BK.offwhite, lineHeight: 1.05 }}>{g.name}</h2>
               {g.tagline && <p style={{ ...BFF, fontSize: 12, color: "rgba(242,236,224,.5)", marginTop: 3 }}>{g.tagline}</p>}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginTop: 14 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 34, marginTop: 18 }}>
               {g.items.map((it) => (
                 <BaomaCard key={it.id} item={it} onPick={pick} onZoom={setZoomItem} />
               ))}
