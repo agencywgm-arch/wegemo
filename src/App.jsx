@@ -5885,7 +5885,7 @@ function useBaomaReveal(rootRef, deps = []) {
   }, deps);
 }
 
-function BaomaCard({ item, onPick }) {
+function BaomaCard({ item, onPick, onZoom }) {
   const { ref, tilt, on, handlers } = useBaomaTilt(8);
   const [failed, setFailed] = useState(false);
   const kb = kbTiming(item.id || item.name);
@@ -5955,6 +5955,26 @@ function BaomaCard({ item, onPick }) {
           </span>
         )}
 
+        {/* loupe : agrandit la photo sans déclencher l'ajout au panier */}
+        {photo && !failed && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onZoom(item); }}
+            aria-label={`Agrandir la photo de ${item.name}`}
+            style={{
+              position: "absolute", top: 8, right: 8, width: 30, height: 30,
+              borderRadius: 10, border: "none", background: "rgba(10,10,10,.45)",
+              backdropFilter: "blur(4px)", color: "#fff", display: "grid", placeItems: "center",
+              cursor: "zoom-in",
+            }}
+          >
+            <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}>
+              <circle cx="11" cy="11" r="7" />
+              <path strokeLinecap="round" d="M21 21l-4.35-4.35M11 8v6M8 11h6" />
+            </svg>
+          </button>
+        )}
+
         {/* bouton d'ajout, repris de la maquette client */}
         <span
           aria-hidden
@@ -5985,10 +6005,70 @@ function BaomaCard({ item, onPick }) {
   );
 }
 
+function BaomaPhotoZoom({ item, onClose }) {
+  useEffect(() => {
+    if (!item) return;
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
+  }, [item, onClose]);
+
+  if (!item) return null;
+  const photo = bImg(item.photo_url);
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 1000, display: "flex",
+        alignItems: "center", justifyContent: "center", padding: 16,
+        background: "rgba(10,10,10,.85)", backdropFilter: "blur(4px)", animation: "fadein .2s",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: "relative", width: "100%", maxWidth: 420, maxHeight: "90vh",
+          overflow: "hidden", borderRadius: 18, background: BK.offwhite, animation: "slideup .25s ease",
+        }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fermer"
+          style={{
+            position: "absolute", top: 10, right: 10, zIndex: 1, width: 36, height: 36,
+            borderRadius: 999, border: "none", background: "rgba(10,10,10,.55)", color: "#fff",
+            display: "grid", placeItems: "center",
+          }}
+        >
+          <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+        {photo && (
+          <img src={photo} alt={item.name} style={{ width: "100%", maxHeight: "60vh", objectFit: "contain", display: "block", background: BK.ink }} />
+        )}
+        <div style={{ padding: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+            <h3 style={{ ...BDISPLAY, fontSize: 18, letterSpacing: 0.4, color: BK.ink }}>{item.name}</h3>
+            <strong style={{ ...BFF, fontSize: 18, fontWeight: 800, color: BK.orange, flexShrink: 0 }}>{eur(item.price)}</strong>
+          </div>
+          {item.description && (
+            <p style={{ ...BFF, fontSize: 13, lineHeight: 1.4, color: "rgba(10,10,10,.65)", marginTop: 8 }}>{item.description}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, onCart, tableLabel, tableNum }) {
   const rootRef = useRef(null);
   const stripRef = useRef(null);
   const [active, setActive] = useState(null);
+  const [zoomItem, setZoomItem] = useState(null);
 
   // Catégories dans l'ordre Baoma, limitées à celles qui ont des plats.
   const known = BAOMA_CATEGORIES.filter((c) => menu.some((m) => m.category === c.name));
@@ -6105,7 +6185,7 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginTop: 14 }}>
               {g.items.map((it) => (
-                <BaomaCard key={it.id} item={it} onPick={pick} />
+                <BaomaCard key={it.id} item={it} onPick={pick} onZoom={setZoomItem} />
               ))}
             </div>
           </section>
@@ -6129,6 +6209,8 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
           </button>
         </div>
       )}
+
+      <BaomaPhotoZoom item={zoomItem} onClose={() => setZoomItem(null)} />
     </div>
   );
 }
