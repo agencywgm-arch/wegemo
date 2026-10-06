@@ -5913,7 +5913,7 @@ function BaomaCard({ item, onPick, onZoom }) {
       onMouseLeave={() => setHover(false)}
       style={{ cursor: out ? "default" : "pointer", opacity: out ? 0.45 : 1 }}
     >
-      <div style={{ position: "relative", aspectRatio: "3 / 2", overflow: "hidden", borderRadius: 10 }}>
+      <div style={{ position: "relative", aspectRatio: "1 / 1", overflow: "hidden", borderRadius: 10 }}>
         {photo && !failed ? (
           <img
             src={photo}
