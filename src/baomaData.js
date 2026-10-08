@@ -15,6 +15,7 @@ export const BAOMA_THEME = {
 // Ordre d'affichage + accroche de chaque catégorie (pas de table dédiée :
 // la colonne menu_items.category reste un texte plat côté base).
 export const BAOMA_CATEGORIES = [
+  { name: "Formules", tagline: "Menu Midi & Menu Enfant" },
   { name: "Bao Créations", tagline: "Tous nos burgers sont servis avec frites" },
   { name: "Smash Bao", tagline: "Tous nos burgers sont servis avec frites" },
   { name: "Smash Burger", tagline: "Tous nos burgers sont servis avec frites" },
@@ -25,7 +26,6 @@ export const BAOMA_CATEGORIES = [
   { name: "Sides", tagline: "Suppléments & accompagnements" },
   { name: "Desserts", tagline: "Pour finir en douceur" },
   { name: "Mojitos & Boissons", tagline: "Faits minute, sans alcool" },
-  { name: "Formules", tagline: "Menu Midi & Menu Enfant" },
 ];
 
 export const BAOMA_MENU = [

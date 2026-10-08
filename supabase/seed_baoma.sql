@@ -32,7 +32,7 @@ begin
 
   -- Réglages : palette Baoma côté reçus/branding
   insert into restaurant_settings (restaurant_id, category_order)
-  values (v_rest, '["Bao Créations","Smash Bao","Asian Fusion","Starters","Starters Signatures","Wings","Sides","Desserts","Mojitos & Boissons","Formules"]'::jsonb)
+  values (v_rest, '["Formules","Bao Créations","Smash Bao","Asian Fusion","Starters","Starters Signatures","Wings","Sides","Desserts","Mojitos & Boissons"]'::jsonb)
   on conflict (restaurant_id) do update set category_order = excluded.category_order;
 
   -- Carte
