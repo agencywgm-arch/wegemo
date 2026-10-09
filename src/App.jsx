@@ -5828,53 +5828,10 @@ function CustomerMenu({ restaurant, menu, settings, lang, setLang, cart, onCompo
 const BK = BAOMA_THEME;
 const BFF = { fontFamily: "'Figtree', -apple-system, BlinkMacSystemFont, sans-serif" };
 const BDISPLAY = { fontFamily: BK.display, fontWeight: 400, textTransform: "uppercase" };
-const KB_DIRS = ["tl", "tr", "bl", "br"];
 
 // Le chemin des photos est relatif à la racine servie : on préfixe par la
 // base Vite pour rester correct sous un sous-chemin (GitHub Pages).
 const bImg = (u) => (u && u.startsWith("/") ? `${(import.meta.env.BASE_URL || "/").replace(/\/+$/, "")}${u}` : u);
-
-// Décale la dérive de chaque photo à partir de son nom, pour éviter que
-// toutes les cartes respirent exactement en même temps.
-function kbTiming(seed) {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 997;
-  return { delay: -((h % 9) * 0.9), duration: 8 + (h % 5), dir: KB_DIRS[h % 4] };
-}
-
-// Tilt 3D piloté au pointeur, unifié souris + tactile : l'appui incline la
-// carte depuis le point touché, le relâchement la laisse revenir après un
-// court délai (sinon l'effet serait invisible sur mobile).
-function useBaomaTilt(strength = 8) {
-  const ref = useRef(null);
-  const [tilt, setTilt] = useState({ rx: 0, ry: 0, px: 0, py: 0 });
-  const [on, setOn] = useState(false);
-  const timer = useRef(undefined);
-
-  useEffect(() => () => clearTimeout(timer.current), []);
-
-  const from = (clientX, clientY) => {
-    const el = ref.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const px = (clientX - r.left) / r.width - 0.5;
-    const py = (clientY - r.top) / r.height - 0.5;
-    setTilt({ rx: -py * strength, ry: px * strength, px, py });
-    setOn(true);
-  };
-  const release = () => { setTilt({ rx: 0, ry: 0, px: 0, py: 0 }); setOn(false); };
-
-  return {
-    ref, tilt, on,
-    handlers: {
-      onPointerMove: (e) => { clearTimeout(timer.current); from(e.clientX, e.clientY); },
-      onPointerDown: (e) => { clearTimeout(timer.current); from(e.clientX, e.clientY); },
-      onPointerLeave: (e) => { if (e.pointerType !== "mouse") return; clearTimeout(timer.current); release(); },
-      onPointerUp: (e) => { if (e.pointerType === "mouse") return; clearTimeout(timer.current); timer.current = setTimeout(release, 600); },
-      onPointerCancel: () => { clearTimeout(timer.current); release(); },
-    },
-  };
-}
 
 // Révèle les éléments .baoma-reveal à leur entrée dans le viewport.
 function useBaomaReveal(rootRef, deps = []) {
@@ -5899,69 +5856,52 @@ function useBaomaReveal(rootRef, deps = []) {
   }, deps);
 }
 
+// Carte au format liste — même habillage que la page vitrine (photo carrée,
+// ligne pointillée nom/prix, description en dessous) mais interagissable :
+// toute la carte ajoute au panier (ou ouvre la composition), la loupe sur la
+// photo zoome sans déclencher l'ajout.
 function BaomaCard({ item, onPick, onZoom }) {
-  const { ref, tilt, on, handlers } = useBaomaTilt(8);
   const [failed, setFailed] = useState(false);
-  const kb = kbTiming(item.id || item.name);
+  const [hover, setHover] = useState(false);
   const out = item.stock != null && Number(item.stock) <= 0;
   const photo = bImg(item.photo_url);
 
   return (
-    <div
-      ref={ref}
-      {...handlers}
-      onClick={() => !out && onPick(item)}
-      className="baoma-reveal"
-      style={{
-        position: "relative", overflow: "hidden", borderRadius: 16,
-        background: BK.charcoal, cursor: out ? "default" : "pointer",
-        opacity: out ? 0.45 : 1,
-        transformStyle: "preserve-3d", perspective: 900,
-        transform: `perspective(900px) rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg) translateY(${on ? -8 : 0}px)`,
-        boxShadow: on ? "0 0 40px -5px rgba(255,90,31,0.35)" : "none",
-        outline: `1px solid ${on ? "rgba(255,90,31,0.6)" : "rgba(242,236,224,0.1)"}`,
-        outlineOffset: -1,
-        transition: "transform .35s cubic-bezier(.16,1,.3,1), box-shadow .3s ease, outline-color .3s ease",
-      }}
-    >
-      <div style={{ position: "relative", aspectRatio: "1 / 1", overflow: "hidden" }}>
+    <div className="baoma-reveal">
+      <div style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => !out && onPick(item)}
+        onPointerEnter={() => setHover(true)}
+        onPointerLeave={() => setHover(false)}
+        disabled={out}
+        aria-label={out ? `${item.name} — épuisé` : `Ajouter ${item.name} au panier`}
+        style={{
+          position: "relative", display: "block", width: "100%", aspectRatio: "1 / 1",
+          overflow: "hidden", borderRadius: 10, border: "none", padding: 0,
+          cursor: out ? "default" : "pointer", opacity: out ? 0.45 : 1,
+          textAlign: "left", background: BK.charcoal,
+        }}
+      >
         {photo && !failed ? (
-          <div
+          <img
+            src={photo}
+            alt={item.name}
+            loading="lazy"
+            onError={() => setFailed(true)}
             style={{
-              position: "absolute", inset: 0,
-              transform: `translate(${tilt.px * -4}%, ${tilt.py * -4}%)`,
-              transition: "transform .4s cubic-bezier(.16,1,.3,1)",
+              width: "100%", height: "100%", objectFit: "cover", display: "block",
+              transform: hover ? "scale(1.04)" : "scale(1)",
+              transition: "transform .7s ease-out",
             }}
-          >
-            <img
-              src={photo}
-              alt={item.name}
-              loading="lazy"
-              onError={() => setFailed(true)}
-              className={`baoma-kb${on ? " baoma-kb-paused" : ""}`}
-              style={{
-                width: "100%", height: "100%", objectFit: "cover", display: "block",
-                animationName: `baoma-kb-${kb.dir}`,
-                animationDelay: `${kb.delay}s`,
-                animationDuration: `${kb.duration}s`,
-              }}
-            />
-          </div>
+          />
         ) : (
           <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", fontSize: 40, background: `linear-gradient(135deg, ${BK.charcoal}, rgba(255,90,31,0.18))` }}>
             {item.emoji || "🍽️"}
           </div>
         )}
 
-        {/* balayage lumineux au survol / à l'appui */}
-        <div
-          style={{
-            position: "absolute", inset: 0, pointerEvents: "none",
-            transform: `skewX(-12deg) translateX(${on ? 130 : -130}%)`,
-            background: "linear-gradient(90deg, transparent, rgba(245,245,240,0.4), transparent)",
-            transition: "transform .7s ease-out",
-          }}
-        />
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "linear-gradient(to top, rgba(10,10,10,.35), transparent 60%)" }} />
 
         {item.is_popular && (
           <span style={{ ...BFF, position: "absolute", top: 8, left: 8, background: BK.orange, color: BK.ink, fontSize: 10, fontWeight: 800, padding: "3px 8px", borderRadius: 999, letterSpacing: 0.4 }}>
@@ -5969,51 +5909,61 @@ function BaomaCard({ item, onPick, onZoom }) {
           </span>
         )}
 
-        {/* loupe : agrandit la photo sans déclencher l'ajout au panier */}
-        {photo && !failed && (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onZoom(item); }}
-            aria-label={`Agrandir la photo de ${item.name}`}
-            style={{
-              position: "absolute", top: 8, right: 8, width: 30, height: 30,
-              borderRadius: 10, border: "none", background: "rgba(10,10,10,.45)",
-              backdropFilter: "blur(4px)", color: "#fff", display: "grid", placeItems: "center",
-              cursor: "zoom-in",
-            }}
-          >
-            <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}>
-              <circle cx="11" cy="11" r="7" />
-              <path strokeLinecap="round" d="M21 21l-4.35-4.35M11 8v6M8 11h6" />
-            </svg>
-          </button>
+        {out && (
+          <span style={{ ...BFF, position: "absolute", bottom: 8, left: 8, background: "rgba(10,10,10,.7)", color: BK.offwhite, fontSize: 10, fontWeight: 800, padding: "3px 8px", borderRadius: 999, letterSpacing: 0.4 }}>
+            ÉPUISÉ
+          </span>
         )}
 
-        {/* bouton d'ajout, repris de la maquette client */}
-        <span
-          aria-hidden
+        {!out && (
+          <span
+            aria-hidden
+            style={{
+              position: "absolute", right: 8, bottom: 8, width: 32, height: 32,
+              borderRadius: 999, background: BK.orange, color: BK.ink,
+              display: "grid", placeItems: "center", fontSize: 18, fontWeight: 800, lineHeight: 1,
+              boxShadow: "0 2px 10px rgba(0,0,0,.25)",
+            }}
+          >
+            +
+          </span>
+        )}
+      </button>
+
+      {/* loupe : agrandit la photo sans déclencher l'ajout au panier */}
+      {photo && !failed && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onZoom(item); }}
+          aria-label={`Agrandir la photo de ${item.name}`}
           style={{
-            position: "absolute", right: 8, bottom: 8, width: 34, height: 34,
-            borderRadius: 12, background: out ? "rgba(10,10,10,.35)" : BK.orange,
-            color: "#fff", display: "grid", placeItems: "center",
-            fontSize: 20, fontWeight: 700, lineHeight: 1,
-            boxShadow: "0 2px 10px rgba(0,0,0,.2)",
+            position: "absolute", top: 8, right: 8, zIndex: 1,
+            width: 30, height: 30, borderRadius: 10, border: "none",
+            background: "rgba(10,10,10,.45)", backdropFilter: "blur(4px)",
+            color: "#fff", display: "grid", placeItems: "center", cursor: "zoom-in",
           }}
         >
-          {out ? "–" : "+"}
-        </span>
+          <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}>
+            <circle cx="11" cy="11" r="7" />
+            <path strokeLinecap="round" d="M21 21l-4.35-4.35M11 8v6M8 11h6" />
+          </svg>
+        </button>
+      )}
       </div>
 
-      <div style={{ padding: "10px 12px 12px" }}>
-        <h3 style={{ ...BDISPLAY, fontSize: 13, lineHeight: 1.15, letterSpacing: 0.3, color: BK.offwhite }}>{item.name}</h3>
+      <div style={{ marginTop: 14 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+          <h3 style={{ ...BDISPLAY, fontSize: 16, lineHeight: 1.15, letterSpacing: 0.4, color: BK.offwhite, flexShrink: 0 }}>
+            {item.name}
+          </h3>
+          <span aria-hidden style={{ flex: 1, minWidth: 12, marginTop: 2, borderBottom: "1px dotted rgba(242,236,224,.25)" }} />
+          <strong style={{ ...BDISPLAY, fontSize: 16, color: BK.offwhite, flexShrink: 0 }}>{eur(item.price)}</strong>
+        </div>
         {item.description && (
-          <p style={{ ...BFF, fontSize: 11, lineHeight: 1.3, color: "rgba(242,236,224,.55)", marginTop: 3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          <p style={{ ...BFF, fontSize: 12.5, lineHeight: 1.45, color: "rgba(242,236,224,.5)", marginTop: 6 }}>
             {item.description}
           </p>
         )}
-        <strong style={{ ...BFF, display: "block", marginTop: 5, fontSize: 13, fontWeight: 800, color: on ? BK.orange : BK.offwhite, transition: "color .3s ease" }}>
-          {eur(item.price)}
-        </strong>
       </div>
     </div>
   );
@@ -6270,7 +6220,7 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
               <h2 style={{ ...BDISPLAY, fontSize: 24, letterSpacing: 0.5, color: BK.offwhite, lineHeight: 1.05 }}>{g.name}</h2>
               {g.tagline && <p style={{ ...BFF, fontSize: 12, color: "rgba(242,236,224,.5)", marginTop: 3 }}>{g.tagline}</p>}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginTop: 14 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 36, marginTop: 20, maxWidth: 460, marginLeft: "auto", marginRight: "auto" }}>
               {g.items.map((it) => (
                 <BaomaCard key={it.id} item={it} onPick={pick} onZoom={setZoomItem} />
               ))}
