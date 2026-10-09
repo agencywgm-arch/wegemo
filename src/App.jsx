@@ -5626,9 +5626,14 @@ function CustomerPage({ slug, tableNum }) {
   if (step === "error") return <CenterMsg emoji="🤷" text="Restaurant introuvable." />;
 
   const dir = lang === "ar" ? "rtl" : "ltr";
+  // Le fond noir Baoma ne s'applique qu'aux étapes réellement redesignées
+  // (type de commande, couverts, carte) : panier/profil/paiement restent en
+  // thème clair générique, sinon leur texte sombre devient illisible sur
+  // fond noir (ils n'ont pas leur propre habillage sombre).
+  const baomaDarkStep = BAOMA_THEME_SLUGS.includes(restaurant.slug) && ["ordertype", "covers", "menu"].includes(step);
 
   return (
-    <div dir={dir} style={{ minHeight: "100vh", background: BAOMA_THEME_SLUGS.includes(restaurant.slug) ? BAOMA_THEME.ink : C.bg, maxWidth: 480, margin: "0 auto", position: "relative" }}>
+    <div dir={dir} style={{ minHeight: "100vh", background: baomaDarkStep ? BAOMA_THEME.ink : C.bg, maxWidth: 480, margin: "0 auto", position: "relative" }}>
       {step === "ordertype" && (
         BAOMA_THEME_SLUGS.includes(restaurant.slug) ? (
           <BaomaOrderType
