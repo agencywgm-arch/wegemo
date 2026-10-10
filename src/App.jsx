@@ -41,6 +41,7 @@ const CUSTOMER_LANGS = [
 const CT = {
   fr: {
     orderTypeTitle: "Comment souhaitez-vous commander ?", orderTypeConfirm: "Continuer",
+    coversTitle: "Combien de couverts ?", coversSub: "Nombre de personnes pour cette commande",
     dineIn: "Sur place", dineInSub: "Je mange au restaurant",
     takeaway: "À emporter", takeawaySub: "Je récupère ma commande",
     all: "Tous", back: "Retour", search: "Rechercher un plat…",
@@ -51,9 +52,15 @@ const CT = {
     orderConfirmed: "Commande confirmée !", orderTracking: "Suivi de commande",
     rateOrder: "Notez votre expérience", leaveGoogleReview: "Laisser un avis Google",
     popular: "Populaire", supplements: "Suppléments", extras: "Garnitures", askAI: "Poser une question",
+    payOnline: "Payer en ligne", paymentPending: "Paiement en cours…",
+    paymentConfirmedTitle: "✓ Paiement confirmé", paymentConfirmedOrder: "Commande",
+    paymentConfirmedThanks: "Merci pour votre commande.",
+    paymentFailedTitle: "Paiement non effectué.", paymentFailedSub: "Votre commande n'a pas été débitée.",
+    retryPayment: "Réessayer",
   },
   en: {
     orderTypeTitle: "How would you like to order?", orderTypeConfirm: "Continue",
+    coversTitle: "How many guests?", coversSub: "Number of people for this order",
     dineIn: "Dine in", dineInSub: "I'm eating at the restaurant",
     takeaway: "Takeaway", takeawaySub: "I'm picking up my order",
     all: "All", back: "Back", search: "Search a dish…",
@@ -64,9 +71,15 @@ const CT = {
     orderConfirmed: "Order confirmed!", orderTracking: "Order tracking",
     rateOrder: "Rate your experience", leaveGoogleReview: "Leave a Google review",
     popular: "Popular", supplements: "Add-ons", extras: "Sides", askAI: "Ask a question",
+    payOnline: "Pay online", paymentPending: "Payment in progress…",
+    paymentConfirmedTitle: "✓ Payment confirmed", paymentConfirmedOrder: "Order",
+    paymentConfirmedThanks: "Thank you for your order.",
+    paymentFailedTitle: "Payment not completed.", paymentFailedSub: "Your order has not been charged.",
+    retryPayment: "Try again",
   },
   ar: {
     orderTypeTitle: "كيف ترغب في الطلب؟", orderTypeConfirm: "متابعة",
+    coversTitle: "كم عدد الأشخاص؟", coversSub: "عدد الأشخاص لهذا الطلب",
     dineIn: "في المطعم", dineInSub: "سآكل في المطعم",
     takeaway: "للأخذ", takeawaySub: "سأستلم طلبي",
     all: "الكل", back: "رجوع", search: "ابحث عن طبق…",
@@ -77,9 +90,15 @@ const CT = {
     orderConfirmed: "تم تأكيد الطلب!", orderTracking: "تتبع الطلب",
     rateOrder: "قيّم تجربتك", leaveGoogleReview: "اترك تقييماً على جوجل",
     popular: "شائع", supplements: "إضافات", extras: "أطباق جانبية", askAI: "اطرح سؤالاً",
+    payOnline: "الدفع عبر الإنترنت", paymentPending: "جارٍ الدفع…",
+    paymentConfirmedTitle: "✓ تم تأكيد الدفع", paymentConfirmedOrder: "الطلب",
+    paymentConfirmedThanks: "شكراً لطلبك.",
+    paymentFailedTitle: "لم يتم الدفع.", paymentFailedSub: "لم يتم خصم أي مبلغ من طلبك.",
+    retryPayment: "إعادة المحاولة",
   },
   es: {
     orderTypeTitle: "¿Cómo desea pedir?", orderTypeConfirm: "Continuar",
+    coversTitle: "¿Cuántos comensales?", coversSub: "Número de personas para este pedido",
     dineIn: "En el local", dineInSub: "Como en el restaurante",
     takeaway: "Para llevar", takeawaySub: "Recojo mi pedido",
     all: "Todos", back: "Volver", search: "Buscar un plato…",
@@ -90,9 +109,15 @@ const CT = {
     orderConfirmed: "¡Pedido confirmado!", orderTracking: "Seguimiento del pedido",
     rateOrder: "Califica tu experiencia", leaveGoogleReview: "Dejar una reseña en Google",
     popular: "Popular", supplements: "Extras", extras: "Guarniciones", askAI: "Hacer una pregunta",
+    payOnline: "Pagar en línea", paymentPending: "Pago en curso…",
+    paymentConfirmedTitle: "✓ Pago confirmado", paymentConfirmedOrder: "Pedido",
+    paymentConfirmedThanks: "Gracias por su pedido.",
+    paymentFailedTitle: "Pago no realizado.", paymentFailedSub: "No se ha realizado ningún cargo.",
+    retryPayment: "Reintentar",
   },
   pt: {
     orderTypeTitle: "Como deseja pedir?", orderTypeConfirm: "Continuar",
+    coversTitle: "Quantos talheres?", coversSub: "Número de pessoas para este pedido",
     dineIn: "No local", dineInSub: "Vou comer no restaurante",
     takeaway: "Para levar", takeawaySub: "Vou buscar o meu pedido",
     all: "Todos", back: "Voltar", search: "Procurar um prato…",
@@ -103,6 +128,11 @@ const CT = {
     orderConfirmed: "Pedido confirmado!", orderTracking: "Acompanhamento do pedido",
     rateOrder: "Avalie a sua experiência", leaveGoogleReview: "Deixar uma avaliação Google",
     popular: "Popular", supplements: "Adicionais", extras: "Acompanhamentos", askAI: "Fazer uma pergunta",
+    payOnline: "Pagar online", paymentPending: "Pagamento em curso…",
+    paymentConfirmedTitle: "✓ Pagamento confirmado", paymentConfirmedOrder: "Pedido",
+    paymentConfirmedThanks: "Obrigado pelo seu pedido.",
+    paymentFailedTitle: "Pagamento não efetuado.", paymentFailedSub: "O seu pedido não foi debitado.",
+    retryPayment: "Tentar novamente",
   },
 };
 const t = (lang, key) => (CT[lang] && CT[lang][key]) || CT.fr[key] || key;
@@ -417,6 +447,7 @@ function useStore(restaurantId) {
   const [promos, setPromos] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   // `reload()` est aussi appelé en tâche de fond (nouvelle commande via le
   // realtime, encaissement au comptoir, changement de statut...) — pas
@@ -447,7 +478,7 @@ function useStore(restaurantId) {
       return;
     }
     if (!loadedOnce.current) setLoading(true);
-    const [m, o, tb, ing, pr, cu, rv] = await Promise.all([
+    const [m, o, tb, ing, pr, cu, rv, ts] = await Promise.all([
       supabase.from("menu_items").select("*").eq("restaurant_id", restaurantId).order("sort_order", { ascending: true }),
       supabase.from("orders").select("*, table:tables(number, label), order_items(quantity, detail, menu_items(name, emoji, price))").eq("restaurant_id", restaurantId).order("created_at", { ascending: false }).limit(200),
       supabase.from("tables").select("*").eq("restaurant_id", restaurantId).order("number"),
@@ -455,6 +486,7 @@ function useStore(restaurantId) {
       supabase.from("promotions").select("*").eq("restaurant_id", restaurantId),
       supabase.from("customers").select("*").eq("restaurant_id", restaurantId),
       supabase.from("reviews").select("*").eq("restaurant_id", restaurantId).order("created_at", { ascending: false }),
+      supabase.from("table_sessions").select("*, table:tables(number, label)").eq("restaurant_id", restaurantId).eq("status", "open").order("opened_at", { ascending: true }),
     ]);
     // order_items est jointe pour reconstituer `items` (nom, emoji, prix) tel
     // qu'attendu par la vue Cuisine, la liste Commandes et le ticket imprimé.
@@ -476,6 +508,7 @@ function useStore(restaurantId) {
     setPromos(pr.data || []);
     setCustomers(cu.data || []);
     setReviews(rv.data || []);
+    setSessions(ts.data || []);
     setLoading(false);
     loadedOnce.current = true;
   }, [restaurantId, demoMode]);
@@ -486,12 +519,13 @@ function useStore(restaurantId) {
     const channel = supabase
       .channel(`orders-${restaurantId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `restaurant_id=eq.${restaurantId}` }, () => reload())
+      .on("postgres_changes", { event: "*", schema: "public", table: "table_sessions", filter: `restaurant_id=eq.${restaurantId}` }, () => reload())
       .subscribe();
     return () => supabase.removeChannel(channel);
   }, [reload, restaurantId, demoMode]);
 
   return {
-    demoMode, loading, menu, orders, doneOrders, tables, ingredients, promos, customers, reviews,
+    demoMode, loading, menu, orders, doneOrders, tables, ingredients, promos, customers, reviews, sessions,
     setMenu, setOrders, setIngredients, setPromos, reload,
   };
 }
@@ -1471,6 +1505,73 @@ const STATUS_META = {
   DONE: { label: "Terminée", color: C.textTertiary },
 };
 
+// Une session groupe les scans successifs du QR d'une même table tant
+// qu'elle n'a pas été explicitement fermée par le staff — voir
+// get_or_open_table_session (migration_table_sessions.sql). Ce panneau lui
+// donne une existence visible côté staff : qui est à quelle table, combien
+// de commandes sont déjà rattachées, depuis combien de temps.
+function TableSessionsPanel({ store }) {
+  const toast = useToast();
+  const sessions = store.sessions || [];
+  if (!sessions.length) return null;
+
+  const allOrders = [...store.orders, ...store.doneOrders];
+
+  const close = async (session) => {
+    if (!window.confirm(`Fermer la session de la table ${session.table?.number ?? "?"} ?`)) return;
+    if (!store.demoMode && hasSupabase) {
+      const { error } = await supabase.rpc("close_table_session", { p_session_id: session.id });
+      if (error) return toast(error.message || "Échec de la fermeture", "error");
+      store.reload();
+    }
+    toast("Session fermée", "success");
+  };
+
+  // Filet de sécurité manuel : l'envoi automatique se déclenche quand le
+  // nombre de commandes atteint le nombre de couverts déclarés — un
+  // déclencheur imparfait (une personne peut commander pour deux, ou ne
+  // rien commander) donc toujours disponible tant que la session n'a pas
+  // déjà été envoyée.
+  const sendToKitchen = async (session) => {
+    if (!store.demoMode && hasSupabase) {
+      const { error } = await supabase.rpc("send_session_to_kitchen", { p_session_id: session.id });
+      if (error) return toast(error.message || "Échec de l'envoi", "error");
+      store.reload();
+    }
+    toast("Session envoyée en cuisine", "success");
+  };
+
+  return (
+    <Surface style={{ padding: 16, marginBottom: 18 }}>
+      <strong style={{ ...FF, fontSize: 15 }}>🪑 Sessions de table en cours</strong>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+        {sessions.map((s) => {
+          const linked = allOrders.filter((o) => o.session_id === s.id);
+          const total = linked.reduce((sum, o) => sum + Number(o.total || 0), 0);
+          const mins = Math.max(0, Math.round((Date.now() - new Date(s.opened_at).getTime()) / 60000));
+          const sent = !!s.kitchen_sent_at;
+          return (
+            <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: C.surfaceAlt, borderRadius: 12 }}>
+              <strong style={{ ...FF, fontSize: 14 }}>Table {s.table?.number ?? "?"}</strong>
+              <Tag color={C.accentOrange}>👥 {s.covers}</Tag>
+              <span style={{ ...FF, fontSize: 13, color: C.textSecondary }}>
+                {linked.length}/{s.covers} commande{linked.length > 1 ? "s" : ""} · {eur(total)}
+              </span>
+              <span style={{ ...FF, fontSize: 12, color: C.textTertiary }}>ouverte depuis {mins} min</span>
+              {sent ? (
+                <Tag color={C.accentGreen}>🍳 Envoyée en cuisine</Tag>
+              ) : (
+                <Btn variant="blue" size="sm" onClick={() => sendToKitchen(s)}>🍳 Envoyer en cuisine</Btn>
+              )}
+              <Btn variant="subtle" size="sm" style={{ marginLeft: "auto" }} onClick={() => close(s)}>Fermer la session</Btn>
+            </div>
+          );
+        })}
+      </div>
+    </Surface>
+  );
+}
+
 function OrdersTab({ restaurant, store }) {
   const toast = useToast();
   const [filter, setFilter] = useState("ALL");
@@ -1500,11 +1601,29 @@ function OrdersTab({ restaurant, store }) {
     toast("Commande supprimée", "info");
   };
 
-  const list = store.orders.filter((o) => filter === "ALL" || o.status === filter);
+  const sessionsById = new Map((store.sessions || []).map((s) => [s.id, s]));
+  const allOrdersEverywhere = [...store.orders, ...store.doneOrders];
+
+  // Les commandes d'une même session doivent apparaître ensemble dans la
+  // liste plutôt que dispersées par date — sinon rien ne les relie
+  // visuellement, même avec le badge de session sur chacune.
+  const list = store.orders
+    .filter((o) => filter === "ALL" || o.status === filter)
+    .slice()
+    .sort((a, b) => {
+      const ka = a.session_id || a.id;
+      const kb = b.session_id || b.id;
+      if (ka === kb) return 0;
+      // Le groupe se positionne à la place de sa commande la plus récente,
+      // pour ne pas perturber le tri par fraîcheur habituel de la liste.
+      const latest = (key) => Math.max(...store.orders.filter((o) => (o.session_id || o.id) === key).map((o) => new Date(o.created_at).getTime()));
+      return latest(kb) - latest(ka);
+    });
 
   return (
     <div>
       <h2 style={{ ...FF, fontSize: 22, fontWeight: 800, marginBottom: 14 }}>🧾 Commandes en cours</h2>
+      <TableSessionsPanel store={store} />
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
         {["ALL", "PENDING", "PREPARING", "READY"].map((f) => (
           <button key={f} onClick={() => setFilter(f)} style={{ ...FF, padding: "7px 13px", borderRadius: 10, fontWeight: 600, fontSize: 13, border: `1px solid ${filter === f ? C.text : C.border}`, background: filter === f ? C.text : C.surface, color: filter === f ? C.white : C.text }}>
@@ -1516,13 +1635,27 @@ function OrdersTab({ restaurant, store }) {
         <Surface style={{ padding: 30, textAlign: "center", color: C.textSecondary, ...FF }}>Aucune commande.</Surface>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {list.map((o) => (
-            <Surface key={o.id} style={{ padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          {list.map((o) => {
+            const session = o.session_id ? sessionsById.get(o.session_id) : null;
+            const sessionOrders = session ? allOrdersEverywhere.filter((x) => x.session_id === session.id) : [];
+            const positionInSession = session ? sessionOrders.findIndex((x) => x.id === o.id) + 1 : 0;
+            return (
+            <Surface key={o.id} style={session ? { padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", borderLeft: `3px solid ${C.accentPurple}` } : { padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <strong style={{ ...FF }}>Table {o.table?.number ?? "?"}</strong>
                   <Tag color={STATUS_META[o.status].color}>{STATUS_META[o.status].label}</Tag>
                   <Tag color={o.order_type === "takeaway" ? C.accentPurple : C.accentBlue}>{o.order_type === "takeaway" ? "À emporter" : "Sur place"}</Tag>
+                  {o.covers > 1 && <Tag color={C.accentOrange}>👥 {o.covers}</Tag>}
+                  {/* Relie visuellement les commandes d'une même session — sans
+                      ce badge, deux commandes de la même table scannée deux
+                      fois n'ont rien qui les rattache l'une à l'autre dans
+                      cette liste, seul le panneau du haut le montrait. */}
+                  {session && (
+                    <Tag color={C.accentPurple}>
+                      🔗 {positionInSession}/{session.covers}{session.kitchen_sent_at ? " · envoyée" : ""}
+                    </Tag>
+                  )}
                   {/* Suivi de transmission à la caisse, masqué si le restaurant
                       n'a pas d'intégration POS (statut not_applicable). */}
                   {o.pos_sync_status && o.pos_sync_status !== "not_applicable" && (
@@ -1546,11 +1679,19 @@ function OrdersTab({ restaurant, store }) {
                 {o.status === "READY" && <Btn variant="subtle" size="sm" onClick={() => updateStatus(o, "DONE")}>Servie</Btn>}
                 <Btn variant="ghost" size="sm" title="Ticket détaillé" onClick={() => setPrinting({ ...o, detailed: true })}>🖨️</Btn>
                 <Btn variant="ghost" size="sm" title="Note sans détail (justificatif)" onClick={() => setPrinting({ ...o, detailed: false })}>📄</Btn>
-                <Btn variant="ghost" size="sm" title="Bon de cuisine" onClick={() => setPrinting({ ...o, kind: "kitchen" })}>🍳</Btn>
+                {session ? (
+                  <Btn variant="ghost" size="sm" title={`Ticket cuisine groupé de la session (${sessionOrders.length} commande${sessionOrders.length > 1 ? "s" : ""})`}
+                    onClick={() => setPrinting({ ...session, kind: "kitchen_session", orders: sessionOrders })}>
+                    👥🍳
+                  </Btn>
+                ) : (
+                  <Btn variant="ghost" size="sm" title="Bon de cuisine" onClick={() => setPrinting({ ...o, kind: "kitchen" })}>🍳</Btn>
+                )}
                 <Btn variant="ghost" size="sm" onClick={() => setEditing(o)}>✏️</Btn>
               </div>
             </Surface>
-          ))}
+            );
+          })}
         </div>
       )}
       {editing && <EditOrderModal order={editing} onClose={() => setEditing(null)} onSave={updateStatus} onDelete={remove} />}
@@ -3575,6 +3716,24 @@ function SettingsTab({ restaurant, store, modules = ["base"], onModulesChange })
       </Surface>
 
       <Surface style={{ padding: 18, marginBottom: 16 }}>
+        <strong style={{ ...FF }}>💳 Paiement en ligne</strong>
+        <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginTop: 6 }}>
+          Provider utilisé pour le paiement en ligne côté client (bouton "Payer par carte" sur le menu). Stripe reste actif tant que vous ne changez pas ce réglage.
+        </p>
+        <div style={{ display: "flex", gap: 8, marginTop: 10, marginBottom: 4 }}>
+          {[["stripe", "Stripe"], ["flatpay", "Flatpay"]].map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => setSettings({ ...settings, payment_provider: val })}
+              style={{ ...FF, flex: 1, padding: 12, borderRadius: 12, border: `2px solid ${(settings.payment_provider || "stripe") === val ? C.accent : C.border}`, background: (settings.payment_provider || "stripe") === val ? `${C.accent}0D` : C.surface, fontWeight: 700, fontSize: 14 }}
+            >{label}</button>
+          ))}
+        </div>
+        <Btn variant="primary" size="sm" onClick={save}>Enregistrer le provider</Btn>
+        <PaymentProviderSection restaurant={restaurant} demoMode={store.demoMode} />
+      </Surface>
+
+      <Surface style={{ padding: 18, marginBottom: 16 }}>
         <strong style={{ ...FF }}>⭐ Avis Google</strong>
         <div style={{ marginTop: 10 }}>
           {field("google_review_url", "Lien d'avis Google")}
@@ -3834,6 +3993,101 @@ function PosConnectSection({ restaurant, demoMode }) {
   );
 }
 
+/* ============================================================================
+ * PAIEMENT EN LIGNE — FLATPAY
+ *
+ * Même principe que PosConnectSection : la clé API Flatpay ne transite
+ * qu'une fois par l'edge function flatpay-save-credentials, écrit dans
+ * payment_connections (table sans policy RLS), et cet écran ne lit ensuite
+ * que l'état via get_payment_connection_status() — jamais la clé elle-même,
+ * même pour le propriétaire.
+ * ==========================================================================*/
+function PaymentProviderSection({ restaurant, demoMode }) {
+  const toast = useToast();
+  const [conn, setConn] = useState(null);
+  const [apiKey, setApiKey] = useState("");
+  const [environment, setEnvironment] = useState("test");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    if (demoMode || !hasSupabase) return;
+    const { data } = await supabase.rpc("get_payment_connection_status", { p_restaurant_id: restaurant.id });
+    setConn(Array.isArray(data) ? data[0] ?? null : data ?? null);
+  }, [restaurant.id, demoMode]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    if (demoMode || !hasSupabase) return toast("(Démo) Connexion Flatpay indisponible", "info");
+    if (!apiKey.trim()) return toast("Clé API requise", "error");
+    setBusy(true);
+    try {
+      await callFunction("flatpay-save-credentials", { restaurant_id: restaurant.id, api_key: apiKey.trim(), environment });
+      setApiKey("");
+      toast("Flatpay connecté", "success");
+      await load();
+    } catch (e) {
+      toast(e.message || "Échec de la connexion", "error");
+    } finally { setBusy(false); }
+  };
+
+  const disconnect = async () => {
+    if (!window.confirm("Déconnecter Flatpay ? Le paiement en ligne Flatpay ne fonctionnera plus.")) return;
+    setBusy(true);
+    try {
+      await supabase.rpc("disconnect_payment_provider", { p_restaurant_id: restaurant.id });
+      toast("Flatpay déconnecté", "success");
+      await load();
+    } catch (e) {
+      toast(e.message || "Erreur", "error");
+    } finally { setBusy(false); }
+  };
+
+  const status = conn?.status || "disconnected";
+  const ui = POS_STATUS_UI[status] || POS_STATUS_UI.disconnected;
+
+  return (
+    <Surface style={{ padding: 20, marginTop: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <strong style={{ ...FF, fontSize: 16 }}>💳 Flatpay</strong>
+          <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginTop: 4 }}>
+            Clé API du compte marchand Flatpay — jamais transmise au navigateur après enregistrement.
+          </p>
+        </div>
+        <span style={{ ...FF, fontSize: 13, fontWeight: 700, color: ui.color }}>
+          {ui.dot} {ui.label} {conn?.environment ? `(${conn.environment})` : ""}
+        </span>
+      </div>
+
+      {status === "error" && conn?.last_error && (
+        <p style={{ ...FF, fontSize: 12, color: C.accent, marginTop: 10, wordBreak: "break-word" }}>{conn.last_error}</p>
+      )}
+
+      {status === "connected" ? (
+        <div style={{ marginTop: 14 }}>
+          <Btn variant="secondary" size="sm" disabled={busy} onClick={disconnect}>Déconnecter</Btn>
+        </div>
+      ) : (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            {["test", "production"].map((env) => (
+              <button
+                key={env}
+                onClick={() => setEnvironment(env)}
+                style={{ ...FF, flex: 1, padding: 10, borderRadius: 10, border: `2px solid ${environment === env ? C.accent : C.border}`, background: environment === env ? `${C.accent}0D` : C.surface, fontSize: 13, fontWeight: 700 }}
+              >{env === "test" ? "Test" : "Production"}</button>
+            ))}
+          </div>
+          <InputField label="Clé API Flatpay" type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
+          <Btn variant="primary" size="sm" disabled={busy} onClick={save}>{busy ? "…" : "Connecter Flatpay"}</Btn>
+        </div>
+      )}
+    </Surface>
+  );
+}
+
 function GmailConnectSection({ restaurant }) {
   const toast = useToast();
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -3909,23 +4163,59 @@ function useRestaurantSettings(restaurantId, demoMode) {
 // imprimerait d'un coup à l'ouverture de l'écran.
 function useAutoPrintQueue(store, autoPrintEnabled) {
   const prevIds = useRef(null);
+  const prevSentSessionIds = useRef(null);
   const [printQueue, setPrintQueue] = useState([]);
 
   useEffect(() => {
     if (store.loading) return;
+    const sessions = store.sessions || [];
     const ids = new Set(store.orders.map((o) => o.id));
-    if (prevIds.current === null) { prevIds.current = ids; return; }
+    const sentIds = new Set(sessions.filter((s) => s.kitchen_sent_at).map((s) => s.id));
+
+    if (prevIds.current === null) {
+      prevIds.current = ids;
+      prevSentSessionIds.current = sentIds;
+      return;
+    }
+
     if (autoPrintEnabled !== false) {
+      const sessionsById = new Map(sessions.map((s) => [s.id, s]));
       const fresh = store.orders.filter((o) => !prevIds.current.has(o.id) && o.customer_name !== "Comptoir");
-      // Deux documents par commande, l'un après l'autre : le ticket client
-      // (avec prix et TVA) puis le bon de cuisine juste derrière (sans prix,
-      // pour la brigade) — imprimés en deux temps sur la même imprimante.
-      if (fresh.length) {
-        setPrintQueue((q) => [...q, ...fresh.flatMap((o) => [o, { ...o, kind: "kitchen" }])]);
+      const jobs = [];
+      for (const o of fresh) {
+        // Ticket client (prix + TVA) : toujours immédiat, une session ne
+        // change rien pour lui — seul le bon de cuisine est concerné.
+        jobs.push(o);
+        const session = o.session_id ? sessionsById.get(o.session_id) : null;
+        if (!session) {
+          // Pas de session (comptoir déjà exclu plus haut, à emporter,
+          // sur place hors session) : comportement inchangé, un bon par
+          // commande.
+          jobs.push({ ...o, kind: "kitchen" });
+        } else if (session.kitchen_sent_at) {
+          // La session a déjà été envoyée en cuisine avant l'arrivée de
+          // cette commande (retardataire) : repli sur un bon individuel
+          // plutôt que de la perdre.
+          jobs.push({ ...o, kind: "kitchen" });
+        }
+        // Sinon : commande rattachée à une session pas encore envoyée —
+        // elle partira dans le ticket groupé, pas ici.
       }
+
+      // Sessions qui viennent de passer à "envoyée en cuisine" (seuil de
+      // couverts atteint automatiquement, ou bouton staff) : un seul bon
+      // groupé pour toutes les commandes déjà rattachées.
+      const newlySent = sessions.filter((s) => s.kitchen_sent_at && !prevSentSessionIds.current.has(s.id));
+      for (const session of newlySent) {
+        const sessionOrders = [...store.orders, ...store.doneOrders].filter((o) => o.session_id === session.id);
+        if (sessionOrders.length) jobs.push({ ...session, kind: "kitchen_session", orders: sessionOrders });
+      }
+
+      if (jobs.length) setPrintQueue((q) => [...q, ...jobs]);
     }
     prevIds.current = ids;
-  }, [store.orders, store.loading, autoPrintEnabled]);
+    prevSentSessionIds.current = sentIds;
+  }, [store.orders, store.doneOrders, store.sessions, store.loading, autoPrintEnabled]);
 
   return {
     printing: printQueue[0] ?? null,
@@ -4118,6 +4408,45 @@ function KitchenTicket({ order }) {
   );
 }
 
+// Un seul ticket pour toutes les commandes d'une session de table, imprimé
+// une fois la session envoyée en cuisine (voir useAutoPrintQueue et
+// TableSessionsPanel) — plutôt qu'un bon dispersé par commande.
+function KitchenSessionTicket({ session, orders = [] }) {
+  if (!session) return null;
+  const tableLabel = (session.table?.label || (session.table?.number != null ? `TABLE ${session.table.number}` : "")).toString().toUpperCase();
+  const when = session.kitchen_sent_at ? new Date(session.kitchen_sent_at) : new Date();
+  const sorted = [...orders].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+
+  return (
+    <div style={{ width: "100%", maxWidth: "72mm", boxSizing: "border-box", padding: "2mm", fontFamily: "'Courier New', Courier, monospace", fontSize: 18, fontWeight: 700, lineHeight: 1.4, color: "#000", background: "#fff" }}>
+      <div style={{ textAlign: "center", fontWeight: 700, fontSize: 20 }}>🍳 BON DE CUISINE — SESSION</div>
+      <div style={{ borderTop: "2px dashed #000", margin: "6px 0" }} />
+      {tableLabel && <div style={{ textAlign: "center", fontWeight: 700, fontSize: 26 }}>{tableLabel}</div>}
+      <div style={{ textAlign: "center" }}>
+        {session.covers} couvert{session.covers > 1 ? "s" : ""} — {sorted.length} commande{sorted.length > 1 ? "s" : ""}
+      </div>
+      <div style={{ textAlign: "center" }}>Envoyé à {when.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</div>
+      {sorted.map((o, oi) => (
+        <div key={o.id || oi}>
+          <div style={{ borderTop: "1px dashed #000", margin: "8px 0" }} />
+          <div style={{ fontSize: 15, fontWeight: 400 }}>
+            Commande {oi + 1}{o.created_at ? ` — ${new Date(o.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}` : ""}
+          </div>
+          {(o.items || []).map((it, i) => (
+            <div key={i} style={{ marginTop: 4 }}>
+              <div style={{ fontWeight: 700, fontSize: 20 }}>{it.quantity}× {it.name}</div>
+              {it.detail && <div style={{ fontStyle: "italic", marginLeft: 8 }}>↳ {it.detail}</div>}
+            </div>
+          ))}
+          {o.note && <div style={{ fontWeight: 700, marginTop: 4 }}>📝 {o.note}</div>}
+        </div>
+      ))}
+      {/* Marge de papier vierge avant la coupe, voir ReceiptTicket. */}
+      <PaperFeed lines={12} />
+    </div>
+  );
+}
+
 // Monté une fois par écran (Cuisine ou Commandes) : reçoit une commande à
 // imprimer via `job`, déclenche window.print() scopé au ticket, et prévient
 // `onDone` une fois l'impression terminée (ou annulée) pour libérer la file.
@@ -4162,9 +4491,11 @@ function TicketPrintLayer({ job, onDone, restaurant, settings }) {
         }
         @media screen { #wegemo-ticket-print { position: fixed; left: -9999px; top: 0; } }
       `}</style>
-      {job.kind === "kitchen"
-        ? <KitchenTicket order={job} />
-        : <ReceiptTicket order={job} restaurant={restaurant} settings={settings} detailed={job.detailed !== false} />}
+      {job.kind === "kitchen_session"
+        ? <KitchenSessionTicket session={job} orders={job.orders} />
+        : job.kind === "kitchen"
+          ? <KitchenTicket order={job} />
+          : <ReceiptTicket order={job} restaurant={restaurant} settings={settings} detailed={job.detailed !== false} />}
     </div>
   );
 }
@@ -4227,6 +4558,7 @@ function KitchenView({ restaurant, onExit }) {
                     </div>
                     <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
                       <Tag color={o.order_type === "takeaway" ? C.accentPurple : C.accentBlue}>{o.order_type === "takeaway" ? "À emporter" : "Sur place"}</Tag>
+                  {o.covers > 1 && <Tag color={C.accentOrange}>👥 {o.covers}</Tag>}
                       {o.payment_method === "cash" && <Tag color={o.cash_collected ? C.accentGreen : C.accentOrange}>{o.cash_collected ? "Encaissé" : "À encaisser"}</Tag>}
                     </div>
                     <ul style={{ ...FF, fontSize: 14, margin: "8px 0", paddingLeft: 18 }}>
@@ -5194,6 +5526,13 @@ function CustomerPage({ slug, tableNum }) {
   const [tableLabel, setTableLabel] = useState(null);
   const [lang, setLang] = useState("fr");
   const [orderType, setOrderType] = useState("dine_in");
+  const [covers, setCovers] = useState(1);
+  // Session de table déjà ouverte par un scan précédent sur la même table
+  // (voir get_or_open_table_session) : si elle existe, on saute l'étape
+  // couverts et on rejoint directement cette session au lieu d'en ouvrir
+  // une nouvelle.
+  const [sessionId, setSessionId] = useState(null);
+  const [openingSession, setOpeningSession] = useState(false);
   const [cart, setCart] = useState([]);
   const [promo, setPromo] = useState(null);
   const [profile, setProfile] = useState({ name: "", email: "" });
@@ -5231,9 +5570,47 @@ function CustomerPage({ slug, tableNum }) {
       setTableId(tb?.id || null);
       setTableLabel(tb?.label || null);
       setSettings(st || {});
+
+      // Une session ouverte sur cette table (par un scan précédent) rend
+      // l'étape couverts inutile pour ce scan-ci — on rejoint directement.
+      if (tb?.id) {
+        const { data: existing } = await supabase
+          .from("table_sessions")
+          .select("id, covers")
+          .eq("table_id", tb.id)
+          .eq("status", "open")
+          .maybeSingle();
+        if (existing) {
+          setSessionId(existing.id);
+          setCovers(existing.covers);
+        }
+      }
+
       setStep("ordertype");
     })();
   }, [slug, tableNum]);
+
+  // Ouvre une nouvelle session (ou rejoint celle qu'un autre scan vient tout
+  // juste d'ouvrir, si la course a lieu au même instant) puis avance au menu.
+  const confirmCovers = async () => {
+    if (!hasSupabase || restaurant.id === "demo") {
+      setStep("menu");
+      return;
+    }
+    setOpeningSession(true);
+    try {
+      const { data, error } = await supabase.rpc("get_or_open_table_session", {
+        p_restaurant_id: restaurant.id, p_table_id: tableId, p_covers: covers,
+      });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      setSessionId(row.session_id);
+      setCovers(row.covers); // une autre personne a peut-être ouvert la session entre-temps
+    } finally {
+      setOpeningSession(false);
+      setStep("menu");
+    }
+  };
 
   const subtotal = cart.reduce((s, c) => s + c.lineTotal, 0);
   const discount = promo ? (promo.discount_percent ? subtotal * (promo.discount_percent / 100) : Math.min(promo.discount_amount || 0, subtotal)) : 0;
@@ -5249,10 +5626,21 @@ function CustomerPage({ slug, tableNum }) {
   if (step === "error") return <CenterMsg emoji="🤷" text="Restaurant introuvable." />;
 
   const dir = lang === "ar" ? "rtl" : "ltr";
+  // Le fond noir Baoma ne s'applique qu'aux étapes réellement redesignées
+  // (type de commande, couverts, carte) : panier/profil/paiement restent en
+  // thème clair générique, sinon leur texte sombre devient illisible sur
+  // fond noir (ils n'ont pas leur propre habillage sombre).
+  const baomaDarkStep = BAOMA_THEME_SLUGS.includes(restaurant.slug) && ["ordertype", "covers", "menu"].includes(step);
 
   return (
-    <div dir={dir} style={{ minHeight: "100vh", background: BAOMA_THEME_SLUGS.includes(restaurant.slug) ? BAOMA_THEME.offwhite : C.bg, maxWidth: 480, margin: "0 auto", position: "relative" }}>
+    <div dir={dir} style={{ minHeight: "100vh", background: baomaDarkStep ? BAOMA_THEME.ink : C.bg, maxWidth: 480, margin: "0 auto", position: "relative" }}>
       {step === "ordertype" && (
+        BAOMA_THEME_SLUGS.includes(restaurant.slug) ? (
+          <BaomaOrderType
+            restaurant={restaurant} lang={lang} setLang={setLang} orderType={orderType} setOrderType={setOrderType}
+            onConfirm={() => setStep(orderType === "dine_in" ? (sessionId ? "menu" : "covers") : "menu")}
+          />
+        ) : (
         <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
             <span style={{ fontSize: 32 }}>{restaurant.logo_emoji}</span>
@@ -5270,9 +5658,42 @@ function CustomerPage({ slug, tableNum }) {
                 </div>
               </button>
             ))}
-            <Btn variant="primary" size="lg" style={{ marginTop: 16 }} onClick={() => setStep("menu")}>{t(lang, "orderTypeConfirm")}</Btn>
+            <Btn variant="primary" size="lg" style={{ marginTop: 16 }} onClick={() => setStep(orderType === "dine_in" ? (sessionId ? "menu" : "covers") : "menu")}>{t(lang, "orderTypeConfirm")}</Btn>
           </div>
         </div>
+        )
+      )}
+
+      {step === "covers" && (
+        BAOMA_THEME_SLUGS.includes(restaurant.slug) ? (
+          <BaomaCovers
+            lang={lang} setLang={setLang} covers={covers} setCovers={setCovers}
+            onBack={() => setStep("ordertype")} onConfirm={confirmCovers} opening={openingSession}
+          />
+        ) : (
+        <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 24 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
+            <button onClick={() => setStep("ordertype")} style={{ ...FF, color: C.textSecondary, fontSize: 14, background: "none", border: "none" }}>← {t(lang, "back")}</button>
+            <LangPicker lang={lang} setLang={setLang} />
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
+            <h1 style={{ ...FF, fontSize: 24, fontWeight: 900, textAlign: "center", marginBottom: 4 }}>{t(lang, "coversTitle")}</h1>
+            <p style={{ ...FF, textAlign: "center", color: C.textSecondary, marginBottom: 32 }}>{t(lang, "coversSub")}</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+              <button
+                onClick={() => setCovers((c) => Math.max(1, c - 1))}
+                style={{ ...FF, width: 52, height: 52, borderRadius: 16, border: `1px solid ${C.border}`, background: C.surface, fontSize: 24, fontWeight: 700, color: C.text }}
+              >−</button>
+              <span style={{ ...FF, fontSize: 40, fontWeight: 900, minWidth: 60, textAlign: "center" }}>{covers}</span>
+              <button
+                onClick={() => setCovers((c) => Math.min(30, c + 1))}
+                style={{ ...FF, width: 52, height: 52, borderRadius: 16, border: `1px solid ${C.border}`, background: C.surface, fontSize: 24, fontWeight: 700, color: C.text }}
+              >+</button>
+            </div>
+            <Btn variant="primary" size="lg" style={{ marginTop: 40, width: "100%" }} disabled={openingSession} onClick={confirmCovers}>{openingSession ? "…" : t(lang, "orderTypeConfirm")}</Btn>
+          </div>
+        </div>
+        )
       )}
 
       {step === "menu" && (
@@ -5298,7 +5719,7 @@ function CustomerPage({ slug, tableNum }) {
       )}
 
       {step === "payment" && (
-        <CustomerPayment restaurant={restaurant} tableId={tableId} orderType={orderType} cart={cart} total={total} promo={promo} profile={profile} lang={lang} onBack={() => setStep("cart")} onDone={(id) => { setOrderId(id); setStep("done"); }} />
+        <CustomerPayment restaurant={restaurant} tableId={tableId} tableNum={tableNum} orderType={orderType} covers={covers} sessionId={sessionId} cart={cart} total={total} promo={promo} profile={profile} lang={lang} onBack={() => setStep("cart")} onDone={(id) => { setOrderId(id); setStep("done"); }} />
       )}
 
       {step === "done" && (
@@ -5412,53 +5833,10 @@ function CustomerMenu({ restaurant, menu, settings, lang, setLang, cart, onCompo
 const BK = BAOMA_THEME;
 const BFF = { fontFamily: "'Figtree', -apple-system, BlinkMacSystemFont, sans-serif" };
 const BDISPLAY = { fontFamily: BK.display, fontWeight: 400, textTransform: "uppercase" };
-const KB_DIRS = ["tl", "tr", "bl", "br"];
 
 // Le chemin des photos est relatif à la racine servie : on préfixe par la
 // base Vite pour rester correct sous un sous-chemin (GitHub Pages).
 const bImg = (u) => (u && u.startsWith("/") ? `${(import.meta.env.BASE_URL || "/").replace(/\/+$/, "")}${u}` : u);
-
-// Décale la dérive de chaque photo à partir de son nom, pour éviter que
-// toutes les cartes respirent exactement en même temps.
-function kbTiming(seed) {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 997;
-  return { delay: -((h % 9) * 0.9), duration: 8 + (h % 5), dir: KB_DIRS[h % 4] };
-}
-
-// Tilt 3D piloté au pointeur, unifié souris + tactile : l'appui incline la
-// carte depuis le point touché, le relâchement la laisse revenir après un
-// court délai (sinon l'effet serait invisible sur mobile).
-function useBaomaTilt(strength = 8) {
-  const ref = useRef(null);
-  const [tilt, setTilt] = useState({ rx: 0, ry: 0, px: 0, py: 0 });
-  const [on, setOn] = useState(false);
-  const timer = useRef(undefined);
-
-  useEffect(() => () => clearTimeout(timer.current), []);
-
-  const from = (clientX, clientY) => {
-    const el = ref.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const px = (clientX - r.left) / r.width - 0.5;
-    const py = (clientY - r.top) / r.height - 0.5;
-    setTilt({ rx: -py * strength, ry: px * strength, px, py });
-    setOn(true);
-  };
-  const release = () => { setTilt({ rx: 0, ry: 0, px: 0, py: 0 }); setOn(false); };
-
-  return {
-    ref, tilt, on,
-    handlers: {
-      onPointerMove: (e) => { clearTimeout(timer.current); from(e.clientX, e.clientY); },
-      onPointerDown: (e) => { clearTimeout(timer.current); from(e.clientX, e.clientY); },
-      onPointerLeave: (e) => { if (e.pointerType !== "mouse") return; clearTimeout(timer.current); release(); },
-      onPointerUp: (e) => { if (e.pointerType === "mouse") return; clearTimeout(timer.current); timer.current = setTimeout(release, 600); },
-      onPointerCancel: () => { clearTimeout(timer.current); release(); },
-    },
-  };
-}
 
 // Révèle les éléments .baoma-reveal à leur entrée dans le viewport.
 function useBaomaReveal(rootRef, deps = []) {
@@ -5483,69 +5861,52 @@ function useBaomaReveal(rootRef, deps = []) {
   }, deps);
 }
 
-function BaomaCard({ item, onPick }) {
-  const { ref, tilt, on, handlers } = useBaomaTilt(8);
+// Carte au format liste — même habillage que la page vitrine (photo carrée,
+// ligne pointillée nom/prix, description en dessous) mais interagissable :
+// toute la carte ajoute au panier (ou ouvre la composition), la loupe sur la
+// photo zoome sans déclencher l'ajout.
+function BaomaCard({ item, onPick, onZoom }) {
   const [failed, setFailed] = useState(false);
-  const kb = kbTiming(item.id || item.name);
+  const [hover, setHover] = useState(false);
   const out = item.stock != null && Number(item.stock) <= 0;
   const photo = bImg(item.photo_url);
 
   return (
-    <div
-      ref={ref}
-      {...handlers}
-      onClick={() => !out && onPick(item)}
-      className="baoma-reveal"
-      style={{
-        position: "relative", overflow: "hidden", borderRadius: 16,
-        background: BK.charcoal, cursor: out ? "default" : "pointer",
-        opacity: out ? 0.45 : 1,
-        transformStyle: "preserve-3d", perspective: 900,
-        transform: `perspective(900px) rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg) translateY(${on ? -8 : 0}px)`,
-        boxShadow: on ? "0 0 40px -5px rgba(255,90,31,0.35)" : "none",
-        outline: `1px solid ${on ? "rgba(255,90,31,0.6)" : "rgba(10,10,10,0.06)"}`,
-        outlineOffset: -1,
-        transition: "transform .35s cubic-bezier(.16,1,.3,1), box-shadow .3s ease, outline-color .3s ease",
-      }}
-    >
-      <div style={{ position: "relative", aspectRatio: "1 / 1", overflow: "hidden" }}>
+    <div className="baoma-reveal">
+      <div style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => !out && onPick(item)}
+        onPointerEnter={() => setHover(true)}
+        onPointerLeave={() => setHover(false)}
+        disabled={out}
+        aria-label={out ? `${item.name} — épuisé` : `Ajouter ${item.name} au panier`}
+        style={{
+          position: "relative", display: "block", width: "100%", aspectRatio: "1 / 1",
+          overflow: "hidden", borderRadius: 10, border: "none", padding: 0,
+          cursor: out ? "default" : "pointer", opacity: out ? 0.45 : 1,
+          textAlign: "left", background: BK.charcoal,
+        }}
+      >
         {photo && !failed ? (
-          <div
+          <img
+            src={photo}
+            alt={item.name}
+            loading="lazy"
+            onError={() => setFailed(true)}
             style={{
-              position: "absolute", inset: 0,
-              transform: `translate(${tilt.px * -4}%, ${tilt.py * -4}%)`,
-              transition: "transform .4s cubic-bezier(.16,1,.3,1)",
+              width: "100%", height: "100%", objectFit: "cover", display: "block",
+              transform: hover ? "scale(1.04)" : "scale(1)",
+              transition: "transform .7s ease-out",
             }}
-          >
-            <img
-              src={photo}
-              alt={item.name}
-              loading="lazy"
-              onError={() => setFailed(true)}
-              className={`baoma-kb${on ? " baoma-kb-paused" : ""}`}
-              style={{
-                width: "100%", height: "100%", objectFit: "cover", display: "block",
-                animationName: `baoma-kb-${kb.dir}`,
-                animationDelay: `${kb.delay}s`,
-                animationDuration: `${kb.duration}s`,
-              }}
-            />
-          </div>
+          />
         ) : (
           <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", fontSize: 40, background: `linear-gradient(135deg, ${BK.charcoal}, rgba(255,90,31,0.18))` }}>
             {item.emoji || "🍽️"}
           </div>
         )}
 
-        {/* balayage lumineux au survol / à l'appui */}
-        <div
-          style={{
-            position: "absolute", inset: 0, pointerEvents: "none",
-            transform: `skewX(-12deg) translateX(${on ? 130 : -130}%)`,
-            background: "linear-gradient(90deg, transparent, rgba(245,245,240,0.4), transparent)",
-            transition: "transform .7s ease-out",
-          }}
-        />
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "linear-gradient(to top, rgba(10,10,10,.35), transparent 60%)" }} />
 
         {item.is_popular && (
           <span style={{ ...BFF, position: "absolute", top: 8, left: 8, background: BK.orange, color: BK.ink, fontSize: 10, fontWeight: 800, padding: "3px 8px", borderRadius: 999, letterSpacing: 0.4 }}>
@@ -5553,31 +5914,193 @@ function BaomaCard({ item, onPick }) {
           </span>
         )}
 
-        {/* bouton d'ajout, repris de la maquette client */}
-        <span
-          aria-hidden
+        {out && (
+          <span style={{ ...BFF, position: "absolute", bottom: 8, left: 8, background: "rgba(10,10,10,.7)", color: BK.offwhite, fontSize: 10, fontWeight: 800, padding: "3px 8px", borderRadius: 999, letterSpacing: 0.4 }}>
+            ÉPUISÉ
+          </span>
+        )}
+
+        {!out && (
+          <span
+            aria-hidden
+            style={{
+              position: "absolute", right: 8, bottom: 8, width: 32, height: 32,
+              borderRadius: 999, background: BK.orange, color: BK.ink,
+              display: "grid", placeItems: "center", fontSize: 18, fontWeight: 800, lineHeight: 1,
+              boxShadow: "0 2px 10px rgba(0,0,0,.25)",
+            }}
+          >
+            +
+          </span>
+        )}
+      </button>
+
+      {/* loupe : agrandit la photo sans déclencher l'ajout au panier */}
+      {photo && !failed && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onZoom(item); }}
+          aria-label={`Agrandir la photo de ${item.name}`}
           style={{
-            position: "absolute", right: 8, bottom: 8, width: 34, height: 34,
-            borderRadius: 12, background: out ? "rgba(10,10,10,.35)" : BK.orange,
-            color: "#fff", display: "grid", placeItems: "center",
-            fontSize: 20, fontWeight: 700, lineHeight: 1,
-            boxShadow: "0 2px 10px rgba(0,0,0,.2)",
+            position: "absolute", top: 8, right: 8, zIndex: 1,
+            width: 30, height: 30, borderRadius: 10, border: "none",
+            background: "rgba(10,10,10,.45)", backdropFilter: "blur(4px)",
+            color: "#fff", display: "grid", placeItems: "center", cursor: "zoom-in",
           }}
         >
-          {out ? "–" : "+"}
-        </span>
+          <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}>
+            <circle cx="11" cy="11" r="7" />
+            <path strokeLinecap="round" d="M21 21l-4.35-4.35M11 8v6M8 11h6" />
+          </svg>
+        </button>
+      )}
       </div>
 
-      <div style={{ padding: "10px 12px 12px" }}>
-        <h3 style={{ ...BDISPLAY, fontSize: 13, lineHeight: 1.15, letterSpacing: 0.3, color: BK.ink }}>{item.name}</h3>
+      <div style={{ marginTop: 14 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+          <h3 style={{ ...BDISPLAY, fontSize: 16, lineHeight: 1.15, letterSpacing: 0.4, color: BK.offwhite, flexShrink: 0 }}>
+            {item.name}
+          </h3>
+          <span aria-hidden style={{ flex: 1, minWidth: 12, marginTop: 2, borderBottom: "1px dotted rgba(242,236,224,.25)" }} />
+          <strong style={{ ...BDISPLAY, fontSize: 16, color: BK.offwhite, flexShrink: 0 }}>{eur(item.price)}</strong>
+        </div>
         {item.description && (
-          <p style={{ ...BFF, fontSize: 11, lineHeight: 1.3, color: "rgba(10,10,10,.62)", marginTop: 3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          <p style={{ ...BFF, fontSize: 12.5, lineHeight: 1.45, color: "rgba(242,236,224,.5)", marginTop: 6 }}>
             {item.description}
           </p>
         )}
-        <strong style={{ ...BFF, display: "block", marginTop: 5, fontSize: 13, fontWeight: 800, color: on ? BK.orange : BK.ink, transition: "color .3s ease" }}>
-          {eur(item.price)}
-        </strong>
+      </div>
+    </div>
+  );
+}
+
+function BaomaPhotoZoom({ item, onClose }) {
+  useEffect(() => {
+    if (!item) return;
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
+  }, [item, onClose]);
+
+  if (!item) return null;
+  const photo = bImg(item.photo_url);
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 1000, display: "flex",
+        alignItems: "center", justifyContent: "center", padding: 16,
+        background: "rgba(10,10,10,.85)", backdropFilter: "blur(4px)", animation: "fadein .2s",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: "relative", width: "100%", maxWidth: 420, maxHeight: "90vh",
+          overflow: "hidden", borderRadius: 18, background: BK.charcoal, animation: "slideup .25s ease",
+        }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fermer"
+          style={{
+            position: "absolute", top: 10, right: 10, zIndex: 1, width: 36, height: 36,
+            borderRadius: 999, border: "none", background: "rgba(10,10,10,.55)", color: "#fff",
+            display: "grid", placeItems: "center",
+          }}
+        >
+          <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+        {photo && (
+          <img src={photo} alt={item.name} style={{ width: "100%", maxHeight: "60vh", objectFit: "contain", display: "block", background: BK.ink }} />
+        )}
+        <div style={{ padding: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+            <h3 style={{ ...BDISPLAY, fontSize: 18, letterSpacing: 0.4, color: BK.offwhite }}>{item.name}</h3>
+            <strong style={{ ...BFF, fontSize: 18, fontWeight: 800, color: BK.orange, flexShrink: 0 }}>{eur(item.price)}</strong>
+          </div>
+          {item.description && (
+            <p style={{ ...BFF, fontSize: 13, lineHeight: 1.4, color: "rgba(242,236,224,.6)", marginTop: 8 }}>{item.description}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BaomaKicker({ children }) {
+  return (
+    <div style={{ ...BFF, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, color: BK.orange, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 3 }}>
+      <span aria-hidden style={{ width: 24, height: 1, background: "rgba(255,90,31,.35)" }} />
+      <span>{children}</span>
+      <span aria-hidden style={{ width: 24, height: 1, background: "rgba(255,90,31,.35)" }} />
+    </div>
+  );
+}
+
+function BaomaOrderType({ restaurant, lang, setLang, orderType, setOrderType, onConfirm }) {
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 24, background: BK.ink }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
+        <span style={{ fontSize: 32 }}>{restaurant.logo_emoji}</span>
+        <LangPicker lang={lang} setLang={setLang} dark />
+      </div>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <BaomaKicker>Bienvenue</BaomaKicker>
+        <h1 style={{ ...BDISPLAY, fontSize: 34, fontStyle: "italic", textAlign: "center", color: BK.offwhite, marginTop: 10, marginBottom: 6 }}>{restaurant.name}</h1>
+        <p style={{ ...BFF, textAlign: "center", color: "rgba(242,236,224,.55)", marginBottom: 28 }}>{t(lang, "orderTypeTitle")}</p>
+        {[["dine_in", "dineIn", "dineInSub", "🍽️"], ["takeaway", "takeaway", "takeawaySub", "🥡"]].map(([val, k, sub, em]) => (
+          <button
+            key={val}
+            onClick={() => setOrderType(val)}
+            style={{
+              ...BFF, display: "flex", alignItems: "center", gap: 14, padding: 18, marginBottom: 12, borderRadius: 16,
+              border: `1px solid ${orderType === val ? BK.orange : "rgba(242,236,224,.14)"}`,
+              background: orderType === val ? "rgba(255,90,31,.08)" : BK.charcoal,
+              textAlign: "left", width: "100%",
+            }}
+          >
+            <span style={{ fontSize: 30 }}>{em}</span>
+            <div>
+              <strong style={{ ...BFF, fontSize: 17, color: BK.offwhite }}>{t(lang, k)}</strong>
+              <div style={{ ...BFF, fontSize: 13, color: "rgba(242,236,224,.5)" }}>{t(lang, sub)}</div>
+            </div>
+          </button>
+        ))}
+        <Btn variant="primary" size="lg" style={{ marginTop: 16, background: BK.orange, color: BK.ink }} onClick={onConfirm}>{t(lang, "orderTypeConfirm")}</Btn>
+      </div>
+    </div>
+  );
+}
+
+function BaomaCovers({ lang, setLang, covers, setCovers, onBack, onConfirm, opening }) {
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 24, background: BK.ink }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
+        <button onClick={onBack} style={{ ...BFF, color: "rgba(242,236,224,.6)", fontSize: 14, background: "none", border: "none" }}>← {t(lang, "back")}</button>
+        <LangPicker lang={lang} setLang={setLang} dark />
+      </div>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
+        <BaomaKicker>Sur place</BaomaKicker>
+        <h1 style={{ ...BDISPLAY, fontSize: 28, fontStyle: "italic", textAlign: "center", color: BK.offwhite, marginTop: 10, marginBottom: 6 }}>{t(lang, "coversTitle")}</h1>
+        <p style={{ ...BFF, textAlign: "center", color: "rgba(242,236,224,.55)", marginBottom: 32 }}>{t(lang, "coversSub")}</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+          <button
+            onClick={() => setCovers((c) => Math.max(1, c - 1))}
+            style={{ ...BFF, width: 52, height: 52, borderRadius: 16, border: "1px solid rgba(242,236,224,.14)", background: BK.charcoal, fontSize: 24, fontWeight: 700, color: BK.offwhite }}
+          >−</button>
+          <span style={{ ...BDISPLAY, fontSize: 40, minWidth: 60, textAlign: "center", color: BK.offwhite }}>{covers}</span>
+          <button
+            onClick={() => setCovers((c) => Math.min(30, c + 1))}
+            style={{ ...BFF, width: 52, height: 52, borderRadius: 16, border: "1px solid rgba(242,236,224,.14)", background: BK.charcoal, fontSize: 24, fontWeight: 700, color: BK.offwhite }}
+          >+</button>
+        </div>
+        <Btn variant="primary" size="lg" style={{ marginTop: 40, width: "100%", background: BK.orange, color: BK.ink }} disabled={opening} onClick={onConfirm}>{opening ? "…" : t(lang, "orderTypeConfirm")}</Btn>
       </div>
     </div>
   );
@@ -5587,6 +6110,7 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
   const rootRef = useRef(null);
   const stripRef = useRef(null);
   const [active, setActive] = useState(null);
+  const [zoomItem, setZoomItem] = useState(null);
 
   // Catégories dans l'ordre Baoma, limitées à celles qui ont des plats.
   const known = BAOMA_CATEGORIES.filter((c) => menu.some((m) => m.category === c.name));
@@ -5647,26 +6171,26 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
   const count = cart.reduce((s, c) => s + (c.qty || 1), 0);
 
   return (
-    <div ref={rootRef} style={{ background: BK.offwhite, minHeight: "100vh", paddingBottom: cart.length ? 92 : 24 }}>
+    <div ref={rootRef} style={{ background: BK.ink, minHeight: "100vh", paddingBottom: cart.length ? 92 : 24 }}>
       {/* En-tête */}
-      <div style={{ background: BK.offwhite, padding: "16px 16px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(10,10,10,.07)" }}>
+      <div style={{ background: BK.ink, padding: "16px 16px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(242,236,224,.08)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <img
             src={bImg("/logo-baoma.png")}
             alt="Baoma"
-            style={{ height: 34, width: "auto", display: "block" }}
+            style={{ height: 34, width: "auto", display: "block", filter: "brightness(0) invert(1)" }}
             onError={(e) => { e.currentTarget.style.display = "none"; }}
           />
           <div>
-            <div style={{ ...BDISPLAY, fontSize: 17, letterSpacing: 0.5, color: BK.ink, lineHeight: 1 }}>{restaurant.name}</div>
-            <div style={{ ...BFF, fontSize: 11, color: "rgba(10,10,10,.55)", marginTop: 2 }}>{tableLabel || `Table ${tableNum}`}</div>
+            <div style={{ ...BDISPLAY, fontSize: 17, letterSpacing: 0.5, color: BK.offwhite, lineHeight: 1 }}>{restaurant.name}</div>
+            <div style={{ ...BFF, fontSize: 11, color: "rgba(242,236,224,.5)", marginTop: 2 }}>{tableLabel || `Table ${tableNum}`}</div>
           </div>
         </div>
-        <LangPicker lang={lang} setLang={setLang} />
+        <LangPicker lang={lang} setLang={setLang} dark />
       </div>
 
       {/* Frise de catégories collante */}
-      <div style={{ position: "sticky", top: 0, zIndex: 20, background: "rgba(245,245,240,.94)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", borderBottom: "1px solid rgba(10,10,10,.06)" }}>
+      <div style={{ position: "sticky", top: 0, zIndex: 20, background: "rgba(10,10,10,.92)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", borderBottom: "1px solid rgba(242,236,224,.07)" }}>
         <div
           ref={stripRef}
           style={{ display: "flex", gap: 8, overflowX: "auto", padding: "10px 16px", scrollbarWidth: "none" }}
@@ -5680,9 +6204,9 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
                 ...BFF, flexShrink: 0, whiteSpace: "nowrap", borderRadius: 999,
                 padding: "7px 15px", fontSize: 11, fontWeight: 800,
                 textTransform: "uppercase", letterSpacing: 0.6,
-                background: activeKey === g.key ? BK.orange : "rgba(10,10,10,.05)",
-                color: activeKey === g.key ? BK.ink : "rgba(10,10,10,.62)",
-                outline: activeKey === g.key ? "none" : "1px solid rgba(10,10,10,.1)",
+                background: activeKey === g.key ? "rgba(255,90,31,.1)" : "rgba(242,236,224,.05)",
+                color: activeKey === g.key ? BK.orange : "rgba(242,236,224,.6)",
+                outline: activeKey === g.key ? "1px solid " + BK.orange : "1px solid rgba(242,236,224,.14)",
                 outlineOffset: -1,
                 transition: "background .3s ease, color .3s ease",
               }}
@@ -5698,12 +6222,12 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
         {groups.map((g) => (
           <section key={g.key} id={`bcat-${g.key}`} style={{ scrollMarginTop: 118, marginTop: 30 }}>
             <div className="baoma-reveal">
-              <h2 style={{ ...BDISPLAY, fontSize: 24, letterSpacing: 0.5, color: BK.ink, lineHeight: 1.05 }}>{g.name}</h2>
-              {g.tagline && <p style={{ ...BFF, fontSize: 12, color: "rgba(10,10,10,.55)", marginTop: 3 }}>{g.tagline}</p>}
+              <h2 style={{ ...BDISPLAY, fontSize: 24, letterSpacing: 0.5, color: BK.offwhite, lineHeight: 1.05 }}>{g.name}</h2>
+              {g.tagline && <p style={{ ...BFF, fontSize: 12, color: "rgba(242,236,224,.5)", marginTop: 3 }}>{g.tagline}</p>}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginTop: 14 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 36, marginTop: 20, maxWidth: 460, marginLeft: "auto", marginRight: "auto" }}>
               {g.items.map((it) => (
-                <BaomaCard key={it.id} item={it} onPick={pick} />
+                <BaomaCard key={it.id} item={it} onPick={pick} onZoom={setZoomItem} />
               ))}
             </div>
           </section>
@@ -5712,7 +6236,7 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
 
       {/* Barre panier */}
       {cart.length > 0 && (
-        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 480, margin: "0 auto", padding: 12, background: "linear-gradient(to top, rgba(245,245,240,.98) 60%, transparent)" }}>
+        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 480, margin: "0 auto", padding: 12, background: "linear-gradient(to top, rgba(10,10,10,.98) 60%, transparent)" }}>
           <button
             onClick={onCart}
             style={{
@@ -5727,6 +6251,8 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
           </button>
         </div>
       )}
+
+      <BaomaPhotoZoom item={zoomItem} onClose={() => setZoomItem(null)} />
     </div>
   );
 }
@@ -5920,14 +6446,21 @@ function StripeCardForm({ clientSecret, publishableKey, total, lang, onSuccess, 
   );
 }
 
-function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, profile, lang, onBack, onDone }) {
+function CustomerPayment({ restaurant, tableId, tableNum, orderType, covers, sessionId, cart, total, promo, profile, lang, onBack, onDone }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [cardIntent, setCardIntent] = useState(null); // { clientSecret, publishableKey }
+  const [paymentProvider, setPaymentProvider] = useState("stripe");
   // Jeton d'idempotence stable pour toute la durée du paiement : un double-tap
   // ou une reprise réseau réutilise la commande déjà créée au lieu d'en ouvrir
   // une seconde. Renouvelé uniquement à la commande suivante.
   const clientToken = useRef(uid());
+
+  useEffect(() => {
+    if (!hasSupabase || restaurant.id === "demo") return;
+    supabase.rpc("get_payment_provider", { p_restaurant_id: restaurant.id })
+      .then(({ data }) => { if (data) setPaymentProvider(data); });
+  }, [restaurant.id]);
 
   const createOrder = useCallback(async (method) => {
     setBusy(true);
@@ -5964,6 +6497,8 @@ function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, p
           detail: (c.supplements || []).map((s) => s.name).join(", "),
         })),
         p_client_token: clientToken.current,
+        p_covers: orderType === "dine_in" ? covers : 1,
+        p_session_id: orderType === "dine_in" ? sessionId : null,
       });
       if (error) throw error;
       const order = { id: res.order_id };
@@ -5998,7 +6533,7 @@ function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, p
       }
       setBusy(false);
     }
-  }, [restaurant.id, tableId, orderType, profile, cart, promo, onDone, toast]);
+  }, [restaurant.id, tableId, orderType, covers, sessionId, profile, cart, promo, onDone, toast]);
 
   const payCard = async () => {
     // If the total is exactly 0 (e.g. 100% promo), skip Stripe entirely —
@@ -6027,6 +6562,44 @@ function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, p
     }
   };
 
+  // Flatpay : paiement hébergé par redirection (contrairement à Stripe,
+  // embarqué via Elements). Le client quitte Wegemo, paie chez Flatpay
+  // (carte / Apple Pay selon l'appareil — géré entièrement par Flatpay, pas
+  // de logique Apple Pay ici), puis revient sur /payment/success|cancel, où
+  // FlatpayPaymentReturn revérifie le statut côté serveur avant de considérer
+  // la commande comme payée.
+  const payFlatpay = async () => {
+    if (total <= 0) return createOrder("card");
+    if (!hasSupabase || restaurant.id === "demo") {
+      await new Promise((r) => setTimeout(r, 600));
+      onDone(uid());
+      return;
+    }
+    setBusy(true);
+    try {
+      const returnBaseUrl = `${siteBase()}/r/${restaurant.slug}/t/${tableNum}`;
+      const data = await callFunction("flatpay-create-payment", {
+        restaurant_id: restaurant.id, table_id: tableId, order_type: orderType,
+        covers: orderType === "dine_in" ? covers : 1, session_id: orderType === "dine_in" ? sessionId : null,
+        items: cart.map((c) => ({
+          menu_item_id: c.item.id, quantity: c.qty,
+          supplements: c.supplements || [], detail: (c.supplements || []).map((s) => s.name).join(", "),
+        })),
+        promo_code: promo?.code || null, customer_name: profile.name || "", customer_email: profile.email || "",
+        client_token: clientToken.current, return_base_url: returnBaseUrl,
+      });
+      if (data?.error || !data?.redirect_url) {
+        toast(data?.error || "Paiement en ligne indisponible.", "error");
+        setBusy(false);
+        return;
+      }
+      window.location.href = data.redirect_url;
+    } catch (e) {
+      toast(e.message || "Erreur", "error");
+      setBusy(false);
+    }
+  };
+
   return (
     <div style={{ padding: 20, minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
@@ -6045,7 +6618,11 @@ function CustomerPayment({ restaurant, tableId, orderType, cart, total, promo, p
       ) : (
         <>
           <Btn variant="primary" size="lg" style={{ marginBottom: 12 }} disabled={busy} onClick={() => createOrder("cash")}>💵 {t(lang, "payCash")}</Btn>
-          <Btn variant="blue" size="lg" disabled={busy} onClick={payCard}>💳 {t(lang, "payCard")}</Btn>
+          {paymentProvider === "flatpay" ? (
+            <Btn variant="blue" size="lg" disabled={busy} onClick={payFlatpay}>💳 {t(lang, "payOnline")}</Btn>
+          ) : (
+            <Btn variant="blue" size="lg" disabled={busy} onClick={payCard}>💳 {t(lang, "payCard")}</Btn>
+          )}
           {busy && <p style={{ ...FF, textAlign: "center", marginTop: 16, color: C.textSecondary }}>…</p>}
         </>
       )}
@@ -6121,6 +6698,82 @@ function CustomerDone({ orderId, restaurant, settings, lang }) {
 }
 
 /* ============================================================================
+ * RETOUR PAIEMENT FLATPAY — /r/{slug}/t/{table}/payment/{success|cancel|pending}
+ *
+ * Le segment d'URL (success/cancel/pending) est purement informatif : l'état
+ * réellement affiché vient TOUJOURS de flatpay-payment-status, qui revérifie
+ * le statut auprès de Flatpay. Revenir sur "success" ne suffit jamais à
+ * afficher "payé" — voir finalizePaymentAttempt côté serveur.
+ * ==========================================================================*/
+function FlatpayPaymentReturn({ slug, tableNum, attemptId }) {
+  const [phase, setPhase] = useState("checking"); // checking | paid | failed | cancelled
+  const [restaurant, setRestaurant] = useState(null);
+  const [settings, setSettings] = useState({});
+  const [lang, setLang] = useState("fr");
+  const [orderId, setOrderId] = useState(null);
+
+  useEffect(() => {
+    if (!hasSupabase) return;
+    (async () => {
+      const byUuid = /^[0-9a-f-]{36}$/i.test(slug);
+      const { data: r } = await supabase.from("restaurants").select("*").eq(byUuid ? "id" : "slug", slug).maybeSingle();
+      setRestaurant(r || null);
+      if (r) {
+        const { data: st } = await supabase.from("restaurant_settings").select("*").eq("restaurant_id", r.id).maybeSingle();
+        setSettings(st || {});
+      }
+    })();
+  }, [slug]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!hasSupabase || !attemptId) { setPhase("failed"); return; }
+    let cancelled = false;
+    let timer = null;
+
+    const check = async () => {
+      try {
+        const res = await callFunction("flatpay-payment-status", { payment_attempt_id: attemptId });
+        if (cancelled) return;
+        if (res.status === "PAID") {
+          setOrderId(res.orderId);
+          setPhase("paid");
+          return;
+        }
+        if (res.status === "PAYMENT_FAILED") { setPhase("failed"); return; }
+        if (res.status === "PAYMENT_CANCELLED") { setPhase("cancelled"); return; }
+        // PAYMENT_PROCESSING : on retente sous peu — le client peut tout juste
+        // revenir de Flatpay avant que le webhook n'ait été livré.
+        timer = setTimeout(check, 2500);
+      } catch {
+        if (!cancelled) timer = setTimeout(check, 2500);
+      }
+    };
+    check();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [attemptId]);
+
+  const retryUrl = restaurant ? `${siteBase()}/r/${restaurant.slug}/t/${tableNum}` : "#";
+
+  if (phase === "paid" && restaurant) {
+    return <CustomerDone orderId={orderId} restaurant={restaurant} settings={settings} lang={lang} />;
+  }
+
+  if (phase === "failed" || phase === "cancelled") {
+    return (
+      <div style={{ padding: 24, minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center" }}>
+        <div style={{ fontSize: 56, marginBottom: 12 }}>✕</div>
+        <h1 style={{ ...FF, fontWeight: 900, fontSize: 22, marginBottom: 6 }}>{t(lang, "paymentFailedTitle")}</h1>
+        <p style={{ ...FF, color: C.textSecondary, marginBottom: 24 }}>{t(lang, "paymentFailedSub")}</p>
+        <Btn variant="primary" size="lg" onClick={() => { window.location.href = retryUrl; }}>{t(lang, "retryPayment")}</Btn>
+      </div>
+    );
+  }
+
+  return <CenterMsg emoji="⏳" text={t(lang, "paymentPending")} />;
+}
+
+/* ============================================================================
  * GMAIL OAUTH CALLBACK
  * ==========================================================================*/
 function GmailCallback() {
@@ -6153,6 +6806,10 @@ function AppInner() {
   const { user, loading, demoUser, setDemoUser, signOut, passwordRecovery } = useAuth();
   const path = window.location.pathname;
 
+  // Retour paiement Flatpay: /r/{slug}/t/{tableNum}/payment/{success|cancel|pending}
+  // — vérifié AVANT customerMatch (plus spécifique) pour ne pas retomber sur
+  // le menu client, qui reprendrait au début du parcours.
+  const paymentReturnMatch = path.match(/\/r\/([^/]+)\/t\/(\d+)\/payment\/(success|cancel|pending)/);
   // Customer route: /r/{slug}/t/{tableNum}
   const customerMatch = path.match(/\/r\/([^/]+)\/t\/(\d+)/);
   const goMatch = path.match(/\/go\/([^/?#]+)/);
@@ -6166,6 +6823,16 @@ function AppInner() {
   if (path.includes("/oauth/gmail")) return <GmailCallback />;
   if (passwordRecovery) return <NewPasswordPage />;
   if (goMatch) return <GoRedirect slug={decodeURIComponent(goMatch[1])} />;
+  if (paymentReturnMatch) {
+    const params = new URLSearchParams(window.location.search);
+    return (
+      <FlatpayPaymentReturn
+        slug={decodeURIComponent(paymentReturnMatch[1])}
+        tableNum={paymentReturnMatch[2]}
+        attemptId={params.get("attempt")}
+      />
+    );
+  }
   if (customerMatch) {
     const cSlug = decodeURIComponent(customerMatch[1]);
     // Hotel rooms open the guest portal (hub), not the restaurant menu flow.
