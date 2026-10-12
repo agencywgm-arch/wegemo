@@ -129,3 +129,27 @@ a {
   .baoma-kb { animation: none; }
   .baoma-reveal { opacity: 1; transform: none; transition: none; }
 }
+
+/* THÈME BAOMA — mise en page responsive de la carte client (QR) : 2 colonnes
+   sur téléphone, 3 sur tablette portrait, 4 sur tablette paysage / grand écran. */
+.baoma-hero { height: 230px; }
+.baoma-sections { padding: 0 16px; }
+.baoma-wrap { max-width: 576px; margin-left: auto; margin-right: auto; }
+.baoma-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 16px;
+  row-gap: 40px;
+  margin-top: 20px;
+}
+@media (min-width: 700px) {
+  .baoma-hero { height: 340px; }
+  .baoma-sections { padding: 0 32px; }
+  .baoma-wrap { max-width: 920px; }
+  .baoma-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 24px; row-gap: 44px; }
+}
+@media (min-width: 1100px) {
+  .baoma-hero { height: 400px; }
+  .baoma-wrap { max-width: 1240px; }
+  .baoma-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

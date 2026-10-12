@@ -5646,13 +5646,15 @@ function CustomerPage({ slug, tableNum }) {
   const baomaDarkStep = BAOMA_THEME_SLUGS.includes(restaurant.slug) && ["ordertype", "covers", "menu"].includes(step);
 
   return (
-    <div dir={dir} style={{ minHeight: "100vh", background: baomaDarkStep ? BAOMA_THEME.ink : C.bg, maxWidth: 480, margin: "0 auto", position: "relative" }}>
+    <div dir={dir} style={{ minHeight: "100vh", background: baomaDarkStep ? BAOMA_THEME.ink : C.bg, maxWidth: baomaDarkStep ? "none" : 480, margin: "0 auto", position: "relative" }}>
       {step === "ordertype" && (
         BAOMA_THEME_SLUGS.includes(restaurant.slug) ? (
-          <BaomaOrderType
-            restaurant={restaurant} lang={lang} setLang={setLang} orderType={orderType} setOrderType={setOrderType}
-            onConfirm={() => setStep(orderType === "dine_in" ? (sessionId ? "menu" : "covers") : "menu")}
-          />
+          <div style={{ maxWidth: 520, margin: "0 auto" }}>
+            <BaomaOrderType
+              restaurant={restaurant} lang={lang} setLang={setLang} orderType={orderType} setOrderType={setOrderType}
+              onConfirm={() => setStep(orderType === "dine_in" ? (sessionId ? "menu" : "covers") : "menu")}
+            />
+          </div>
         ) : (
         <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
@@ -5679,10 +5681,12 @@ function CustomerPage({ slug, tableNum }) {
 
       {step === "covers" && (
         BAOMA_THEME_SLUGS.includes(restaurant.slug) ? (
-          <BaomaCovers
-            lang={lang} setLang={setLang} covers={covers} setCovers={setCovers}
-            onBack={() => setStep("ordertype")} onConfirm={confirmCovers} opening={openingSession}
-          />
+          <div style={{ maxWidth: 520, margin: "0 auto" }}>
+            <BaomaCovers
+              lang={lang} setLang={setLang} covers={covers} setCovers={setCovers}
+              onBack={() => setStep("ordertype")} onConfirm={confirmCovers} opening={openingSession}
+            />
+          </div>
         ) : (
         <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
@@ -5995,7 +5999,7 @@ function BaomaHeroVideo() {
   const [ready, setReady] = useState(false);
   const poster = bImg("/hero-baoma-poster.jpg");
   return (
-    <div style={{ position: "relative", height: 230, overflow: "hidden", background: `${BK.ink} url(${poster}) center/cover` }}>
+    <div className="baoma-hero" style={{ position: "relative", overflow: "hidden", background: `${BK.ink} url(${poster}) center/cover` }}>
       {!failed && (
         <video
           autoPlay muted loop playsInline preload="auto" poster={poster}
@@ -6238,7 +6242,7 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
       <div style={{ position: "sticky", top: 0, zIndex: 20, background: "rgba(10,10,10,.92)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", borderBottom: "1px solid rgba(242,236,224,.07)" }}>
         <div
           ref={stripRef}
-          style={{ display: "flex", gap: 8, overflowX: "auto", padding: "10px 16px", scrollbarWidth: "none" }}
+          style={{ display: "flex", justifyContent: "safe center", gap: 8, overflowX: "auto", padding: "10px 16px", scrollbarWidth: "none" }}
         >
           {groups.map((g) => (
             <button
@@ -6263,14 +6267,14 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
       </div>
 
       {/* Sections : toute la carte à la suite */}
-      <div style={{ padding: "0 16px" }}>
+      <div className="baoma-sections">
         {groups.map((g) => (
           <section key={g.key} id={`bcat-${g.key}`} style={{ scrollMarginTop: 118, marginTop: 30 }}>
-            <div className="baoma-reveal">
+            <div className="baoma-reveal baoma-wrap">
               <h2 style={{ ...BDISPLAY, fontSize: 24, letterSpacing: 0.5, color: BK.offwhite, lineHeight: 1.05 }}>{g.name}</h2>
               {g.tagline && <p style={{ ...BFF, fontSize: 12, color: "rgba(242,236,224,.5)", marginTop: 3 }}>{g.tagline}</p>}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", columnGap: 16, rowGap: 40, marginTop: 20, maxWidth: 576, marginLeft: "auto", marginRight: "auto" }}>
+            <div className="baoma-grid baoma-wrap">
               {g.items.map((it) => (
                 <BaomaCard key={it.id} item={it} onPick={pick} onZoom={setZoomItem} />
               ))}
