@@ -5957,10 +5957,10 @@ function BaomaCard({ item, onPick, onZoom }) {
       </div>
 
       <div style={{ marginTop: 14 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-          <h3 style={{ ...BDISPLAY, fontSize: 16, lineHeight: 1.15, letterSpacing: 0.4, color: BK.offwhite, flexShrink: 0 }}>
-            {item.name}
-          </h3>
+        <h3 style={{ ...BDISPLAY, fontSize: 16, lineHeight: 1.15, letterSpacing: 0.4, color: BK.offwhite }}>
+          {item.name}
+        </h3>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}>
           <span aria-hidden style={{ flex: 1, minWidth: 12, marginTop: 2, borderBottom: "1px dotted rgba(242,236,224,.25)" }} />
           <strong style={{ ...BDISPLAY, fontSize: 16, color: BK.offwhite, flexShrink: 0 }}>{eur(item.price)}</strong>
         </div>
@@ -6225,7 +6225,7 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
               <h2 style={{ ...BDISPLAY, fontSize: 24, letterSpacing: 0.5, color: BK.offwhite, lineHeight: 1.05 }}>{g.name}</h2>
               {g.tagline && <p style={{ ...BFF, fontSize: 12, color: "rgba(242,236,224,.5)", marginTop: 3 }}>{g.tagline}</p>}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 36, marginTop: 20, maxWidth: 460, marginLeft: "auto", marginRight: "auto" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", columnGap: 16, rowGap: 40, marginTop: 20, maxWidth: 576, marginLeft: "auto", marginRight: "auto" }}>
               {g.items.map((it) => (
                 <BaomaCard key={it.id} item={it} onPick={pick} onZoom={setZoomItem} />
               ))}
