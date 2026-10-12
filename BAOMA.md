@@ -58,3 +58,18 @@ Deux options :
   faudra extraire ces constantes vers `restaurant_settings`.
 - Le récapitulatif panier réutilise le composant Wegemo standard (emoji, pas
   photo).
+
+## Même carte sur tous les comptes Baoma
+
+Chaque restaurant a sa propre copie de la carte dans `menu_items`. La page QR,
+la caisse (Vente), la cuisine et le dashboard lisent tous cette copie. Pour que
+tous les comptes Baoma aient exactement la carte officielle de `src/baomaData.js` :
+
+1. Régénérer le script si la carte a changé (le script est généré depuis
+   `src/baomaData.js`).
+2. Coller `supabase/migration_baoma_sync_menu.sql` dans l'éditeur SQL Supabase
+   et exécuter. Les comptes concernés : slug commençant par « baoma » + les
+   restaurants du même groupe franchise. Les plats hors carte officielle sont
+   désactivés (jamais supprimés) ; stock et TVA ne sont pas modifiés.
+3. Pour resynchroniser plus tard sans recoller tout le script : `select sync_baoma_menu();`
+   (la fonction reste enregistrée dans la base, il faut recoller le script si la carte change).
