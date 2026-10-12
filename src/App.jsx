@@ -2453,6 +2453,7 @@ function PromoCodes({ restaurant, store }) {
 function MenuTab({ restaurant, store }) {
   const toast = useToast();
   const [editing, setEditing] = useState(null);
+  const [showUnavailable, setShowUnavailable] = useState(false);
   const blank = { name: "", description: "", price: 0, category: "Plats", emoji: "🍴", is_popular: false, available: true, stock: "", vat_rate: 10, supplements: [], extras: [] };
 
   const save = async (item) => {
@@ -2486,19 +2487,31 @@ function MenuTab({ restaurant, store }) {
     toast("Plat supprimé", "info");
   };
 
-  const cats = [...new Set(store.menu.map((m) => m.category))];
+  // Un plat indisponible n'apparaît plus dans la liste (ni côté client, ni en
+  // caisse) : on le masque aussi ici par défaut, avec un bouton pour le
+  // retrouver et le réactiver.
+  const unavailableCount = store.menu.filter((m) => !m.available).length;
+  const visibleMenu = showUnavailable ? store.menu : store.menu.filter((m) => m.available);
+  const cats = [...new Set(visibleMenu.map((m) => m.category))];
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 8, flexWrap: "wrap" }}>
         <h2 style={{ ...FF, fontSize: 22, fontWeight: 800 }}>🍽️ Carte</h2>
-        <Btn variant="primary" onClick={() => setEditing(blank)}>+ Plat</Btn>
+        <div style={{ display: "flex", gap: 8 }}>
+          {unavailableCount > 0 && (
+            <Btn variant="subtle" onClick={() => setShowUnavailable((v) => !v)}>
+              {showUnavailable ? "Masquer" : "Voir"} les indisponibles ({unavailableCount})
+            </Btn>
+          )}
+          <Btn variant="primary" onClick={() => setEditing(blank)}>+ Plat</Btn>
+        </div>
       </div>
       {cats.map((cat) => (
         <div key={cat} style={{ marginBottom: 18 }}>
           <h3 style={{ ...FF, fontSize: 15, fontWeight: 700, color: C.textSecondary, marginBottom: 8 }}>{cat}</h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10 }}>
-            {store.menu.filter((m) => m.category === cat).map((m) => (
+            {visibleMenu.filter((m) => m.category === cat).map((m) => (
               <Surface key={m.id} style={{ padding: 14, cursor: "pointer", opacity: m.available ? 1 : 0.5 }} onClick={() => setEditing(m)}>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <span style={{ fontSize: 24 }}>{m.emoji}</span>
