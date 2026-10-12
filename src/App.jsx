@@ -5974,6 +5974,36 @@ function BaomaCard({ item, onPick, onZoom }) {
   );
 }
 
+// Bannière vidéo en tête de la carte (même vidéo que le site vitrine). Muette,
+// en boucle ; si la lecture auto est bloquée ou que la vidéo échoue, l'image
+// d'affiche reste visible.
+function BaomaHeroVideo() {
+  const [failed, setFailed] = useState(false);
+  const [ready, setReady] = useState(false);
+  const poster = bImg("/hero-baoma-poster.jpg");
+  return (
+    <div style={{ position: "relative", height: 230, overflow: "hidden", background: `${BK.ink} url(${poster}) center/cover` }}>
+      {!failed && (
+        <video
+          autoPlay muted loop playsInline preload="auto" poster={poster}
+          onLoadedData={() => setReady(true)}
+          onError={() => setFailed(true)}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: ready ? 1 : 0, transition: "opacity .7s" }}
+        >
+          <source src={bImg("/hero-baoma.mp4")} type="video/mp4" />
+        </video>
+      )}
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(10,10,10,.35) 0%, rgba(10,10,10,.55) 55%, rgba(10,10,10,1) 100%)" }} />
+      <div style={{ position: "absolute", left: 16, right: 16, bottom: 20 }}>
+        <div style={{ ...BDISPLAY, fontStyle: "italic", fontWeight: 300, textTransform: "uppercase", fontSize: 34, lineHeight: 1, letterSpacing: 0.5, color: BK.offwhite }}>
+          Asian fusion<br />réinventée
+        </div>
+        <p style={{ ...BDISPLAY, fontSize: 15, color: "rgba(242,236,224,.7)", marginTop: 8 }}>Bao burgers · Smash bao · Bowls signature</p>
+      </div>
+    </div>
+  );
+}
+
 function BaomaPhotoZoom({ item, onClose }) {
   useEffect(() => {
     if (!item) return;
@@ -6188,6 +6218,8 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
         </div>
         <LangPicker lang={lang} setLang={setLang} dark />
       </div>
+
+      <BaomaHeroVideo />
 
       {/* Frise de catégories collante */}
       <div style={{ position: "sticky", top: 0, zIndex: 20, background: "rgba(10,10,10,.92)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", borderBottom: "1px solid rgba(242,236,224,.07)" }}>
