@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, createContext, useContext } from "react";
 import QRCode from "qrcode";
 import { supabase, hasSupabase, callFunction } from "./lib/supabase.js";
+import { getPrintMode, setPrintMode, getQzPrinter, setQzPrinter, getPaperWidth, setPaperWidth, listQzPrinters, qzDefaultPrinter, printTicketElement } from "./lib/printStation.js";
 import { BAOMA_SLUG, BAOMA_THEME, BAOMA_CATEGORIES, BAOMA_MENU, BAOMA_RESTAURANT } from "./baomaData.js";
 
 // Restaurants qui utilisent le design premium Baoma (photos, tilt 3D, etc.)
@@ -2449,6 +2450,79 @@ function PromoCodes({ restaurant, store }) {
   );
 }
 
+// Réglage d'impression propre à CET appareil (stocké dans le navigateur) :
+// le PC relié à l'imprimante se met en mode QZ Tray (silencieux) ; les tablettes
+// en « ne pas imprimer ».
+function PrintStationCard() {
+  const toast = useToast();
+  const [mode, setModeState] = useState(getPrintMode());
+  const [printer, setPrinterState] = useState(getQzPrinter());
+  const [paper, setPaperState] = useState(getPaperWidth());
+  const [printers, setPrinters] = useState([]);
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const changeMode = (m) => { setPrintMode(m); setModeState(m); };
+  const changePrinter = (p) => { setQzPrinter(p); setPrinterState(p); };
+  const changePaper = (w) => { setPaperWidth(w); setPaperState(w); };
+
+  const detect = async () => {
+    setBusy(true);
+    setStatus("Connexion à QZ Tray…");
+    try {
+      const list = await listQzPrinters();
+      setPrinters(list);
+      if (!printer) {
+        const def = await qzDefaultPrinter().catch(() => "");
+        const pick = list.find((n) => n === def) || list.find((n) => /epson|tm-|receipt|ticket/i.test(n)) || list[0];
+        if (pick) changePrinter(pick);
+      }
+      setStatus(`✅ QZ Tray connecté — ${list.length} imprimante${list.length > 1 ? "s" : ""} trouvée${list.length > 1 ? "s" : ""}.`);
+    } catch (err) {
+      setStatus(`❌ QZ Tray injoignable : ${err?.message || err}. Vérifiez qu'il est lancé (icône près de l'horloge) et autorisez ce site si une fenêtre apparaît.`);
+      toast("QZ Tray injoignable", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const selectStyle = { ...FF, width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 14, background: C.white, color: C.text };
+  const labelStyle = { ...FF, fontSize: 13, fontWeight: 600, color: C.textSecondary, display: "block", margin: "12px 0 6px" };
+
+  return (
+    <div style={{ margin: "14px 0", padding: 14, border: `1px solid ${C.border}`, borderRadius: 12 }}>
+      <strong style={{ ...FF, fontSize: 14 }}>🖥️ Impression sur cet appareil</strong>
+      <p style={{ ...FF, fontSize: 12, color: C.textSecondary, marginTop: 4 }}>
+        Ce réglage ne concerne que cet appareil. Sur le PC relié à l'imprimante : QZ Tray. Sur les tablettes : « Ne pas imprimer ».
+      </p>
+      <label htmlFor="print-mode" style={labelStyle}>Mode</label>
+      <select id="print-mode" value={mode} onChange={(e) => changeMode(e.target.value)} style={selectStyle}>
+        <option value="browser">Navigateur (boîte de dialogue d'impression)</option>
+        <option value="qz">QZ Tray — impression silencieuse (PC de la caisse)</option>
+        <option value="off">Ne pas imprimer automatiquement sur cet appareil</option>
+      </select>
+      {mode === "qz" && (
+        <div>
+          <label htmlFor="print-printer" style={labelStyle}>Imprimante</label>
+          <select id="print-printer" value={printer} onChange={(e) => changePrinter(e.target.value)} style={selectStyle}>
+            <option value="">— choisir —</option>
+            {[...new Set([printer, ...printers].filter(Boolean))].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+          <label htmlFor="print-paper" style={labelStyle}>Largeur du papier</label>
+          <select id="print-paper" value={paper} onChange={(e) => changePaper(e.target.value)} style={selectStyle}>
+            <option value="80">80 mm (48 caractères)</option>
+            <option value="58">58 mm (32 caractères)</option>
+          </select>
+          <div style={{ marginTop: 10 }}>
+            <Btn variant="subtle" onClick={detect} disabled={busy}>{busy ? "…" : "🔌 Détecter QZ Tray et les imprimantes"}</Btn>
+          </div>
+          {status && <p style={{ ...FF, fontSize: 12, marginTop: 8, color: C.textSecondary }}>{status}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---- Menu ---- */
 function MenuTab({ restaurant, store }) {
   const toast = useToast();
@@ -3764,6 +3838,7 @@ function SettingsTab({ restaurant, store, modules = ["base"], onModulesChange })
         <label style={{ ...FF, fontSize: 14, display: "flex", gap: 8, alignItems: "center", margin: "10px 0 4px" }}>
           <input type="checkbox" checked={settings.auto_print_enabled !== false} onChange={(e) => setSettings({ ...settings, auto_print_enabled: e.target.checked })} /> Impression automatique des tickets
         </label>
+        <PrintStationCard />
         <div style={{ marginTop: 8 }}>
           {field("ticket_address", "Adresse (affichée sur le ticket)")}
           {field("ticket_phone", "Téléphone")}
@@ -4191,7 +4266,9 @@ function useAutoPrintQueue(store, autoPrintEnabled) {
       return;
     }
 
-    if (autoPrintEnabled !== false) {
+    // Un appareil réglé sur « ne pas imprimer » (ex. une tablette) n'imprime
+    // jamais automatiquement : seul le poste relié à l'imprimante le fait.
+    if (autoPrintEnabled !== false && getPrintMode() !== "off") {
       const sessionsById = new Map(sessions.map((s) => [s.id, s]));
       const fresh = store.orders.filter((o) => !prevIds.current.has(o.id) && o.customer_name !== "Comptoir");
       const jobs = [];
@@ -4465,6 +4542,7 @@ function KitchenSessionTicket({ session, orders = [] }) {
 // `onDone` une fois l'impression terminée (ou annulée) pour libérer la file.
 // `job.kind === "kitchen"` imprime le bon de cuisine, sinon le ticket client.
 function TicketPrintLayer({ job, onDone, restaurant, settings }) {
+  const toast = useToast();
   useEffect(() => {
     if (!job) return;
     document.body.classList.add("wegemo-printing-ticket");
@@ -4473,8 +4551,26 @@ function TicketPrintLayer({ job, onDone, restaurant, settings }) {
       window.removeEventListener("afterprint", finish);
       onDone();
     };
-    window.addEventListener("afterprint", finish);
-    const t = setTimeout(() => window.print(), 60);
+    const browserPrint = () => {
+      window.addEventListener("afterprint", finish);
+      window.print();
+    };
+    // Poste relié à l'imprimante : impression silencieuse via QZ Tray. Si QZ
+    // est injoignable on retombe sur la boîte d'impression du navigateur plutôt
+    // que de perdre le ticket.
+    if (getPrintMode() === "qz") {
+      const t = setTimeout(async () => {
+        try {
+          await printTicketElement(document.getElementById("wegemo-ticket-print"));
+          finish();
+        } catch (err) {
+          toast(`QZ Tray : ${err?.message || "impression impossible"}. Impression par le navigateur.`, "error");
+          browserPrint();
+        }
+      }, 80);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(browserPrint, 60);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job]);
