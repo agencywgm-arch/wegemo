@@ -6290,7 +6290,7 @@ function ComposeModal({ item, lang, onClose, onAdd }) {
             >
               <option value="">{COMPOSE_GROUP_DEFAULT[g] || "Aucun"}</option>
               {allSups.filter((s) => s.group === g).map((s) => (
-                <option key={s.name} value={s.name}>{s.name} (+{eur(s.price)})</option>
+                <option key={s.name} value={s.name}>{Number(s.price) ? `${s.name} (+${eur(s.price)})` : s.name}</option>
               ))}
             </select>
           </div>

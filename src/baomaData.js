@@ -34,6 +34,7 @@ export const BAOMA_CATEGORIES = [
 // menu_items.supplements avec une clé `group` : sans `group`, un supplément
 // reste une simple case à cocher (comportement historique des autres restos).
 const FRITES_OPTIONS = [
+  { name: "Sans frites", price: 0 },
   { name: "Frites Paprika", price: 1.2 },
   { name: "Frites de Patate Douce", price: 1.6 },
   { name: "Frites Cheddar Maison", price: 1.5 },
