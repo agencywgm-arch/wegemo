@@ -11,6 +11,9 @@ const PAPER_KEY = "wegemo_qz_paper"; // "80" (défaut) | "58"
 const read = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
 const write = (k, v) => { try { localStorage.setItem(k, v); } catch { /* storage unavailable */ } };
 
+const CERT_KEY = "wegemo_qz_cert";
+const PRIVATE_KEY = "wegemo_qz_key";
+
 export const getPrintMode = () => read(MODE_KEY, "browser");
 export const setPrintMode = (m) => write(MODE_KEY, m);
 export const getQzPrinter = () => read(PRINTER_KEY, "");
@@ -21,24 +24,72 @@ export const setPaperWidth = (w) => write(PAPER_KEY, w);
 // Colonnes d'une ligne en police A : 48 sur du 80 mm, 32 sur du 58 mm.
 export const paperColumns = () => (getPaperWidth() === "58" ? 32 : 48);
 
+// Certificat + clé privée de CE poste, générés dans son navigateur (jamais
+// envoyés ailleurs). Sans eux les demandes ne sont pas signées et QZ Tray
+// affiche « Untrusted website » à chaque action, sans pouvoir la mémoriser.
+export const hasQzCredentials = () => Boolean(read(CERT_KEY, "") && read(PRIVATE_KEY, ""));
+export const getQzCertificate = () => read(CERT_KEY, "");
+
+export async function signMessage(message) {
+  const forge = (await import("node-forge")).default;
+  const key = forge.pki.privateKeyFromPem(read(PRIVATE_KEY, ""));
+  const md = forge.md.sha512.create();
+  md.update(message, "utf8");
+  return forge.util.encode64(key.sign(md));
+}
+
+function applySecurity(qz) {
+  const signed = hasQzCredentials();
+  const cert = getQzCertificate();
+  qz.security.setCertificatePromise((resolve) => resolve(signed ? cert : undefined));
+  qz.security.setSignatureAlgorithm("SHA512");
+  qz.security.setSignaturePromise((toSign) => (resolve, reject) => {
+    if (!signed) return resolve();
+    signMessage(toSign).then(resolve, reject);
+  });
+}
+
+export async function generateQzCredentials() {
+  const forge = (await import("node-forge")).default;
+  await new Promise((r) => setTimeout(r, 30)); // laisse l'écran afficher « génération… »
+  const keys = forge.pki.rsa.generateKeyPair({ bits: 2048, e: 0x10001 });
+  const cert = forge.pki.createCertificate();
+  cert.publicKey = keys.publicKey;
+  cert.serialNumber = "01" + forge.util.bytesToHex(forge.random.getBytesSync(8));
+  cert.validity.notBefore = new Date(Date.now() - 24 * 3600 * 1000);
+  cert.validity.notAfter = new Date(Date.now() + 10 * 365 * 24 * 3600 * 1000);
+  const attrs = [
+    { name: "commonName", value: "Wegemo Caisse" },
+    { name: "organizationName", value: "Baoma" },
+    { name: "countryName", value: "FR" },
+  ];
+  cert.setSubject(attrs);
+  cert.setIssuer(attrs);
+  cert.sign(keys.privateKey, forge.md.sha256.create());
+  write(CERT_KEY, forge.pki.certificateToPem(cert));
+  write(PRIVATE_KEY, forge.pki.privateKeyToPem(keys.privateKey));
+  // La connexion ouverte garde l'ancienne identité : on la referme.
+  try {
+    const qz = await getQz();
+    if (qz.websocket.isActive()) await qz.websocket.disconnect();
+  } catch { /* QZ absent : rien à fermer */ }
+  return getQzCertificate();
+}
+
+export function clearQzCredentials() {
+  write(CERT_KEY, "");
+  write(PRIVATE_KEY, "");
+}
+
 let qzPromise = null;
 function getQz() {
-  if (!qzPromise) {
-    qzPromise = import("qz-tray").then((m) => {
-      const qz = m.default || m;
-      // Demandes non signées : QZ Tray affiche une fois « Untrusted website »
-      // sur le PC, à autoriser avec « Remember this decision ».
-      qz.security.setCertificatePromise((resolve) => resolve());
-      qz.security.setSignatureAlgorithm("SHA512");
-      qz.security.setSignaturePromise(() => (resolve) => resolve());
-      return qz;
-    });
-  }
+  if (!qzPromise) qzPromise = import("qz-tray").then((m) => m.default || m);
   return qzPromise;
 }
 
 export async function connectQz() {
   const qz = await getQz();
+  applySecurity(qz);
   if (!qz.websocket.isActive()) await qz.websocket.connect({ retries: 2, delay: 1 });
   return qz;
 }

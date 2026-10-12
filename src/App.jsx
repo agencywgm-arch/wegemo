@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, createContext, useContext } from "react";
 import QRCode from "qrcode";
 import { supabase, hasSupabase, callFunction } from "./lib/supabase.js";
-import { getPrintMode, setPrintMode, getQzPrinter, setQzPrinter, getPaperWidth, setPaperWidth, listQzPrinters, qzDefaultPrinter, printTicketElement } from "./lib/printStation.js";
+import { getPrintMode, setPrintMode, getQzPrinter, setQzPrinter, getPaperWidth, setPaperWidth, listQzPrinters, qzDefaultPrinter, printTicketElement, hasQzCredentials, getQzCertificate, generateQzCredentials, clearQzCredentials } from "./lib/printStation.js";
 import { BAOMA_SLUG, BAOMA_THEME, BAOMA_CATEGORIES, BAOMA_MENU, BAOMA_RESTAURANT } from "./baomaData.js";
 
 // Restaurants qui utilisent le design premium Baoma (photos, tilt 3D, etc.)
@@ -2461,6 +2461,30 @@ function PrintStationCard() {
   const [printers, setPrinters] = useState([]);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [signed, setSigned] = useState(hasQzCredentials());
+
+  const generateCert = async () => {
+    setBusy(true);
+    setStatus("Génération du certificat… (quelques secondes)");
+    try {
+      await generateQzCredentials();
+      setSigned(true);
+      setStatus("✅ Certificat généré sur ce poste. Cliquez sur « Détecter » : dans QZ Tray, choisissez Allow en cochant « Remember this decision ».");
+    } catch (err) {
+      setStatus(`❌ Échec de la génération : ${err?.message || err}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const downloadCert = () => {
+    const url = URL.createObjectURL(new Blob([getQzCertificate()], { type: "application/x-x509-ca-cert" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "wegemo-qz.crt";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  const removeCert = () => { clearQzCredentials(); setSigned(false); setStatus("Certificat supprimé de ce poste."); };
 
   const changeMode = (m) => { setPrintMode(m); setModeState(m); };
   const changePrinter = (p) => { setQzPrinter(p); setPrinterState(p); };
@@ -2515,6 +2539,17 @@ function PrintStationCard() {
           </select>
           <div style={{ marginTop: 10 }}>
             <Btn variant="subtle" onClick={detect} disabled={busy}>{busy ? "…" : "🔌 Détecter QZ Tray et les imprimantes"}</Btn>
+          </div>
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+            <strong style={{ ...FF, fontSize: 13 }}>🔐 Autorisation QZ Tray {signed ? "✅" : "❌"}</strong>
+            <p style={{ ...FF, fontSize: 12, color: C.textSecondary, marginTop: 4 }}>
+              Sans certificat, QZ Tray affiche « Untrusted website » à chaque ticket. Le certificat est créé sur ce poste et la clé n'en sort jamais.
+            </p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+              <Btn variant="subtle" onClick={generateCert} disabled={busy}>{signed ? "Régénérer" : "Générer"} le certificat de ce poste</Btn>
+              {signed && <Btn variant="subtle" onClick={downloadCert}>⬇️ Télécharger le certificat (.crt)</Btn>}
+              {signed && <Btn variant="subtle" onClick={removeCert}>Supprimer</Btn>}
+            </div>
           </div>
           {status && <p style={{ ...FF, fontSize: 12, marginTop: 8, color: C.textSecondary }}>{status}</p>}
         </div>
