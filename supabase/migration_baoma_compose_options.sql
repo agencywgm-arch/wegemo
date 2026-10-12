@@ -1,7 +1,10 @@
--- Options de composition des plats Baoma (fenêtre de commande client).
--- À exécuter UNE fois dans l'éditeur SQL Supabase. Idempotent : réexécutable
--- sans effet de bord (réécrit les options des plats ci-dessous).
+-- Mise à jour carte Baoma du 2026-10-12 — À exécuter UNE fois dans l'éditeur SQL
+-- Supabase. Idempotent : réexécutable sans effet de bord.
 --
+--  0. Retrait du Croissmash : désactivé (available = false), jamais de DELETE,
+--     car order_items.menu_item_id référence menu_items(id) ON DELETE RESTRICT.
+--  0b. « Smash Braisé » devient « Smash Truffé » (même photo, même prix).
+--  1. Options de composition des plats (fenêtre de commande client) :
 --  * Burgers (Bao Créations, Smash Bao, Smash Burger) : retirer salade /
 --    oignons / sauce selon le plat, extra viande, choix de frites, boisson.
 --  * Wings : choix de frites + boisson.
@@ -22,6 +25,17 @@ begin
   if v_rest is null then
     raise exception 'Restaurant "baoma" introuvable — vérifie le slug avant de relancer.';
   end if;
+
+  -- --- Étape 0 : Croissmash retiré, Smash Braisé renommé en Smash Truffé -----
+  update menu_items set available = false
+   where restaurant_id = v_rest and name = 'Croissmash';
+
+  update menu_items
+     set name = 'Smash Truffé',
+         description = 'Steak smashé, oignon frit croustillant, sauce crémeuse à la truffe, bun vapeur'
+   where restaurant_id = v_rest and name in ('Smash Braisé', 'Smash Truffé') and category = 'Smash Burger';
+
+  -- --- Étape 1 : options de composition ---------------------------------------
 
   update menu_items set supplements = '[{"name":"Sans sauce","price":0,"group":"Retirer","multi":true},{"name":"Extra viande","price":3,"group":"Extras","multi":true},{"name":"Sans frites","price":0,"group":"Frites"},{"name":"Frites Paprika","price":1.2,"group":"Frites"},{"name":"Frites de Patate Douce","price":1.6,"group":"Frites"},{"name":"Frites Cheddar Maison","price":1.5,"group":"Frites"},{"name":"Frites Bacon Cheddar","price":3,"group":"Frites"},{"name":"Pepsi","price":2.5,"group":"Boisson"},{"name":"Pepsi Zero","price":2.5,"group":"Boisson"},{"name":"Pepsi Cherry","price":2.5,"group":"Boisson"},{"name":"Schweppes Pomme","price":2.5,"group":"Boisson"},{"name":"Schweppes Agrumes","price":2.5,"group":"Boisson"},{"name":"Orangina","price":2.5,"group":"Boisson"},{"name":"Oasis Tropical","price":2.5,"group":"Boisson"},{"name":"Ice Tea","price":2.5,"group":"Boisson"},{"name":"Perrier","price":2.5,"group":"Boisson"},{"name":"Eau","price":2.5,"group":"Boisson"},{"name":"Thé","price":2,"group":"Boisson"},{"name":"Café","price":2,"group":"Boisson"},{"name":"Mojito Violette","price":5.5,"group":"Boisson"},{"name":"Mojito Passion","price":5.5,"group":"Boisson"},{"name":"Mojito Cerise","price":5.5,"group":"Boisson"},{"name":"Mojito Kiwi","price":5.5,"group":"Boisson"},{"name":"Mojito Classique","price":5.5,"group":"Boisson"},{"name":"Thé Glacé Maison","price":5.5,"group":"Boisson"}]'::jsonb
    where restaurant_id = v_rest and name = 'Boeuf Croustillant' and category = 'Bao Créations' and is_menu = false;
@@ -57,7 +71,7 @@ begin
    where restaurant_id = v_rest and name = 'Smash Truffée' and category = 'Smash Bao' and is_menu = false;
 
   update menu_items set supplements = '[{"name":"Sans sauce","price":0,"group":"Retirer","multi":true},{"name":"Extra viande","price":3,"group":"Extras","multi":true},{"name":"Sans frites","price":0,"group":"Frites"},{"name":"Frites Paprika","price":1.2,"group":"Frites"},{"name":"Frites de Patate Douce","price":1.6,"group":"Frites"},{"name":"Frites Cheddar Maison","price":1.5,"group":"Frites"},{"name":"Frites Bacon Cheddar","price":3,"group":"Frites"},{"name":"Pepsi","price":2.5,"group":"Boisson"},{"name":"Pepsi Zero","price":2.5,"group":"Boisson"},{"name":"Pepsi Cherry","price":2.5,"group":"Boisson"},{"name":"Schweppes Pomme","price":2.5,"group":"Boisson"},{"name":"Schweppes Agrumes","price":2.5,"group":"Boisson"},{"name":"Orangina","price":2.5,"group":"Boisson"},{"name":"Oasis Tropical","price":2.5,"group":"Boisson"},{"name":"Ice Tea","price":2.5,"group":"Boisson"},{"name":"Perrier","price":2.5,"group":"Boisson"},{"name":"Eau","price":2.5,"group":"Boisson"},{"name":"Thé","price":2,"group":"Boisson"},{"name":"Café","price":2,"group":"Boisson"},{"name":"Mojito Violette","price":5.5,"group":"Boisson"},{"name":"Mojito Passion","price":5.5,"group":"Boisson"},{"name":"Mojito Cerise","price":5.5,"group":"Boisson"},{"name":"Mojito Kiwi","price":5.5,"group":"Boisson"},{"name":"Mojito Classique","price":5.5,"group":"Boisson"},{"name":"Thé Glacé Maison","price":5.5,"group":"Boisson"}]'::jsonb
-   where restaurant_id = v_rest and name = 'Smash Braisé' and category = 'Smash Burger' and is_menu = false;
+   where restaurant_id = v_rest and name = 'Smash Truffé' and category = 'Smash Burger' and is_menu = false;
 
   update menu_items set supplements = '[{"name":"Sans roquette","price":0,"group":"Retirer","multi":true},{"name":"Extra viande","price":3,"group":"Extras","multi":true},{"name":"Sans frites","price":0,"group":"Frites"},{"name":"Frites Paprika","price":1.2,"group":"Frites"},{"name":"Frites de Patate Douce","price":1.6,"group":"Frites"},{"name":"Frites Cheddar Maison","price":1.5,"group":"Frites"},{"name":"Frites Bacon Cheddar","price":3,"group":"Frites"},{"name":"Pepsi","price":2.5,"group":"Boisson"},{"name":"Pepsi Zero","price":2.5,"group":"Boisson"},{"name":"Pepsi Cherry","price":2.5,"group":"Boisson"},{"name":"Schweppes Pomme","price":2.5,"group":"Boisson"},{"name":"Schweppes Agrumes","price":2.5,"group":"Boisson"},{"name":"Orangina","price":2.5,"group":"Boisson"},{"name":"Oasis Tropical","price":2.5,"group":"Boisson"},{"name":"Ice Tea","price":2.5,"group":"Boisson"},{"name":"Perrier","price":2.5,"group":"Boisson"},{"name":"Eau","price":2.5,"group":"Boisson"},{"name":"Thé","price":2,"group":"Boisson"},{"name":"Café","price":2,"group":"Boisson"},{"name":"Mojito Violette","price":5.5,"group":"Boisson"},{"name":"Mojito Passion","price":5.5,"group":"Boisson"},{"name":"Mojito Cerise","price":5.5,"group":"Boisson"},{"name":"Mojito Kiwi","price":5.5,"group":"Boisson"},{"name":"Mojito Classique","price":5.5,"group":"Boisson"},{"name":"Thé Glacé Maison","price":5.5,"group":"Boisson"}]'::jsonb
    where restaurant_id = v_rest and name = 'Smash Chèvre Miel' and category = 'Smash Burger' and is_menu = false;
