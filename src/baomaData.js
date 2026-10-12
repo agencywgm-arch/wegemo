@@ -28,7 +28,33 @@ export const BAOMA_CATEGORIES = [
   { name: "Mojitos & Boissons", tagline: "Faits minute, sans alcool" },
 ];
 
-export const BAOMA_MENU = [
+// Options proposées dans la fenêtre de composition d'un plat (menus déroulants).
+// Les prix sont ceux de la carte : frites "avec Bao burger" (la frite maison est
+// incluse dans le burger), boissons au tarif carte. Stockées dans
+// menu_items.supplements avec une clé `group` : sans `group`, un supplément
+// reste une simple case à cocher (comportement historique des autres restos).
+const FRITES_OPTIONS = [
+  { name: "Frites Paprika", price: 1.2 },
+  { name: "Frites de Patate Douce", price: 1.6 },
+  { name: "Frites Cheddar Maison", price: 1.5 },
+  { name: "Frites Bacon Cheddar", price: 3 },
+].map((o) => ({ ...o, group: "Frites" }));
+
+const BOISSON_OPTIONS = [
+  ...["Pepsi", "Pepsi Zero", "Pepsi Cherry", "Schweppes Pomme", "Schweppes Agrumes", "Orangina", "Oasis Tropical", "Ice Tea", "Perrier", "Eau"].map((name) => ({ name, price: 2.5 })),
+  { name: "Thé", price: 2 },
+  { name: "Café", price: 2 },
+  ...["Mojito Violette", "Mojito Passion", "Mojito Cerise", "Mojito Kiwi", "Mojito Classique", "Thé Glacé Maison"].map((name) => ({ name, price: 5.5 })),
+].map((o) => ({ ...o, group: "Boisson" }));
+
+export const BAOMA_OPTIONS_BY_CATEGORY = {
+  "Bao Créations": [...FRITES_OPTIONS, ...BOISSON_OPTIONS],
+  "Smash Bao": [...FRITES_OPTIONS, ...BOISSON_OPTIONS],
+  "Smash Burger": [...FRITES_OPTIONS, ...BOISSON_OPTIONS],
+  "Asian Fusion": BOISSON_OPTIONS,
+};
+
+const BAOMA_MENU_BASE = [
   { id: "baoma-boeuf-croustillant-burger", restaurant_id: "baoma-demo", name: "Boeuf Croustillant", description: "Boeuf croustillant, sauce maison, cheddar fondu, bun vapeur", price: 14.9, category: "Bao Créations", emoji: "🍽️", photo_url: "/menu/boeuf-croustillant-burger.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 1, is_menu: false },
   { id: "baoma-boeuf-fondant", restaurant_id: "baoma-demo", name: "Boeuf Fondant", description: "Boeuf fondant mijoté, oignons caramélisés, cheddar fondu", price: 14.9, category: "Bao Créations", emoji: "🍽️", photo_url: "/menu/boeuf-fondant.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 2, is_menu: false },
   { id: "baoma-fried-chicken-spicy", restaurant_id: "baoma-demo", name: "Fried Chicken / Spicy", description: "Poulet pané, sauce épicée aigre-douce, sésame", price: 12.9, category: "Bao Créations", emoji: "🍽️", photo_url: "/menu/fried-chicken-spicy.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 4, is_menu: false },
@@ -79,6 +105,8 @@ export const BAOMA_MENU = [
   { id: "baoma-menu-midi", restaurant_id: "baoma-demo", name: "Menu Midi", description: "Burger + frites — formule valable de 12h à 15h, du lundi au vendredi · Au choix : Végé, Fried Chicken, Cheese Burger, Smash Bao, Chicken Thaï · Boisson au choix : +1.50€ · Cocktail au choix : +3.50€", price: 15.9, category: "Formules", emoji: "🍽️", photo_url: "/menu/menu-midi.jpg", is_popular: true, available: true, stock: null, supplements: [], extras: [], sort_order: 48, is_menu: true },
   { id: "baoma-menu-enfant", restaurant_id: "baoma-demo", name: "Menu Enfant", description: "Burger ou Nuggets · + 1 frite · + 1 boisson · + 1 compote ou 1 boule de glace", price: 9.9, category: "Formules", emoji: "🍽️", photo_url: "/menu/menu-enfant.jpg", is_popular: true, available: true, stock: null, supplements: [], extras: [], sort_order: 49, is_menu: true },
 ];
+
+export const BAOMA_MENU = BAOMA_MENU_BASE.map((it) => ({ ...it, supplements: BAOMA_OPTIONS_BY_CATEGORY[it.category] || it.supplements }));
 
 export const BAOMA_RESTAURANT = {
   id: "baoma-demo", name: "Baoma", address: "", logo_emoji: "🐼",

@@ -6257,16 +6257,46 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
   );
 }
 
+// Libellé de l'option "rien de plus" d'un menu déroulant, par groupe.
+const COMPOSE_GROUP_DEFAULT = { Frites: "Frites maison (incluses)", Boisson: "Sans boisson" };
+
+// Les suppléments portant une clé `group` (ex. Frites, Boisson) s'affichent en
+// menu déroulant à choix unique ; les autres restent des cases à cocher.
 function ComposeModal({ item, lang, onClose, onAdd }) {
+  const allSups = item.supplements || [];
+  const loose = allSups.filter((s) => !s.group);
+  const groups = [...new Set(allSups.filter((s) => s.group).map((s) => s.group))];
   const [selected, setSelected] = useState([]);
+  const [picked, setPicked] = useState({});
   const [qty, setQty] = useState(1);
   const toggle = (s) => setSelected((p) => (p.find((x) => x.name === s.name) ? p.filter((x) => x.name !== s.name) : [...p, s]));
+  const chosen = [
+    ...selected,
+    ...groups.map((g) => allSups.find((s) => s.group === g && s.name === picked[g])).filter(Boolean),
+  ];
+  const labelStyle = { ...FF, fontSize: 13, fontWeight: 600, color: C.textSecondary, display: "block", margin: "12px 0 6px" };
   return (
     <Modal onClose={onClose}>
       <div style={{ padding: 22 }}>
         <h3 style={{ ...FF }}>{item.emoji} {item.name}</h3>
-        {(item.supplements || []).length > 0 && <span style={{ ...FF, fontSize: 13, fontWeight: 600, color: C.textSecondary, display: "block", margin: "12px 0 6px" }}>{t(lang, "supplements")}</span>}
-        {(item.supplements || []).map((s) => (
+        {groups.map((g) => (
+          <div key={g}>
+            <label htmlFor={`compose-${g}`} style={labelStyle}>{g}</label>
+            <select
+              id={`compose-${g}`}
+              value={picked[g] || ""}
+              onChange={(e) => setPicked((p) => ({ ...p, [g]: e.target.value }))}
+              style={{ ...FF, width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 14, background: C.white, color: C.text }}
+            >
+              <option value="">{COMPOSE_GROUP_DEFAULT[g] || "Aucun"}</option>
+              {allSups.filter((s) => s.group === g).map((s) => (
+                <option key={s.name} value={s.name}>{s.name} (+{eur(s.price)})</option>
+              ))}
+            </select>
+          </div>
+        ))}
+        {loose.length > 0 && <span style={labelStyle}>{t(lang, "supplements")}</span>}
+        {loose.map((s) => (
           <label key={s.name} style={{ ...FF, display: "flex", justifyContent: "space-between", padding: "8px 0", fontSize: 14 }}>
             <span><input type="checkbox" onChange={() => toggle(s)} /> {s.name}</span>
             <span>+{eur(s.price)}</span>
@@ -6277,8 +6307,8 @@ function ComposeModal({ item, lang, onClose, onAdd }) {
           <strong style={{ ...FF }}>{qty}</strong>
           <Btn variant="subtle" size="sm" onClick={() => setQty((q) => q + 1)}>+</Btn>
         </div>
-        <Btn variant="primary" size="lg" style={{ width: "100%" }} onClick={() => { onAdd(item, selected, qty); onClose(); }}>
-          {t(lang, "addToCart")} — {eur((Number(item.price) + selected.reduce((s, x) => s + Number(x.price), 0)) * qty)}
+        <Btn variant="primary" size="lg" style={{ width: "100%" }} onClick={() => { onAdd(item, chosen, qty); onClose(); }}>
+          {t(lang, "addToCart")} — {eur((Number(item.price) + chosen.reduce((s, x) => s + Number(x.price), 0)) * qty)}
         </Btn>
       </div>
     </Modal>
