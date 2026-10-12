@@ -28,11 +28,15 @@ export const BAOMA_CATEGORIES = [
   { name: "Mojitos & Boissons", tagline: "Faits minute, sans alcool" },
 ];
 
-// Options proposées dans la fenêtre de composition d'un plat (menus déroulants).
-// Les prix sont ceux de la carte : frites "avec Bao burger" (la frite maison est
-// incluse dans le burger), boissons au tarif carte. Stockées dans
-// menu_items.supplements avec une clé `group` : sans `group`, un supplément
-// reste une simple case à cocher (comportement historique des autres restos).
+// Options proposées dans la fenêtre de composition d'un plat. Stockées dans
+// menu_items.supplements, avec deux clés optionnelles :
+//   group  -> regroupe les options sous un titre ; en liste déroulante à choix
+//             unique (Frites, Boisson) ou, avec multi:true, en cases à cocher
+//             (Retirer, Extras) ;
+//   sans `group`, un supplément reste une simple case à cocher (comportement
+//   historique des autres restos).
+// Prix = ceux de la carte : frites "avec Bao burger" (la frite maison est
+// incluse dans le burger), boissons au tarif carte.
 const FRITES_OPTIONS = [
   { name: "Sans frites", price: 0 },
   { name: "Frites Paprika", price: 1.2 },
@@ -48,12 +52,49 @@ const BOISSON_OPTIONS = [
   ...["Mojito Violette", "Mojito Passion", "Mojito Cerise", "Mojito Kiwi", "Mojito Classique", "Thé Glacé Maison"].map((name) => ({ name, price: 5.5 })),
 ].map((o) => ({ ...o, group: "Boisson" }));
 
-export const BAOMA_OPTIONS_BY_CATEGORY = {
-  "Bao Créations": [...FRITES_OPTIONS, ...BOISSON_OPTIONS],
-  "Smash Bao": [...FRITES_OPTIONS, ...BOISSON_OPTIONS],
-  "Smash Burger": [...FRITES_OPTIONS, ...BOISSON_OPTIONS],
-  "Asian Fusion": BOISSON_OPTIONS,
+// ⚠️ Prix de l'extra viande : à confirmer avec le restaurant (non fourni).
+export const EXTRA_VIANDE_PRICE = 3;
+const EXTRA_VIANDE = { name: "Extra viande", price: EXTRA_VIANDE_PRICE, group: "Extras", multi: true };
+
+const retirer = (...names) => names.map((n) => ({ name: n, price: 0, group: "Retirer", multi: true }));
+const SANS_SALADE = "Sans salade";
+const SANS_OIGNONS = "Sans oignons";
+const SANS_SAUCE = "Sans sauce";
+
+// Ingrédients retirables par burger, déduits de la composition affichée sur la
+// carte (salade, oignons, sauce selon les plats).
+const BURGER_RETRAITS = {
+  "baoma-boeuf-croustillant-burger": [SANS_SAUCE],
+  "baoma-boeuf-fondant": [SANS_OIGNONS],
+  "baoma-fried-chicken-spicy": [SANS_SAUCE],
+  "baoma-chicken-thai": [SANS_OIGNONS],
+  "baoma-bao-vege": [SANS_SALADE, SANS_OIGNONS],
+  "baoma-bao-fried-chicken-moutarde-miel": [SANS_SALADE, SANS_SAUCE],
+  "baoma-crazy-champi": [SANS_SAUCE],
+  "baoma-smash-bao-burger": [SANS_SAUCE],
+  "baoma-konoha-smash": [SANS_OIGNONS],
+  "baoma-smash-cheese": [SANS_OIGNONS, SANS_SAUCE],
+  "baoma-smash-truffee": [SANS_SAUCE],
+  "baoma-smash-braise": [SANS_SAUCE],
+  "baoma-smash-chevre-miel": ["Sans roquette"],
+  "baoma-smash-bacon": [SANS_SAUCE],
+  "baoma-smash-oignon": [SANS_OIGNONS, SANS_SAUCE],
 };
+
+const RIZ_RETRAITS = retirer("Sans piment", "Sans graine de sésame", "Sans coriandre");
+
+const BURGER_CATEGORIES = ["Bao Créations", "Smash Bao", "Smash Burger"];
+
+// Options d'un plat selon sa catégorie : burgers = retraits + extra viande +
+// frites + boisson ; wings = frites + boisson ; bowls = retraits + boisson.
+export function baomaOptionsFor(item) {
+  if (BURGER_CATEGORIES.includes(item.category)) {
+    return [...retirer(...(BURGER_RETRAITS[item.id] || [])), EXTRA_VIANDE, ...FRITES_OPTIONS, ...BOISSON_OPTIONS];
+  }
+  if (item.category === "Wings") return [...FRITES_OPTIONS, ...BOISSON_OPTIONS];
+  if (item.category === "Asian Fusion") return [...RIZ_RETRAITS, ...BOISSON_OPTIONS];
+  return null;
+}
 
 const BAOMA_MENU_BASE = [
   { id: "baoma-boeuf-croustillant-burger", restaurant_id: "baoma-demo", name: "Boeuf Croustillant", description: "Boeuf croustillant, sauce maison, cheddar fondu, bun vapeur", price: 14.9, category: "Bao Créations", emoji: "🍽️", photo_url: "/menu/boeuf-croustillant-burger.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 1, is_menu: false },
@@ -107,7 +148,7 @@ const BAOMA_MENU_BASE = [
   { id: "baoma-menu-enfant", restaurant_id: "baoma-demo", name: "Menu Enfant", description: "Burger ou Nuggets · + 1 frite · + 1 boisson · + 1 compote ou 1 boule de glace", price: 9.9, category: "Formules", emoji: "🍽️", photo_url: "/menu/menu-enfant.jpg", is_popular: true, available: true, stock: null, supplements: [], extras: [], sort_order: 49, is_menu: true },
 ];
 
-export const BAOMA_MENU = BAOMA_MENU_BASE.map((it) => ({ ...it, supplements: BAOMA_OPTIONS_BY_CATEGORY[it.category] || it.supplements }));
+export const BAOMA_MENU = BAOMA_MENU_BASE.map((it) => ({ ...it, supplements: baomaOptionsFor(it) || it.supplements }));
 
 export const BAOMA_RESTAURANT = {
   id: "baoma-demo", name: "Baoma", address: "", logo_emoji: "🐼",

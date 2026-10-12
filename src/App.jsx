@@ -6260,26 +6260,41 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
 // Libellé de l'option "rien de plus" d'un menu déroulant, par groupe.
 const COMPOSE_GROUP_DEFAULT = { Frites: "Frites maison (incluses)", Boisson: "Sans boisson" };
 
-// Les suppléments portant une clé `group` (ex. Frites, Boisson) s'affichent en
-// menu déroulant à choix unique ; les autres restent des cases à cocher.
+// Suppléments d'un plat (menu_items.supplements). Une clé `group` les regroupe
+// sous un titre : liste déroulante à choix unique (ex. Frites, Boisson) ou,
+// avec `multi`, cases à cocher (ex. Retirer, Extras). Sans `group`, ce sont de
+// simples cases à cocher sous « Suppléments ».
 function ComposeModal({ item, lang, onClose, onAdd }) {
   const allSups = item.supplements || [];
   const loose = allSups.filter((s) => !s.group);
   const groups = [...new Set(allSups.filter((s) => s.group).map((s) => s.group))];
+  const isMulti = (g) => allSups.some((s) => s.group === g && s.multi);
   const [selected, setSelected] = useState([]);
   const [picked, setPicked] = useState({});
   const [qty, setQty] = useState(1);
   const toggle = (s) => setSelected((p) => (p.find((x) => x.name === s.name) ? p.filter((x) => x.name !== s.name) : [...p, s]));
   const chosen = [
     ...selected,
-    ...groups.map((g) => allSups.find((s) => s.group === g && s.name === picked[g])).filter(Boolean),
+    ...groups.filter((g) => !isMulti(g)).map((g) => allSups.find((s) => s.group === g && s.name === picked[g])).filter(Boolean),
   ];
   const labelStyle = { ...FF, fontSize: 13, fontWeight: 600, color: C.textSecondary, display: "block", margin: "12px 0 6px" };
+  const priceTag = (s) => (Number(s.price) ? `+${eur(s.price)}` : "");
+  const checkboxes = (list) => list.map((s) => (
+    <label key={s.name} style={{ ...FF, display: "flex", justifyContent: "space-between", padding: "8px 0", fontSize: 14 }}>
+      <span><input type="checkbox" checked={!!selected.find((x) => x.name === s.name)} onChange={() => toggle(s)} /> {s.name}</span>
+      <span>{priceTag(s)}</span>
+    </label>
+  ));
   return (
     <Modal onClose={onClose}>
-      <div style={{ padding: 22 }}>
+      <div style={{ padding: 22, maxHeight: "85vh", overflowY: "auto" }}>
         <h3 style={{ ...FF }}>{item.emoji} {item.name}</h3>
-        {groups.map((g) => (
+        {groups.map((g) => (isMulti(g) ? (
+          <div key={g}>
+            <span style={labelStyle}>{g}</span>
+            {checkboxes(allSups.filter((s) => s.group === g))}
+          </div>
+        ) : (
           <div key={g}>
             <label htmlFor={`compose-${g}`} style={labelStyle}>{g}</label>
             <select
@@ -6290,18 +6305,13 @@ function ComposeModal({ item, lang, onClose, onAdd }) {
             >
               <option value="">{COMPOSE_GROUP_DEFAULT[g] || "Aucun"}</option>
               {allSups.filter((s) => s.group === g).map((s) => (
-                <option key={s.name} value={s.name}>{Number(s.price) ? `${s.name} (+${eur(s.price)})` : s.name}</option>
+                <option key={s.name} value={s.name}>{Number(s.price) ? `${s.name} (${priceTag(s)})` : s.name}</option>
               ))}
             </select>
           </div>
-        ))}
+        )))}
         {loose.length > 0 && <span style={labelStyle}>{t(lang, "supplements")}</span>}
-        {loose.map((s) => (
-          <label key={s.name} style={{ ...FF, display: "flex", justifyContent: "space-between", padding: "8px 0", fontSize: 14 }}>
-            <span><input type="checkbox" onChange={() => toggle(s)} /> {s.name}</span>
-            <span>+{eur(s.price)}</span>
-          </label>
-        ))}
+        {checkboxes(loose)}
         <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "14px 0" }}>
           <Btn variant="subtle" size="sm" onClick={() => setQty((q) => Math.max(1, q - 1))}>−</Btn>
           <strong style={{ ...FF }}>{qty}</strong>
