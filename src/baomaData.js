@@ -81,6 +81,10 @@ const BURGER_RETRAITS = {
   "baoma-smash-braise": [SANS_SAUCE],
 };
 
+// Formule Midi : un burger au choix, inclus dans le prix (choix obligatoire).
+const MIDI_BURGERS = ["Bao Végé", "Fried Chicken / Spicy", "Smash Cheese", "Smash Bao Burger", "Chicken Thaï"]
+  .map((name) => ({ name, price: 0, group: "Burger", required: true }));
+
 const RIZ_RETRAITS = retirer("Sans piment", "Sans graine de sésame", "Sans coriandre");
 
 const BURGER_CATEGORIES = ["Bao Créations", "Smash Bao", "Smash Burger"];
@@ -88,6 +92,7 @@ const BURGER_CATEGORIES = ["Bao Créations", "Smash Bao", "Smash Burger"];
 // Options d'un plat selon sa catégorie : burgers = retraits + extra viande +
 // frites + boisson ; wings = frites + boisson ; bowls = retraits + boisson.
 export function baomaOptionsFor(item) {
+  if (item.id === "baoma-menu-midi") return MIDI_BURGERS;
   if (BURGER_CATEGORIES.includes(item.category)) {
     return [...retirer(...(BURGER_RETRAITS[item.id] || [])), EXTRA_VIANDE, ...FRITES_OPTIONS, ...BOISSON_OPTIONS];
   }
@@ -111,7 +116,7 @@ const BAOMA_MENU_BASE = [
   { id: "baoma-smash-truffe", restaurant_id: "baoma-demo", name: "Smash Truffé", description: "Steak smashé, oignon frit croustillant, sauce crémeuse à la truffe, bun vapeur", price: 14.9, category: "Smash Burger", emoji: "🍽️", photo_url: "/menu/smash-braise.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 50, is_menu: false },
   { id: "baoma-smash-chevre-miel", restaurant_id: "baoma-demo", name: "Smash Chèvre Miel", description: "Steak smashé, chèvre fondant, miel, roquette, bun vapeur", price: 14.9, category: "Smash Burger", emoji: "🍽️", photo_url: "/menu/smash-chevre-miel.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 51, is_menu: false },
   { id: "baoma-smash-bacon", restaurant_id: "baoma-demo", name: "Smash Bacon", description: "Steak smashé, bacon grillé, cheddar fondu, sauce maison, bun vapeur", price: 14.9, category: "Smash Burger", emoji: "🍽️", photo_url: "/menu/smash-bacon.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 52, is_menu: false },
-  { id: "baoma-smash-braise", restaurant_id: "baoma-demo", name: "Smash Braisé", description: "Steak smashé, bœuf braisé effiloché, sauce maison, bun vapeur", price: 14.9, category: "Smash Burger", emoji: "🍽️", photo_url: "/menu/smash-oignon.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 53, is_menu: false },
+  { id: "baoma-smash-braise", restaurant_id: "baoma-demo", name: "Smash Braisé", description: "Steak smashé, bœuf braisé effiloché, sauce Tokyo, bun vapeur", price: 14.9, category: "Smash Burger", emoji: "🍽️", photo_url: "/menu/smash-oignon.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 53, is_menu: false },
   { id: "baoma-boeuf-croustillant-bowl", restaurant_id: "baoma-demo", name: "Boeuf Croustillant", description: "Riz vinaigré, boeuf croustillant, oeuf mariné, légumes sautés", price: 14.9, category: "Asian Fusion", emoji: "🍽️", photo_url: "/menu/boeuf-croustillant-bowl.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 15, is_menu: false },
   { id: "baoma-crousty-chicken", restaurant_id: "baoma-demo", name: "Crousty Chicken", description: "Riz vinaigré, poulet croustillant, oeuf mariné, légumes sautés", price: 13.9, category: "Asian Fusion", emoji: "🍽️", photo_url: "/menu/crousty-chicken.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 16, is_menu: false },
   { id: "baoma-poulet-thai", restaurant_id: "baoma-demo", name: "Poulet Thaï", description: "Riz vinaigré, poulet grillé façon thaï, oeuf mariné", price: 13.5, category: "Asian Fusion", emoji: "🍽️", photo_url: "/menu/poulet-thai.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 18, is_menu: false },

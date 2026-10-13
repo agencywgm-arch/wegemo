@@ -6438,7 +6438,7 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
 }
 
 // Libellé de l'option "rien de plus" d'un menu déroulant, par groupe.
-const COMPOSE_GROUP_DEFAULT = { Frites: "Frites maison (incluses)", Boisson: "Sans boisson" };
+const COMPOSE_GROUP_DEFAULT = { Frites: "Frites maison (incluses)", Boisson: "Sans boisson", Burger: "— Choisir un burger —" };
 
 // Suppléments d'un plat (menu_items.supplements). Une clé `group` les regroupe
 // sous un titre : liste déroulante à choix unique (ex. Frites, Boisson) ou,
@@ -6453,6 +6453,8 @@ function ComposeModal({ item, lang, onClose, onAdd }) {
   const [picked, setPicked] = useState({});
   const [qty, setQty] = useState(1);
   const toggle = (s) => setSelected((p) => (p.find((x) => x.name === s.name) ? p.filter((x) => x.name !== s.name) : [...p, s]));
+  // Groupe dont un choix est obligatoire (ex. le burger de la Formule Midi).
+  const missing = groups.filter((g) => !isMulti(g) && allSups.some((s) => s.group === g && s.required) && !picked[g]);
   const chosen = [
     ...selected,
     ...groups.filter((g) => !isMulti(g)).map((g) => allSups.find((s) => s.group === g && s.name === picked[g])).filter(Boolean),
@@ -6497,8 +6499,10 @@ function ComposeModal({ item, lang, onClose, onAdd }) {
           <strong style={{ ...FF }}>{qty}</strong>
           <Btn variant="subtle" size="sm" onClick={() => setQty((q) => q + 1)}>+</Btn>
         </div>
-        <Btn variant="primary" size="lg" style={{ width: "100%" }} onClick={() => { onAdd(item, chosen, qty); onClose(); }}>
-          {t(lang, "addToCart")} — {eur((Number(item.price) + chosen.reduce((s, x) => s + Number(x.price), 0)) * qty)}
+        <Btn variant="primary" size="lg" style={{ width: "100%" }} disabled={missing.length > 0} onClick={() => { onAdd(item, chosen, qty); onClose(); }}>
+          {missing.length > 0
+            ? `Choisissez : ${missing.join(", ").toLowerCase()}`
+            : `${t(lang, "addToCart")} — ${eur((Number(item.price) + chosen.reduce((s, x) => s + Number(x.price), 0)) * qty)}`}
         </Btn>
       </div>
     </Modal>
