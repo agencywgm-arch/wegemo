@@ -57,29 +57,10 @@ export const EXTRA_VIANDE_PRICE = 3;
 const EXTRA_VIANDE = { name: "Extra viande", price: EXTRA_VIANDE_PRICE, group: "Extras", multi: true };
 
 const retirer = (...names) => names.map((n) => ({ name: n, price: 0, group: "Retirer", multi: true }));
-const SANS_SALADE = "Sans salade";
-const SANS_OIGNONS = "Sans oignons";
-const SANS_SAUCE = "Sans sauce";
-
-// Ingrédients retirables par burger, déduits de la composition affichée sur la
-// carte (salade, oignons, sauce selon les plats).
-const BURGER_RETRAITS = {
-  "baoma-boeuf-croustillant-burger": [SANS_SAUCE],
-  "baoma-boeuf-fondant": [SANS_OIGNONS],
-  "baoma-fried-chicken-spicy": [SANS_SAUCE],
-  "baoma-chicken-thai": [SANS_OIGNONS],
-  "baoma-bao-vege": [SANS_SALADE, SANS_OIGNONS],
-  "baoma-bao-fried-chicken-moutarde-miel": [SANS_SALADE, SANS_SAUCE],
-  "baoma-crazy-champi": [SANS_SAUCE],
-  "baoma-smash-bao-burger": [SANS_SAUCE],
-  "baoma-konoha-smash": [SANS_OIGNONS],
-  "baoma-smash-cheese": [SANS_OIGNONS, SANS_SAUCE],
-  "baoma-smash-truffee": [SANS_SAUCE],
-  "baoma-smash-truffe": [SANS_SALADE, SANS_OIGNONS, SANS_SAUCE],
-  "baoma-smash-chevre-miel": ["Sans roquette"],
-  "baoma-smash-bacon": [SANS_SAUCE],
-  "baoma-smash-braise": [SANS_SAUCE],
-};
+// Retraits proposés sur TOUS les burgers : toujours salade, pickles et oignons
+// confits — sauf le Smash Truffé, qui a des oignons frits.
+const BURGER_RETRAITS = ["Sans salade", "Sans pickles", "Sans oignons confits"];
+const TRUFFE_RETRAITS = ["Sans salade", "Sans pickles", "Sans oignons frits"];
 
 // Formule Midi : un burger au choix, inclus dans le prix (choix obligatoire).
 const MIDI_BURGERS = ["Bao Végé", "Fried Chicken / Spicy", "Smash Cheese", "Smash Bao Burger", "Chicken Thaï"]
@@ -94,7 +75,8 @@ const BURGER_CATEGORIES = ["Bao Créations", "Smash Bao", "Smash Burger"];
 export function baomaOptionsFor(item) {
   if (item.id === "baoma-menu-midi") return MIDI_BURGERS;
   if (BURGER_CATEGORIES.includes(item.category)) {
-    return [...retirer(...(BURGER_RETRAITS[item.id] || [])), EXTRA_VIANDE, ...FRITES_OPTIONS, ...BOISSON_OPTIONS];
+    const retraits = item.id === "baoma-smash-truffe" ? TRUFFE_RETRAITS : BURGER_RETRAITS;
+    return [...retirer(...retraits), EXTRA_VIANDE, ...FRITES_OPTIONS, ...BOISSON_OPTIONS];
   }
   if (item.category === "Wings") return [...FRITES_OPTIONS, ...BOISSON_OPTIONS];
   if (item.category === "Asian Fusion") return [...RIZ_RETRAITS, ...BOISSON_OPTIONS];
