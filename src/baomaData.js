@@ -37,18 +37,19 @@ export const BAOMA_CATEGORIES = [
 //   historique des autres restos).
 // Prix = ceux de la carte : frites "avec Bao burger" (la frite maison est
 // incluse dans le burger), boissons au tarif carte.
-const FRITES_OPTIONS = [
-  { name: "Sans frites", price: 0 },
+const FRITES_VARIANTES = [
   { name: "Frites Paprika", price: 1.2 },
   { name: "Frites de Patate Douce", price: 1.6 },
   { name: "Frites Cheddar Maison", price: 1.5 },
   { name: "Frites Bacon Cheddar", price: 3 },
-].map((o) => ({ ...o, group: "Frites" }));
+];
+// Wings : pas de frites incluses, « Sans frites » ne change pas le prix.
+const FRITES_OPTIONS = [{ name: "Sans frites", price: 0 }, ...FRITES_VARIANTES].map((o) => ({ ...o, group: "Frites" }));
+// Burgers : la frite maison est incluse, y renoncer retire 3 € du prix.
+const BURGER_FRITES = [{ name: "Sans frites", price: -3 }, ...FRITES_VARIANTES].map((o) => ({ ...o, group: "Frites" }));
 
 const BOISSON_OPTIONS = [
-  ...["Pepsi", "Pepsi Zero", "Pepsi Cherry", "Schweppes Pomme", "Schweppes Agrumes", "Orangina", "Oasis Tropical", "Ice Tea", "Perrier", "Eau"].map((name) => ({ name, price: 2.5 })),
-  { name: "Thé", price: 2 },
-  { name: "Café", price: 2 },
+  ...["Pepsi", "Pepsi Zero", "Sprite", "Schweppes Pomme", "Schweppes Agrumes", "Orangina", "Oasis Tropical", "Ice Tea", "Perrier", "Eau"].map((name) => ({ name, price: 1.5 })),
   ...["Mojito Violette", "Mojito Passion", "Mojito Cerise", "Mojito Kiwi", "Mojito Classique", "Thé Glacé Maison"].map((name) => ({ name, price: 5.5 })),
 ].map((o) => ({ ...o, group: "Boisson" }));
 
@@ -68,6 +69,9 @@ const MIDI_BURGERS = ["Bao Végé", "Fried Chicken / Spicy", "Smash Cheese", "Sm
 
 const RIZ_RETRAITS = retirer("Sans piment", "Sans graine de sésame", "Sans coriandre");
 
+// Crazy Champi : deux versions au même prix, choix obligatoire.
+const CRAZY_VERSIONS = ["Viande hachée", "Fried chicken"].map((name) => ({ name, price: 0, group: "Version", required: true }));
+
 const BURGER_CATEGORIES = ["Bao Créations", "Smash Bao", "Smash Burger"];
 
 // Options d'un plat selon sa catégorie : burgers = retraits + extra viande +
@@ -76,7 +80,8 @@ export function baomaOptionsFor(item) {
   if (item.id === "baoma-menu-midi") return MIDI_BURGERS;
   if (BURGER_CATEGORIES.includes(item.category)) {
     const retraits = item.id === "baoma-smash-truffe" ? TRUFFE_RETRAITS : BURGER_RETRAITS;
-    return [...retirer(...retraits), EXTRA_VIANDE, ...FRITES_OPTIONS, ...BOISSON_OPTIONS];
+    const versions = item.id === "baoma-crazy-champi" ? CRAZY_VERSIONS : [];
+    return [...versions, ...retirer(...retraits), EXTRA_VIANDE, ...BURGER_FRITES, ...BOISSON_OPTIONS];
   }
   if (item.category === "Wings") return [...FRITES_OPTIONS, ...BOISSON_OPTIONS];
   if (item.category === "Asian Fusion") return [...RIZ_RETRAITS, ...BOISSON_OPTIONS];
@@ -90,7 +95,7 @@ const BAOMA_MENU_BASE = [
   { id: "baoma-chicken-thai", restaurant_id: "baoma-demo", name: "Chicken Thaï", description: "Poulet grillé façon thaï, oignons rouges, cheddar fondu", price: 12.9, category: "Bao Créations", emoji: "🍽️", photo_url: "/menu/chicken-thai-burger.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 5, is_menu: false },
   { id: "baoma-bao-vege", restaurant_id: "baoma-demo", name: "Bao Végé", description: "Oeuf au plat, salade, oignons rouges, sésame", price: 12.9, category: "Bao Créations", emoji: "🍽️", photo_url: "/menu/bao-vege.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 6, is_menu: false },
   { id: "baoma-bao-fried-chicken-moutarde-miel", restaurant_id: "baoma-demo", name: "Bao Fried Chicken Moutarde-Miel", description: "Poulet croustillant, cheddar fondu, sauce miel moutarde, salade", price: 12.9, category: "Bao Créations", emoji: "🍽️", photo_url: "/menu/bao-fried-chicken-moutarde-miel.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 7, is_menu: false },
-  { id: "baoma-crazy-champi", restaurant_id: "baoma-demo", name: "Crazy Champi", description: "Double steak smashé, champignons, sauce crémeuse maison", price: 17.9, category: "Smash Bao", emoji: "🍽️", photo_url: "/menu/crazy-champi.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 8, is_menu: false },
+  { id: "baoma-crazy-champi", restaurant_id: "baoma-demo", name: "Crazy Champi", description: "Double steak smashé ou fried chicken, champignons, sauce crémeuse maison", price: 17.9, category: "Smash Bao", emoji: "🍽️", photo_url: "/menu/crazy-champi.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 8, is_menu: false },
   { id: "baoma-smash-bao-burger", restaurant_id: "baoma-demo", name: "Smash Bao Burger", description: "Steak smashé, champignons confits, sauce crémeuse", price: 13.9, category: "Smash Bao", emoji: "🍽️", photo_url: "/menu/smash-bao-burger.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 10, is_menu: false },
   { id: "baoma-konoha-smash", restaurant_id: "baoma-demo", name: "Konoha Smash", description: "Double steak smashé, double cheddar fondu, oignons rouges confits", price: 14.9, category: "Smash Bao", emoji: "🍽️", photo_url: "/menu/konoha-smash.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 11, is_menu: false },
   { id: "baoma-smash-cheese", restaurant_id: "baoma-demo", name: "Smash Cheese", description: "Steak smashé, cheddar fondu, oignons rouges, sauce maison", price: 14.9, category: "Smash Bao", emoji: "🍽️", photo_url: "/menu/smash-cheese.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 13, is_menu: false },

@@ -6122,6 +6122,45 @@ function BaomaCard({ item, onPick, onZoom }) {
   );
 }
 
+// Burger mis en avant tout en haut de la carte (Crazy Champi), animé : halo
+// orange qui pulse, photo qui zoome lentement, badge flottant, reflet qui passe.
+function BaomaFeatured({ item, onPick }) {
+  const [failed, setFailed] = useState(false);
+  if (!item) return null;
+  const photo = bImg(item.photo_url);
+  const out = item.stock != null && Number(item.stock) <= 0;
+  return (
+    <div className="baoma-sections" style={{ marginTop: 18 }}>
+      <div className="baoma-wrap">
+        <button
+          type="button"
+          className="baoma-feature"
+          disabled={out}
+          onClick={() => onPick(item)}
+          aria-label={`Commander ${item.name}`}
+        >
+          {photo && !failed && (
+            <img className="baoma-feature-img" src={photo} alt={item.name} onError={() => setFailed(true)} />
+          )}
+          <span className="baoma-feature-shade" />
+          <span className="baoma-feature-shine" />
+          <span className="baoma-feature-badge">★ LE BURGER À LA UNE</span>
+          <span className="baoma-feature-text">
+            <span style={{ ...BDISPLAY, display: "block", fontSize: 32, lineHeight: 1, letterSpacing: 0.5, color: BK.offwhite, textTransform: "uppercase" }}>{item.name}</span>
+            <span style={{ ...BFF, display: "block", fontSize: 13, lineHeight: 1.4, color: "rgba(242,236,224,.8)", marginTop: 6, maxWidth: 420 }}>{item.description}</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
+              <strong style={{ ...BDISPLAY, fontSize: 24, color: BK.offwhite }}>{eur(item.price)}</strong>
+              <span style={{ ...BFF, background: BK.orange, color: BK.ink, fontSize: 12, fontWeight: 800, letterSpacing: 0.6, textTransform: "uppercase", padding: "9px 16px", borderRadius: 999 }}>
+                {out ? "Épuisé" : "Commander"}
+              </span>
+            </span>
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // Bannière vidéo en tête de la carte (même vidéo que le site vitrine). Muette,
 // en boucle ; si la lecture auto est bloquée ou que la vidéo échoue, l'image
 // d'affiche reste visible.
@@ -6368,6 +6407,7 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
       </div>
 
       <BaomaHeroVideo />
+      <BaomaFeatured item={menu.find((m) => m.name === "Crazy Champi")} onPick={pick} />
 
       {/* Frise de catégories collante */}
       <div style={{ position: "sticky", top: 0, zIndex: 20, background: "rgba(10,10,10,.92)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", borderBottom: "1px solid rgba(242,236,224,.07)" }}>
@@ -6438,7 +6478,7 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
 }
 
 // Libellé de l'option "rien de plus" d'un menu déroulant, par groupe.
-const COMPOSE_GROUP_DEFAULT = { Frites: "Frites maison (incluses)", Boisson: "Sans boisson", Burger: "— Choisir un burger —" };
+const COMPOSE_GROUP_DEFAULT = { Frites: "Frites maison (incluses)", Boisson: "Sans boisson", Burger: "— Choisir un burger —", Version: "— Choisir la version —" };
 
 // Suppléments d'un plat (menu_items.supplements). Une clé `group` les regroupe
 // sous un titre : liste déroulante à choix unique (ex. Frites, Boisson) ou,
@@ -6460,7 +6500,7 @@ function ComposeModal({ item, lang, onClose, onAdd }) {
     ...groups.filter((g) => !isMulti(g)).map((g) => allSups.find((s) => s.group === g && s.name === picked[g])).filter(Boolean),
   ];
   const labelStyle = { ...FF, fontSize: 13, fontWeight: 600, color: C.textSecondary, display: "block", margin: "12px 0 6px" };
-  const priceTag = (s) => (Number(s.price) ? `+${eur(s.price)}` : "");
+  const priceTag = (s) => (Number(s.price) ? `${Number(s.price) < 0 ? "−" : "+"}${eur(Math.abs(Number(s.price)))}` : "");
   const checkboxes = (list) => list.map((s) => (
     <label key={s.name} style={{ ...FF, display: "flex", justifyContent: "space-between", padding: "8px 0", fontSize: 14 }}>
       <span><input type="checkbox" checked={!!selected.find((x) => x.name === s.name)} onChange={() => toggle(s)} /> {s.name}</span>
