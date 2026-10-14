@@ -53,15 +53,15 @@ const BOISSON_OPTIONS = [
   ...["Mojito Violette", "Mojito Passion", "Mojito Cerise", "Mojito Kiwi", "Mojito Classique", "Thé Glacé Maison"].map((name) => ({ name, price: 5.5 })),
 ].map((o) => ({ ...o, group: "Boisson" }));
 
-// ⚠️ Prix de l'extra viande : à confirmer avec le restaurant (non fourni).
-export const EXTRA_VIANDE_PRICE = 3;
-const EXTRA_VIANDE = { name: "Extra viande", price: EXTRA_VIANDE_PRICE, group: "Extras", multi: true };
+// Supplément steak : 4 €.
+export const EXTRA_VIANDE_PRICE = 4;
+const EXTRA_VIANDE = { name: "Supplément steak", price: EXTRA_VIANDE_PRICE, group: "Extras", multi: true };
 
 const retirer = (...names) => names.map((n) => ({ name: n, price: 0, group: "Retirer", multi: true }));
-// Retraits proposés sur TOUS les burgers : toujours salade, pickles et oignons
-// confits — sauf le Smash Truffé, qui a des oignons frits.
-const BURGER_RETRAITS = ["Sans salade", "Sans pickles", "Sans oignons confits"];
-const TRUFFE_RETRAITS = ["Sans salade", "Sans pickles", "Sans oignons frits"];
+// Retraits proposés sur TOUS les burgers : oignon, cheddar, salade, pickles —
+// sauf le Smash Truffé, dont le fromage est de la mozzarella.
+const BURGER_RETRAITS = ["Sans oignon", "Sans cheddar", "Sans salade", "Sans pickles"];
+const TRUFFE_RETRAITS = ["Sans oignon", "Sans mozzarella", "Sans salade", "Sans pickles"];
 
 // Formule Midi : un burger au choix, inclus dans le prix (choix obligatoire).
 const MIDI_BURGERS = ["Bao Végé", "Fried Chicken / Spicy", "Smash Cheese", "Smash Bao Burger", "Chicken Thaï"]
