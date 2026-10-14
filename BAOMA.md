@@ -65,8 +65,9 @@ Chaque restaurant a sa propre copie de la carte dans `menu_items`. La page QR,
 la caisse (Vente), la cuisine et le dashboard lisent tous cette copie. Pour que
 tous les comptes Baoma aient exactement la carte officielle de `src/baomaData.js` :
 
-1. Régénérer le script si la carte a changé (le script est généré depuis
-   `src/baomaData.js`).
+1. Régénérer le script si la carte a changé :
+   `node scripts/gen-baoma-sync-sql.mjs > supabase/migration_baoma_sync_menu.sql`
+   (généré depuis `src/baomaData.js`).
 2. Coller `supabase/migration_baoma_sync_menu.sql` dans l'éditeur SQL Supabase
    et exécuter. Les comptes concernés : slug commençant par « baoma » + les
    restaurants du même groupe franchise. Les plats hors carte officielle sont
