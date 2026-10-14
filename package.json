@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.2",
+    "node-forge": "^1.4.0",
     "qrcode": "^1.5.4",
+    "qz-tray": "^2.3.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.16.0"

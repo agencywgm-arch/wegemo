@@ -32,7 +32,7 @@ begin
 
   -- Réglages : palette Baoma côté reçus/branding
   insert into restaurant_settings (restaurant_id, category_order)
-  values (v_rest, '["Bao Créations","Smash Bao","Asian Fusion","Starters","Starters Signatures","Wings","Sides","Desserts","Mojitos & Boissons","Formules"]'::jsonb)
+  values (v_rest, '["Formules","Bao Créations","Smash Bao","Asian Fusion","Starters","Starters Signatures","Wings","Sides","Desserts","Mojitos & Boissons"]'::jsonb)
   on conflict (restaurant_id) do update set category_order = excluded.category_order;
 
   -- Carte
@@ -49,7 +49,6 @@ begin
     (v_rest, 'Smash Choji', 'Steak smashé, oignon frit croustillant, sauce signature', 15.9, 'Smash Bao', '🍽️', '/menu/smash-choji.jpg', false, true, 9, false),
     (v_rest, 'Smash Bao Burger', 'Steak smashé, champignons confits, sauce crémeuse, bun vapeur', 13.9, 'Smash Bao', '🍽️', '/menu/smash-bao-burger.jpg', false, true, 10, false),
     (v_rest, 'Konoha Smash', 'Double steak smashé, cheddar fondu, oignons rouges confits', 14.9, 'Smash Bao', '🍽️', '/menu/konoha-smash.jpg', false, true, 11, false),
-    (v_rest, 'Croissmash', 'Croissant au beurre, sauce bbq, sauce Smoky bacon, salade, double cheddar, double steak smashés', 12.9, 'Smash Bao', '🍽️', '/menu/croissmash.jpg', false, true, 12, false),
     (v_rest, 'Smash Cheese', 'Steak smashé, cheddar fondu, oignons rouges, sauce maison, bun vapeur', 11.9, 'Smash Bao', '🍽️', '/menu/smash-cheese.jpg', false, true, 13, false),
     (v_rest, 'Smash Truffée', 'Double steak smashé, champignons grillés, cheddar, sauce crémeuse à la truffe', 17.9, 'Smash Bao', '🍽️', '/menu/smash-truffee.jpg', false, true, 14, false),
     (v_rest, 'Boeuf Croustillant', 'Riz vinaigré, boeuf croustillant, oeuf mariné, légumes sautés', 14.9, 'Asian Fusion', '🍽️', '/menu/boeuf-croustillant-bowl.jpg', false, true, 15, false),

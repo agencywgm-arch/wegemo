@@ -1,0 +1,147 @@
+-- Synchronisation de la carte Baoma sur TOUS les comptes Baoma.
+-- À coller dans l'éditeur SQL Supabase puis « Run ». Relançable sans risque.
+--
+-- Comptes concernés : slug commençant par « baoma » + restaurants du même groupe
+-- franchise que « baoma ». Les autres restaurants ne sont pas touchés.
+-- Pour chaque compte : les plats de la carte officielle sont créés ou mis à jour
+-- (nom, description, prix, photo, ordre, options) ; stock et TVA ne changent pas ;
+-- tout plat hors carte officielle est DÉSACTIVÉ (available = false), jamais
+-- supprimé (order_items référence menu_items) ; l'ordre des catégories est mis à jour.
+-- Liste d'options utilisées par chaque plat :
+--   o1 : Boeuf Croustillant, Boeuf Fondant, Fried Chicken / Spicy, Chicken Thaï, Bao Végé, Bao Fried Chicken Moutarde-Miel, Smash Bao Burger, Konoha Smash, Smash Cheese, Smash Truffée, Smash Chèvre Miel, Smash Bacon, Smash Braisé
+--   o2 : Crazy Champi
+--   o3 : Smash Truffé
+--   o4 : Boeuf Croustillant, Crousty Chicken, Poulet Thaï, Crevette Thaï
+--   o5 : Wings Korean Style, Wings Moutarde Miel, Wings Parmesan, Wings Classic Style
+--   o6 : Menu Midi
+--   o7 : Formule Étudiante
+-- Généré depuis src/baomaData.js : ne pas éditer à la main.
+
+create or replace function sync_baoma_menu() returns void
+language plpgsql as $fn$
+declare
+  v_opts  jsonb := $json$
+  {
+    "o1": [{"name":"Sans oignon","price":0,"group":"Retirer","multi":true},{"name":"Sans cheddar","price":0,"group":"Retirer","multi":true},{"name":"Sans salade","price":0,"group":"Retirer","multi":true},{"name":"Sans pickles","price":0,"group":"Retirer","multi":true},{"name":"Supplément steak","price":4,"group":"Extras","multi":true},{"name":"Sans frites","price":-3,"group":"Frites"},{"name":"Frites Paprika","price":1.2,"group":"Frites"},{"name":"Frites de Patate Douce","price":1.6,"group":"Frites"},{"name":"Frites Cheddar Maison","price":1.5,"group":"Frites"},{"name":"Frites Bacon Cheddar","price":3,"group":"Frites"},{"name":"Pepsi","price":1.5,"group":"Boisson"},{"name":"Pepsi Zero","price":1.5,"group":"Boisson"},{"name":"Sprite","price":1.5,"group":"Boisson"},{"name":"Schweppes Pomme","price":1.5,"group":"Boisson"},{"name":"Schweppes Agrumes","price":1.5,"group":"Boisson"},{"name":"Orangina","price":1.5,"group":"Boisson"},{"name":"Oasis Tropical","price":1.5,"group":"Boisson"},{"name":"Ice Tea","price":1.5,"group":"Boisson"},{"name":"Perrier","price":1.5,"group":"Boisson"},{"name":"Eau","price":1.5,"group":"Boisson"},{"name":"Mojito Violette","price":5.5,"group":"Boisson"},{"name":"Mojito Passion","price":5.5,"group":"Boisson"},{"name":"Mojito Cerise","price":5.5,"group":"Boisson"},{"name":"Mojito Kiwi","price":5.5,"group":"Boisson"},{"name":"Mojito Classique","price":5.5,"group":"Boisson"},{"name":"Thé Glacé Maison","price":5.5,"group":"Boisson"}],
+    "o2": [{"name":"Viande hachée","price":0,"group":"Version","required":true},{"name":"Fried chicken","price":0,"group":"Version","required":true},{"name":"Sans oignon","price":0,"group":"Retirer","multi":true},{"name":"Sans cheddar","price":0,"group":"Retirer","multi":true},{"name":"Sans salade","price":0,"group":"Retirer","multi":true},{"name":"Sans pickles","price":0,"group":"Retirer","multi":true},{"name":"Supplément steak","price":4,"group":"Extras","multi":true},{"name":"Sans frites","price":-3,"group":"Frites"},{"name":"Frites Paprika","price":1.2,"group":"Frites"},{"name":"Frites de Patate Douce","price":1.6,"group":"Frites"},{"name":"Frites Cheddar Maison","price":1.5,"group":"Frites"},{"name":"Frites Bacon Cheddar","price":3,"group":"Frites"},{"name":"Pepsi","price":1.5,"group":"Boisson"},{"name":"Pepsi Zero","price":1.5,"group":"Boisson"},{"name":"Sprite","price":1.5,"group":"Boisson"},{"name":"Schweppes Pomme","price":1.5,"group":"Boisson"},{"name":"Schweppes Agrumes","price":1.5,"group":"Boisson"},{"name":"Orangina","price":1.5,"group":"Boisson"},{"name":"Oasis Tropical","price":1.5,"group":"Boisson"},{"name":"Ice Tea","price":1.5,"group":"Boisson"},{"name":"Perrier","price":1.5,"group":"Boisson"},{"name":"Eau","price":1.5,"group":"Boisson"},{"name":"Mojito Violette","price":5.5,"group":"Boisson"},{"name":"Mojito Passion","price":5.5,"group":"Boisson"},{"name":"Mojito Cerise","price":5.5,"group":"Boisson"},{"name":"Mojito Kiwi","price":5.5,"group":"Boisson"},{"name":"Mojito Classique","price":5.5,"group":"Boisson"},{"name":"Thé Glacé Maison","price":5.5,"group":"Boisson"}],
+    "o3": [{"name":"Sans oignon","price":0,"group":"Retirer","multi":true},{"name":"Sans mozzarella","price":0,"group":"Retirer","multi":true},{"name":"Sans salade","price":0,"group":"Retirer","multi":true},{"name":"Sans pickles","price":0,"group":"Retirer","multi":true},{"name":"Supplément steak","price":4,"group":"Extras","multi":true},{"name":"Sans frites","price":-3,"group":"Frites"},{"name":"Frites Paprika","price":1.2,"group":"Frites"},{"name":"Frites de Patate Douce","price":1.6,"group":"Frites"},{"name":"Frites Cheddar Maison","price":1.5,"group":"Frites"},{"name":"Frites Bacon Cheddar","price":3,"group":"Frites"},{"name":"Pepsi","price":1.5,"group":"Boisson"},{"name":"Pepsi Zero","price":1.5,"group":"Boisson"},{"name":"Sprite","price":1.5,"group":"Boisson"},{"name":"Schweppes Pomme","price":1.5,"group":"Boisson"},{"name":"Schweppes Agrumes","price":1.5,"group":"Boisson"},{"name":"Orangina","price":1.5,"group":"Boisson"},{"name":"Oasis Tropical","price":1.5,"group":"Boisson"},{"name":"Ice Tea","price":1.5,"group":"Boisson"},{"name":"Perrier","price":1.5,"group":"Boisson"},{"name":"Eau","price":1.5,"group":"Boisson"},{"name":"Mojito Violette","price":5.5,"group":"Boisson"},{"name":"Mojito Passion","price":5.5,"group":"Boisson"},{"name":"Mojito Cerise","price":5.5,"group":"Boisson"},{"name":"Mojito Kiwi","price":5.5,"group":"Boisson"},{"name":"Mojito Classique","price":5.5,"group":"Boisson"},{"name":"Thé Glacé Maison","price":5.5,"group":"Boisson"}],
+    "o4": [{"name":"Sans piment","price":0,"group":"Retirer","multi":true},{"name":"Sans graine de sésame","price":0,"group":"Retirer","multi":true},{"name":"Sans coriandre","price":0,"group":"Retirer","multi":true},{"name":"Pepsi","price":1.5,"group":"Boisson"},{"name":"Pepsi Zero","price":1.5,"group":"Boisson"},{"name":"Sprite","price":1.5,"group":"Boisson"},{"name":"Schweppes Pomme","price":1.5,"group":"Boisson"},{"name":"Schweppes Agrumes","price":1.5,"group":"Boisson"},{"name":"Orangina","price":1.5,"group":"Boisson"},{"name":"Oasis Tropical","price":1.5,"group":"Boisson"},{"name":"Ice Tea","price":1.5,"group":"Boisson"},{"name":"Perrier","price":1.5,"group":"Boisson"},{"name":"Eau","price":1.5,"group":"Boisson"},{"name":"Mojito Violette","price":5.5,"group":"Boisson"},{"name":"Mojito Passion","price":5.5,"group":"Boisson"},{"name":"Mojito Cerise","price":5.5,"group":"Boisson"},{"name":"Mojito Kiwi","price":5.5,"group":"Boisson"},{"name":"Mojito Classique","price":5.5,"group":"Boisson"},{"name":"Thé Glacé Maison","price":5.5,"group":"Boisson"}],
+    "o5": [{"name":"Sans frites","price":0,"group":"Frites"},{"name":"Frites Paprika","price":1.2,"group":"Frites"},{"name":"Frites de Patate Douce","price":1.6,"group":"Frites"},{"name":"Frites Cheddar Maison","price":1.5,"group":"Frites"},{"name":"Frites Bacon Cheddar","price":3,"group":"Frites"},{"name":"Pepsi","price":1.5,"group":"Boisson"},{"name":"Pepsi Zero","price":1.5,"group":"Boisson"},{"name":"Sprite","price":1.5,"group":"Boisson"},{"name":"Schweppes Pomme","price":1.5,"group":"Boisson"},{"name":"Schweppes Agrumes","price":1.5,"group":"Boisson"},{"name":"Orangina","price":1.5,"group":"Boisson"},{"name":"Oasis Tropical","price":1.5,"group":"Boisson"},{"name":"Ice Tea","price":1.5,"group":"Boisson"},{"name":"Perrier","price":1.5,"group":"Boisson"},{"name":"Eau","price":1.5,"group":"Boisson"},{"name":"Mojito Violette","price":5.5,"group":"Boisson"},{"name":"Mojito Passion","price":5.5,"group":"Boisson"},{"name":"Mojito Cerise","price":5.5,"group":"Boisson"},{"name":"Mojito Kiwi","price":5.5,"group":"Boisson"},{"name":"Mojito Classique","price":5.5,"group":"Boisson"},{"name":"Thé Glacé Maison","price":5.5,"group":"Boisson"}],
+    "o6": [{"name":"Bao Végé","price":0,"group":"Burger","required":true},{"name":"Fried Chicken / Spicy","price":0,"group":"Burger","required":true},{"name":"Smash Cheese","price":0,"group":"Burger","required":true},{"name":"Smash Bao Burger","price":0,"group":"Burger","required":true},{"name":"Chicken Thaï","price":0,"group":"Burger","required":true}],
+    "o7": [{"name":"Crazy Champi","price":0,"group":"Plat","required":true},{"name":"Smash Bao Burger","price":0,"group":"Plat","required":true},{"name":"Konoha Smash","price":0,"group":"Plat","required":true},{"name":"Smash Cheese","price":0,"group":"Plat","required":true},{"name":"Smash Truffée","price":0,"group":"Plat","required":true},{"name":"Smash Truffé","price":0,"group":"Plat","required":true},{"name":"Smash Chèvre Miel","price":0,"group":"Plat","required":true},{"name":"Smash Bacon","price":0,"group":"Plat","required":true},{"name":"Smash Braisé","price":0,"group":"Plat","required":true},{"name":"Wings Korean Style (5 pièces)","price":0,"group":"Plat","required":true},{"name":"Wings Moutarde Miel (5 pièces)","price":0,"group":"Plat","required":true},{"name":"Wings Parmesan (5 pièces)","price":0,"group":"Plat","required":true},{"name":"Wings Classic Style (5 pièces)","price":0,"group":"Plat","required":true},{"name":"Pepsi","price":0,"group":"Boisson","required":true},{"name":"Pepsi Zero","price":0,"group":"Boisson","required":true},{"name":"Sprite","price":0,"group":"Boisson","required":true},{"name":"Schweppes Pomme","price":0,"group":"Boisson","required":true},{"name":"Schweppes Agrumes","price":0,"group":"Boisson","required":true},{"name":"Orangina","price":0,"group":"Boisson","required":true},{"name":"Oasis Tropical","price":0,"group":"Boisson","required":true},{"name":"Ice Tea","price":0,"group":"Boisson","required":true},{"name":"Perrier","price":0,"group":"Boisson","required":true},{"name":"Eau","price":0,"group":"Boisson","required":true}]
+  }
+  $json$::jsonb;
+  v_items jsonb := $json$
+  [
+  {"name":"Boeuf Croustillant","description":"Boeuf croustillant, sauce maison, cheddar fondu","price":14.9,"category":"Bao Créations","emoji":"🍽️","photo_url":"/menu/boeuf-croustillant-burger.jpg","is_popular":false,"sort_order":1,"is_menu":false,"opts":"o1"},
+  {"name":"Boeuf Fondant","description":"Boeuf fondant mijoté, oignons caramélisés, cheddar fondu","price":14.9,"category":"Bao Créations","emoji":"🍽️","photo_url":"/menu/boeuf-fondant.jpg","is_popular":false,"sort_order":2,"is_menu":false,"opts":"o1"},
+  {"name":"Fried Chicken / Spicy","description":"Poulet pané, sauce épicée aigre-douce, sésame","price":12.9,"category":"Bao Créations","emoji":"🍽️","photo_url":"/menu/fried-chicken-spicy.jpg","is_popular":false,"sort_order":4,"is_menu":false,"opts":"o1"},
+  {"name":"Chicken Thaï","description":"Poulet grillé façon thaï, oignons rouges, cheddar fondu","price":12.9,"category":"Bao Créations","emoji":"🍽️","photo_url":"/menu/chicken-thai-burger.jpg","is_popular":false,"sort_order":5,"is_menu":false,"opts":"o1"},
+  {"name":"Bao Végé","description":"Oeuf au plat, salade, oignons rouges, sésame","price":12.9,"category":"Bao Créations","emoji":"🍽️","photo_url":"/menu/bao-vege.jpg","is_popular":false,"sort_order":6,"is_menu":false,"opts":"o1"},
+  {"name":"Bao Fried Chicken Moutarde-Miel","description":"Poulet croustillant, cheddar fondu, sauce miel moutarde, salade","price":12.9,"category":"Bao Créations","emoji":"🍽️","photo_url":"/menu/bao-fried-chicken-moutarde-miel.jpg","is_popular":false,"sort_order":7,"is_menu":false,"opts":"o1"},
+  {"name":"Crazy Champi","description":"Double steak smashé ou fried chicken, champignons, sauce crémeuse maison","price":17.9,"category":"Smash Bao","emoji":"🍽️","photo_url":"/menu/crazy-champi.jpg","is_popular":false,"sort_order":8,"is_menu":false,"opts":"o2"},
+  {"name":"Smash Bao Burger","description":"Steak smashé, champignons confits, sauce crémeuse","price":13.9,"category":"Smash Bao","emoji":"🍽️","photo_url":"/menu/smash-bao-burger.jpg","is_popular":false,"sort_order":10,"is_menu":false,"opts":"o1"},
+  {"name":"Konoha Smash","description":"Double steak smashé, double cheddar fondu, oignons rouges confits","price":14.9,"category":"Smash Bao","emoji":"🍽️","photo_url":"/menu/konoha-smash.jpg","is_popular":false,"sort_order":11,"is_menu":false,"opts":"o1"},
+  {"name":"Smash Cheese","description":"Steak smashé, cheddar fondu, oignons rouges, sauce maison","price":14.9,"category":"Smash Bao","emoji":"🍽️","photo_url":"/menu/smash-cheese.jpg","is_popular":false,"sort_order":13,"is_menu":false,"opts":"o1"},
+  {"name":"Smash Truffée","description":"Double steak smashé, champignons grillés, double cheddar, sauce crémeuse à la truffe","price":17.9,"category":"Smash Bao","emoji":"🍽️","photo_url":"/menu/smash-truffee.jpg","is_popular":false,"sort_order":14,"is_menu":false,"opts":"o1"},
+  {"name":"Smash Truffé","description":"Double steak smashé, oignons croustillants frits, sauce crémeuse à la truffe, mozzarella, salade, pickles","price":14.9,"category":"Smash Burger","emoji":"🍽️","photo_url":"/menu/smash-braise.jpg","is_popular":false,"sort_order":50,"is_menu":false,"opts":"o3"},
+  {"name":"Smash Chèvre Miel","description":"Double steak smashé, chèvre fondant, miel, salade, oignons confits, pickles, sauce Tokyo","price":14.9,"category":"Smash Burger","emoji":"🍽️","photo_url":"/menu/smash-chevre-miel.jpg","is_popular":false,"sort_order":51,"is_menu":false,"opts":"o1"},
+  {"name":"Smash Bacon","description":"Double steak smashé, double cheddar, sauce Tokyo, bacon, oignons confits, salade, pickles","price":14.9,"category":"Smash Burger","emoji":"🍽️","photo_url":"/menu/smash-bacon.jpg","is_popular":false,"sort_order":52,"is_menu":false,"opts":"o1"},
+  {"name":"Smash Braisé","description":"Double steak smashé, bœuf braisé, oignons confits, pickles, salade, sauce Tokyo","price":14.9,"category":"Smash Burger","emoji":"🍽️","photo_url":"/menu/smash-oignon.jpg","is_popular":false,"sort_order":53,"is_menu":false,"opts":"o1"},
+  {"name":"Boeuf Croustillant","description":"Riz vinaigré, boeuf croustillant, oeuf mariné, légumes sautés","price":14.9,"category":"Asian Fusion","emoji":"🍽️","photo_url":"/menu/boeuf-croustillant-bowl.jpg","is_popular":false,"sort_order":15,"is_menu":false,"opts":"o4"},
+  {"name":"Crousty Chicken","description":"Riz vinaigré, poulet croustillant, oeuf mariné, légumes sautés","price":13.9,"category":"Asian Fusion","emoji":"🍽️","photo_url":"/menu/crousty-chicken.jpg","is_popular":false,"sort_order":16,"is_menu":false,"opts":"o4"},
+  {"name":"Poulet Thaï","description":"Riz vinaigré, poulet grillé façon thaï, oeuf mariné","price":13.5,"category":"Asian Fusion","emoji":"🍽️","photo_url":"/menu/poulet-thai.jpg","is_popular":false,"sort_order":18,"is_menu":false,"opts":"o4"},
+  {"name":"Crevette Thaï","description":"Riz vinaigré, crevettes sautées, oeuf mariné, légumes croquants","price":14.9,"category":"Asian Fusion","emoji":"🍽️","photo_url":"/menu/crevette-thai.jpg","is_popular":false,"sort_order":19,"is_menu":false,"opts":"o4"},
+  {"name":"Nêms Poulet","description":"2 pièces, sauce aigre-douce","price":3.9,"category":"Starters","emoji":"🍽️","photo_url":"/menu/nems-poulet.jpg","is_popular":false,"sort_order":20,"is_menu":false,"opts":null},
+  {"name":"Nêms Crevette","description":"2 pièces, sauce aigre-douce","price":3.9,"category":"Starters","emoji":"🍽️","photo_url":"/menu/nems-crevette.jpg","is_popular":false,"sort_order":21,"is_menu":false,"opts":null},
+  {"name":"Tempura Crevette","description":"2 pièces, sauce aigre-douce","price":3.9,"category":"Starters","emoji":"🍽️","photo_url":"/menu/tempura-crevette.jpg","is_popular":false,"sort_order":23,"is_menu":false,"opts":null},
+  {"name":"Chicken Rasengan","description":"Bouchées de poulet pané, sauce Rasengan épicée, coriandre","price":6.9,"category":"Starters Signatures","emoji":"🍽️","photo_url":"/menu/chicken-rasengan.jpg","is_popular":false,"sort_order":24,"is_menu":false,"opts":null},
+  {"name":"Chidori Shrimp","description":"Crevettes panées croustillantes, sauce épicée signature, coriandre","price":7.9,"category":"Starters Signatures","emoji":"🍽️","photo_url":"/menu/chidori-shrimp.jpg","is_popular":false,"sort_order":25,"is_menu":false,"opts":null},
+  {"name":"Boeuf Fromage","description":"2 pièces, boeuf mariné, cheddar fondant, glaçage sésame","price":6,"category":"Starters Signatures","emoji":"🍽️","photo_url":"/menu/boeuf-fromage.jpg","is_popular":false,"sort_order":26,"is_menu":false,"opts":null},
+  {"name":"Boeuf Fromage Crunchy","description":"2 pièces, panure croustillante, coeur cheddar fondant","price":6.9,"category":"Starters Signatures","emoji":"🍽️","photo_url":"/menu/boeuf-fromage-crunchy.jpg","is_popular":false,"sort_order":27,"is_menu":false,"opts":null},
+  {"name":"Wings Korean Style","description":"4 pièces : 6.00€ · 6 pièces : 8.00€ · sauce coréenne épicée, sésame","price":6,"category":"Wings","emoji":"🍽️","photo_url":"/menu/wings-korean-style.jpg","is_popular":false,"sort_order":28,"is_menu":false,"opts":"o5"},
+  {"name":"Wings Moutarde Miel","description":"4 pièces : 6.00€ · 6 pièces : 8.00€ · sauce miel moutarde, sésame","price":6,"category":"Wings","emoji":"🍽️","photo_url":"/menu/wings-korean-moutarde-miel.jpg","is_popular":false,"sort_order":29,"is_menu":false,"opts":"o5"},
+  {"name":"Wings Parmesan","description":"4 pièces : 6.00€ · 6 pièces : 8.00€ · parmesan, ail, persil","price":6,"category":"Wings","emoji":"🍽️","photo_url":"/menu/wings-parmesan.jpg","is_popular":false,"sort_order":30,"is_menu":false,"opts":"o5"},
+  {"name":"Wings Classic Style","description":"4 pièces : 6.00€ · 6 pièces : 8.00€ · recette classique, sésame","price":6,"category":"Wings","emoji":"🍽️","photo_url":"/menu/wings-classic-style.jpg","is_popular":false,"sort_order":31,"is_menu":false,"opts":"o5"},
+  {"name":"Frites Maison","description":"Seules : 3.00€","price":3,"category":"Sides","emoji":"🍽️","photo_url":"/menu/frites-maison.jpg","is_popular":false,"sort_order":31,"is_menu":false,"opts":null},
+  {"name":"Frites Paprika","description":"Seules : 3.50€ · avec Bao burger : +1.20€","price":3.5,"category":"Sides","emoji":"🍽️","photo_url":"/menu/frites-paprika.jpg","is_popular":false,"sort_order":32,"is_menu":false,"opts":null},
+  {"name":"Frites de Patate Douce","description":"Seules : 4.00€ · avec Bao burger : +1.60€","price":4,"category":"Sides","emoji":"🍽️","photo_url":"/menu/frites-patate-douce.jpg","is_popular":false,"sort_order":33,"is_menu":false,"opts":null},
+  {"name":"Frites Cheddar Maison","description":"Seules : 4.50€ · avec Bao burger : +1.50€","price":4.5,"category":"Sides","emoji":"🍽️","photo_url":"/menu/frites-cheddar-maison.jpg","is_popular":false,"sort_order":34,"is_menu":false,"opts":null},
+  {"name":"Frites Bacon Cheddar","description":"Seules : 5.50€ · avec Bao burger : +3.00€","price":5.5,"category":"Sides","emoji":"🍽️","photo_url":"/menu/frites-bacon-cheddar.jpg","is_popular":false,"sort_order":35,"is_menu":false,"opts":null},
+  {"name":"Cheesecake Fruits Rouges","description":"Cheesecake new-yorkais, coulis de fruits rouges","price":6.9,"category":"Desserts","emoji":"🍽️","photo_url":"/menu/cheesecake-fruits-rouges.jpg","is_popular":false,"sort_order":36,"is_menu":false,"opts":null},
+  {"name":"Cheesecake Mangue","description":"Cheesecake new-yorkais, coulis de mangue","price":6.9,"category":"Desserts","emoji":"🍽️","photo_url":"/menu/cheesecake-mangue.jpg","is_popular":false,"sort_order":37,"is_menu":false,"opts":null},
+  {"name":"Cheesecake Caramel","description":"Cheesecake new-yorkais, caramel, éclats de noisettes","price":6.9,"category":"Desserts","emoji":"🍽️","photo_url":"/menu/cheesecake-caramel.jpg","is_popular":false,"sort_order":38,"is_menu":false,"opts":null},
+  {"name":"Brioche Perdue Caramel","description":"Brioche perdue, glace vanille, caramel, éclats de noisettes","price":8.9,"category":"Desserts","emoji":"🍽️","photo_url":"/menu/brioche-perdue-caramel.jpg","is_popular":false,"sort_order":39,"is_menu":false,"opts":null},
+  {"name":"Brioche Perdue Chocolat","description":"Brioche perdue, chantilly, chocolat, fruits rouges","price":8.9,"category":"Desserts","emoji":"🍽️","photo_url":"/menu/brioche-perdue-chocolat.jpg","is_popular":false,"sort_order":40,"is_menu":false,"opts":null},
+  {"name":"Churros","description":"Churros maison, sucre cannelle, sauce chocolat","price":4.9,"category":"Desserts","emoji":"🍽️","photo_url":"/menu/churros.jpg","is_popular":false,"sort_order":41,"is_menu":false,"opts":null},
+  {"name":"Mojito Violette","description":"Citron vert, menthe fraîche, sirop de violette","price":5.5,"category":"Mojitos & Boissons","emoji":"🍽️","photo_url":"/menu/mojito-violette.jpg","is_popular":false,"sort_order":42,"is_menu":false,"opts":null},
+  {"name":"Mojito Passion","description":"Citron vert, menthe fraîche, fruit de la passion","price":5.5,"category":"Mojitos & Boissons","emoji":"🍽️","photo_url":"/menu/mojito-passion.jpg","is_popular":false,"sort_order":43,"is_menu":false,"opts":null},
+  {"name":"Mojito Cerise","description":"Citron vert, menthe fraîche, sirop de cerise","price":5.5,"category":"Mojitos & Boissons","emoji":"🍽️","photo_url":"/menu/mojito-cerise.jpg","is_popular":false,"sort_order":44,"is_menu":false,"opts":null},
+  {"name":"Mojito Kiwi","description":"Citron vert, menthe fraîche, kiwi","price":5.5,"category":"Mojitos & Boissons","emoji":"🍽️","photo_url":"/menu/mojito-kiwi.jpg","is_popular":false,"sort_order":45,"is_menu":false,"opts":null},
+  {"name":"Mojito Classique","description":"Citron vert, menthe fraîche, sucre de canne","price":5.5,"category":"Mojitos & Boissons","emoji":"🍽️","photo_url":"/menu/mojito-classique.jpg","is_popular":false,"sort_order":46,"is_menu":false,"opts":null},
+  {"name":"Thé Glacé Maison","description":"Thé glacé maison, menthe fraîche","price":5.5,"category":"Mojitos & Boissons","emoji":"🍽️","photo_url":"/menu/the-glace.jpg","is_popular":false,"sort_order":47,"is_menu":false,"opts":null},
+  {"name":"Menu Midi","description":"Burger + frites — formule valable de 12h à 15h, du lundi au vendredi · Au choix : Végé, Fried Chicken, Cheese Burger, Smash Bao, Chicken Thaï · Boisson au choix : +1.50€ · Cocktail au choix : +3.50€","price":15.9,"category":"Formules","emoji":"🍽️","photo_url":"/menu/menu-midi.jpg","is_popular":true,"sort_order":48,"is_menu":true,"opts":"o6"},
+  {"name":"Menu Enfant","description":"Burger enfant : ketchup, steak, cheddar · Frites · Boisson","price":9.9,"category":"Formules","emoji":"🍽️","photo_url":"/menu/menu-enfant.jpg","is_popular":true,"sort_order":49,"is_menu":true,"opts":null},
+  {"name":"Formule Étudiante","description":"Un smash ou 5 wings · Frites · Boisson","price":10,"category":"Formules","emoji":"🎓","photo_url":"/menu/formule-etudiante.jpg","is_popular":false,"sort_order":50,"is_menu":true,"opts":"o7"}
+  ]
+  $json$::jsonb;
+  v_order jsonb := '["Formules","Bao Créations","Smash Bao","Smash Burger","Asian Fusion","Starters","Starters Signatures","Wings","Sides","Desserts","Mojitos & Boissons"]'::jsonb;
+  v_group uuid;
+  r record;
+  it jsonb;
+  v_sup jsonb;
+begin
+  select group_id into v_group from restaurants where slug = 'baoma';
+
+  for r in
+    select id, slug, name from restaurants
+     where slug like 'baoma%' or (v_group is not null and group_id = v_group)
+  loop
+    raise notice 'Carte synchronisée : % (%)', r.name, r.slug;
+
+    for it in select * from jsonb_array_elements(v_items) loop
+      v_sup := case when it->>'opts' is null then '[]'::jsonb else v_opts->(it->>'opts') end;
+
+      update menu_items set
+             description = it->>'description',
+             price       = (it->>'price')::numeric,
+             emoji       = it->>'emoji',
+             photo_url   = it->>'photo_url',
+             is_popular  = (it->>'is_popular')::boolean,
+             sort_order  = (it->>'sort_order')::int,
+             is_menu     = (it->>'is_menu')::boolean,
+             supplements = v_sup,
+             available   = true
+       where restaurant_id = r.id and name = it->>'name' and category = it->>'category';
+
+      if not found then
+        insert into menu_items (restaurant_id, name, description, price, category, emoji,
+                                photo_url, is_popular, available, sort_order, is_menu, supplements)
+        values (r.id, it->>'name', it->>'description', (it->>'price')::numeric, it->>'category',
+                it->>'emoji', it->>'photo_url', (it->>'is_popular')::boolean, true,
+                (it->>'sort_order')::int, (it->>'is_menu')::boolean, v_sup);
+      end if;
+    end loop;
+
+    update menu_items m set available = false
+     where m.restaurant_id = r.id and m.available = true
+       and not exists (
+         select 1 from jsonb_array_elements(v_items) c
+          where c->>'name' = m.name and c->>'category' = m.category);
+
+    insert into restaurant_settings (restaurant_id, category_order)
+    values (r.id, v_order)
+    on conflict (restaurant_id) do update set category_order = excluded.category_order;
+  end loop;
+end
+$fn$;
+
+select sync_baoma_menu();
+
+-- Vérification : plats actifs / désactivés par compte Baoma.
+select r.slug, count(*) filter (where m.available) as plats_actifs,
+       count(*) filter (where not m.available) as plats_desactives
+  from restaurants r join menu_items m on m.restaurant_id = r.id
+ where r.slug like 'baoma%'
+    or r.group_id = (select group_id from restaurants where slug = 'baoma' and group_id is not null)
+ group by r.slug order by r.slug;
