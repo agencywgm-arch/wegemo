@@ -3843,7 +3843,7 @@ function SettingsTab({ restaurant, store, modules = ["base"], onModulesChange })
           Provider utilisé pour le paiement en ligne côté client (bouton "Payer par carte" sur le menu). Stripe reste actif tant que vous ne changez pas ce réglage.
         </p>
         <div style={{ display: "flex", gap: 8, marginTop: 10, marginBottom: 4 }}>
-          {[["stripe", "Stripe"], ["flatpay", "Flatpay"]].map(([val, label]) => (
+          {[["stripe", "Stripe"], ["flatpay", "Flatpay"], ["adyen", "Adyen"]].map(([val, label]) => (
             <button
               key={val}
               onClick={() => setSettings({ ...settings, payment_provider: val })}
@@ -3852,7 +3852,7 @@ function SettingsTab({ restaurant, store, modules = ["base"], onModulesChange })
           ))}
         </div>
         <Btn variant="primary" size="sm" onClick={save}>Enregistrer le provider</Btn>
-        <PaymentProviderSection restaurant={restaurant} demoMode={store.demoMode} />
+        <PaymentProviderSection restaurant={restaurant} demoMode={store.demoMode} provider={settings.payment_provider || "stripe"} />
       </Surface>
 
       <Surface style={{ padding: 18, marginBottom: 16 }}>
@@ -4125,10 +4125,15 @@ function PosConnectSection({ restaurant, demoMode }) {
  * que l'état via get_payment_connection_status() — jamais la clé elle-même,
  * même pour le propriétaire.
  * ==========================================================================*/
-function PaymentProviderSection({ restaurant, demoMode }) {
+function PaymentProviderSection({ restaurant, demoMode, provider = "flatpay" }) {
   const toast = useToast();
+  const isAdyen = provider === "adyen";
+  const pname = isAdyen ? "Adyen" : "Flatpay";
   const [conn, setConn] = useState(null);
   const [apiKey, setApiKey] = useState("");
+  const [merchantAccount, setMerchantAccount] = useState("");
+  const [livePrefix, setLivePrefix] = useState("");
+  const [hmacKey, setHmacKey] = useState("");
   const [environment, setEnvironment] = useState("test");
   const [busy, setBusy] = useState(false);
 
@@ -4142,13 +4147,26 @@ function PaymentProviderSection({ restaurant, demoMode }) {
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
-    if (demoMode || !hasSupabase) return toast("(Démo) Connexion Flatpay indisponible", "info");
+    if (demoMode || !hasSupabase) return toast(`(Démo) Connexion ${pname} indisponible`, "info");
     if (!apiKey.trim()) return toast("Clé API requise", "error");
+    if (isAdyen) {
+      if (!merchantAccount.trim()) return toast("Nom du compte marchand requis", "error");
+      if (environment === "production" && !livePrefix.trim()) return toast("Préfixe d'URL live requis en production", "error");
+      if (!/^[0-9a-fA-F]{64}$/.test(hmacKey.trim())) return toast("Clé HMAC : 64 caractères hexadécimaux attendus", "error");
+    }
     setBusy(true);
     try {
-      await callFunction("flatpay-save-credentials", { restaurant_id: restaurant.id, api_key: apiKey.trim(), environment });
+      if (isAdyen) {
+        await callFunction("adyen-save-credentials", {
+          restaurant_id: restaurant.id, api_key: apiKey.trim(), environment,
+          merchant_account: merchantAccount.trim(), live_url_prefix: livePrefix.trim(), hmac_key: hmacKey.trim(),
+        });
+        setMerchantAccount(""); setLivePrefix(""); setHmacKey("");
+      } else {
+        await callFunction("flatpay-save-credentials", { restaurant_id: restaurant.id, api_key: apiKey.trim(), environment });
+      }
       setApiKey("");
-      toast("Flatpay connecté", "success");
+      toast(`${pname} connecté`, "success");
       await load();
     } catch (e) {
       toast(e.message || "Échec de la connexion", "error");
@@ -4156,31 +4174,33 @@ function PaymentProviderSection({ restaurant, demoMode }) {
   };
 
   const disconnect = async () => {
-    if (!window.confirm("Déconnecter Flatpay ? Le paiement en ligne Flatpay ne fonctionnera plus.")) return;
+    if (!window.confirm(`Déconnecter ${pname} ? Le paiement en ligne ${pname} ne fonctionnera plus.`)) return;
     setBusy(true);
     try {
       await supabase.rpc("disconnect_payment_provider", { p_restaurant_id: restaurant.id });
-      toast("Flatpay déconnecté", "success");
+      toast(`${pname} déconnecté`, "success");
       await load();
     } catch (e) {
       toast(e.message || "Erreur", "error");
     } finally { setBusy(false); }
   };
 
-  const status = conn?.status || "disconnected";
+  const status = conn && conn.provider === provider ? conn.status || "disconnected" : "disconnected";
   const ui = POS_STATUS_UI[status] || POS_STATUS_UI.disconnected;
 
   return (
     <Surface style={{ padding: 20, marginTop: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <div>
-          <strong style={{ ...FF, fontSize: 16 }}>💳 Flatpay</strong>
+          <strong style={{ ...FF, fontSize: 16 }}>💳 {pname}</strong>
           <p style={{ ...FF, fontSize: 13, color: C.textSecondary, marginTop: 4 }}>
-            Clé API du compte marchand Flatpay — jamais transmise au navigateur après enregistrement.
+            {isAdyen
+              ? "Identifiants du compte marchand Adyen — jamais transmis au navigateur après enregistrement. Guide : ADYEN_INTEGRATION.md"
+              : "Clé API du compte marchand Flatpay — jamais transmise au navigateur après enregistrement."}
           </p>
         </div>
         <span style={{ ...FF, fontSize: 13, fontWeight: 700, color: ui.color }}>
-          {ui.dot} {ui.label} {conn?.environment ? `(${conn.environment})` : ""}
+          {ui.dot} {ui.label} {status !== "disconnected" && conn?.environment ? `(${conn.environment})` : ""}
         </span>
       </div>
 
@@ -4203,8 +4223,17 @@ function PaymentProviderSection({ restaurant, demoMode }) {
               >{env === "test" ? "Test" : "Production"}</button>
             ))}
           </div>
-          <InputField label="Clé API Flatpay" type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
-          <Btn variant="primary" size="sm" disabled={busy} onClick={save}>{busy ? "…" : "Connecter Flatpay"}</Btn>
+          <InputField label={`Clé API ${pname}`} type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
+          {isAdyen && (
+            <>
+              <InputField label="Compte marchand (Merchant account)" value={merchantAccount} onChange={(e) => setMerchantAccount(e.target.value)} />
+              {environment === "production" && (
+                <InputField label="Préfixe d'URL live (ex. 1797a841fbb37ca7-AdyenDemo)" value={livePrefix} onChange={(e) => setLivePrefix(e.target.value)} />
+              )}
+              <InputField label="Clé HMAC du webhook (64 caractères)" type="password" value={hmacKey} onChange={(e) => setHmacKey(e.target.value)} />
+            </>
+          )}
+          <Btn variant="primary" size="sm" disabled={busy} onClick={save}>{busy ? "…" : `Connecter ${pname}`}</Btn>
         </div>
       )}
     </Surface>
@@ -6832,7 +6861,7 @@ function CustomerPayment({ restaurant, tableId, tableNum, orderType, covers, ses
   // de logique Apple Pay ici), puis revient sur /payment/success|cancel, où
   // FlatpayPaymentReturn revérifie le statut côté serveur avant de considérer
   // la commande comme payée.
-  const payFlatpay = async () => {
+  const payHosted = async (fn) => {
     if (total <= 0) return createOrder("card");
     if (!hasSupabase || restaurant.id === "demo") {
       await new Promise((r) => setTimeout(r, 600));
@@ -6842,7 +6871,7 @@ function CustomerPayment({ restaurant, tableId, tableNum, orderType, covers, ses
     setBusy(true);
     try {
       const returnBaseUrl = `${siteBase()}/r/${restaurant.slug}/t/${tableNum}`;
-      const data = await callFunction("flatpay-create-payment", {
+      const data = await callFunction(fn, {
         restaurant_id: restaurant.id, table_id: tableId, order_type: orderType,
         covers: orderType === "dine_in" ? covers : 1, session_id: orderType === "dine_in" ? sessionId : null,
         items: cart.map((c) => ({
@@ -6864,6 +6893,9 @@ function CustomerPayment({ restaurant, tableId, tableNum, orderType, covers, ses
     }
   };
 
+  const payFlatpay = () => payHosted("flatpay-create-payment");
+  const payAdyen = () => payHosted("adyen-create-payment");
+
   return (
     <div style={{ padding: 20, minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
@@ -6882,8 +6914,8 @@ function CustomerPayment({ restaurant, tableId, tableNum, orderType, covers, ses
       ) : (
         <>
           <Btn variant="primary" size="lg" style={{ marginBottom: 12 }} disabled={busy} onClick={() => createOrder("cash")}>💵 {t(lang, "payCash")}</Btn>
-          {paymentProvider === "flatpay" ? (
-            <Btn variant="blue" size="lg" disabled={busy} onClick={payFlatpay}>💳 {t(lang, "payOnline")}</Btn>
+          {paymentProvider === "flatpay" || paymentProvider === "adyen" ? (
+            <Btn variant="blue" size="lg" disabled={busy} onClick={paymentProvider === "adyen" ? payAdyen : payFlatpay}>💳 {t(lang, "payOnline")}</Btn>
           ) : (
             <Btn variant="blue" size="lg" disabled={busy} onClick={payCard}>💳 {t(lang, "payCard")}</Btn>
           )}
@@ -6969,7 +7001,7 @@ function CustomerDone({ orderId, restaurant, settings, lang }) {
  * le statut auprès de Flatpay. Revenir sur "success" ne suffit jamais à
  * afficher "payé" — voir finalizePaymentAttempt côté serveur.
  * ==========================================================================*/
-function FlatpayPaymentReturn({ slug, tableNum, attemptId }) {
+function FlatpayPaymentReturn({ slug, tableNum, attemptId, provider = "flatpay" }) {
   const [phase, setPhase] = useState("checking"); // checking | paid | failed | cancelled
   const [restaurant, setRestaurant] = useState(null);
   const [settings, setSettings] = useState({});
@@ -6997,7 +7029,7 @@ function FlatpayPaymentReturn({ slug, tableNum, attemptId }) {
 
     const check = async () => {
       try {
-        const res = await callFunction("flatpay-payment-status", { payment_attempt_id: attemptId });
+        const res = await callFunction(provider === "adyen" ? "adyen-payment-status" : "flatpay-payment-status", { payment_attempt_id: attemptId });
         if (cancelled) return;
         if (res.status === "PAID") {
           setOrderId(res.orderId);
@@ -7094,6 +7126,7 @@ function AppInner() {
         slug={decodeURIComponent(paymentReturnMatch[1])}
         tableNum={paymentReturnMatch[2]}
         attemptId={params.get("attempt")}
+        provider={params.get("provider") === "adyen" ? "adyen" : "flatpay"}
       />
     );
   }

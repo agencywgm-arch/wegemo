@@ -11,7 +11,14 @@
 // commande WGM (create_order_secure, numéro fiscal inclus) n'est créée
 // QU'À CE MOMENT — jamais avant.
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import type { PaymentProvider } from "./payment_provider.ts";
+import type { PaymentProvider, PaymentStatusResult } from "./payment_provider.ts";
+
+/**
+ * Statut déjà vérifié par l'appelant (ex. notification Adyen dont la signature
+ * HMAC vient d'être validée) : on ne rappelle alors pas le provider.
+ * `pspReference` est conservée pour les remboursements.
+ */
+export type VerifiedPayment = PaymentStatusResult & { pspReference?: string };
 
 export interface FinalizeResult {
   status: "PAID" | "PAYMENT_PROCESSING" | "PAYMENT_FAILED" | "PAYMENT_CANCELLED";
@@ -26,6 +33,7 @@ export async function finalizePaymentAttempt(
   provider: PaymentProvider,
   attemptId: string,
   source: "status_check" | "webhook",
+  verified?: VerifiedPayment,
 ): Promise<FinalizeResult> {
   const { data: attempt } = await admin
     .from("payment_attempts")
@@ -57,18 +65,18 @@ export async function finalizePaymentAttempt(
     return { status: "PAYMENT_PROCESSING", orderId: null, error: "provider_payment_id_absent" };
   }
 
-  let live;
+  let live: PaymentStatusResult;
   try {
-    live = await provider.getPaymentStatus(attempt.provider_payment_id);
+    live = verified ?? await provider.getPaymentStatus(attempt.provider_payment_id);
   } catch (e) {
     await logEvent(admin, attempt, source, "status", false, undefined, String((e as Error)?.message ?? e));
     // Panne réseau/API côté Flatpay : on laisse la tentative en l'état
     // (PAYMENT_PROCESSING) plutôt que de la marquer échouée à tort — un
     // prochain appel (webhook ou nouveau check) retentera.
-    return { status: "PAYMENT_PROCESSING", orderId: null, error: "flatpay_unreachable" };
+    return { status: "PAYMENT_PROCESSING", orderId: null, error: `${attempt.provider}_unreachable` };
   }
 
-  await logEvent(admin, attempt, source, "status", true, undefined, `statut Flatpay: ${live.rawStatus ?? live.status}`);
+  await logEvent(admin, attempt, source, "status", true, undefined, `statut ${attempt.provider}: ${live.rawStatus ?? live.status}`);
 
   if (live.status === "failed") {
     await admin.from("payment_attempts").update({ status: "PAYMENT_FAILED", last_status_detail: live.rawStatus ?? null }).eq("id", attempt.id);
@@ -89,12 +97,12 @@ export async function finalizePaymentAttempt(
   // ou tentative de manipulation) — on ne crée jamais la commande dans ce cas.
   if (live.amount != null && Math.abs(live.amount - Number(attempt.amount)) > 0.01) {
     await logEvent(admin, attempt, source, "status", false, undefined,
-      `montant Flatpay (${live.amount}) ≠ montant attendu (${attempt.amount})`);
+      `montant ${attempt.provider} (${live.amount}) ≠ montant attendu (${attempt.amount})`);
     return { status: "PAYMENT_PROCESSING", orderId: null, error: "montant_incoherent" };
   }
   if (live.currency && live.currency !== attempt.currency) {
     await logEvent(admin, attempt, source, "status", false, undefined,
-      `devise Flatpay (${live.currency}) ≠ devise attendue (${attempt.currency})`);
+      `devise ${attempt.provider} (${live.currency}) ≠ devise attendue (${attempt.currency})`);
     return { status: "PAYMENT_PROCESSING", orderId: null, error: "devise_incoherente" };
   }
 
@@ -105,7 +113,11 @@ export async function finalizePaymentAttempt(
   // create_order_secure qui suit.
   const { data: claimed } = await admin
     .from("payment_attempts")
-    .update({ status: "PAID", last_status_detail: live.rawStatus ?? null })
+    .update({
+      status: "PAID",
+      last_status_detail: live.rawStatus ?? null,
+      ...(verified?.pspReference ? { provider_reference: verified.pspReference } : {}),
+    })
     .eq("id", attempt.id)
     .in("status", ["PENDING_PAYMENT", "PAYMENT_PROCESSING"])
     .select("id")
@@ -130,7 +142,7 @@ export async function finalizePaymentAttempt(
     p_table: attempt.table_id,
     p_order_type: attempt.order_type,
     p_payment_method: "card",
-    p_payment_mode: "online_flatpay",
+    p_payment_mode: `online_${attempt.provider}`,
     p_customer_name: attempt.customer_name,
     p_customer_email: attempt.customer_email,
     p_note: attempt.note,
