@@ -48,8 +48,9 @@ const FRITES_OPTIONS = [{ name: "Sans frites", price: 0 }, ...FRITES_VARIANTES].
 // Burgers : la frite maison est incluse, y renoncer retire 3 € du prix.
 const BURGER_FRITES = [{ name: "Sans frites", price: -3 }, ...FRITES_VARIANTES].map((o) => ({ ...o, group: "Frites" }));
 
+const SOFTS = ["Pepsi", "Pepsi Zero", "Sprite", "Schweppes Pomme", "Schweppes Agrumes", "Orangina", "Oasis Tropical", "Ice Tea", "Perrier", "Eau"];
 const BOISSON_OPTIONS = [
-  ...["Pepsi", "Pepsi Zero", "Sprite", "Schweppes Pomme", "Schweppes Agrumes", "Orangina", "Oasis Tropical", "Ice Tea", "Perrier", "Eau"].map((name) => ({ name, price: 1.5 })),
+  ...SOFTS.map((name) => ({ name, price: 1.5 })),
   ...["Mojito Violette", "Mojito Passion", "Mojito Cerise", "Mojito Kiwi", "Mojito Classique", "Thé Glacé Maison"].map((name) => ({ name, price: 5.5 })),
 ].map((o) => ({ ...o, group: "Boisson" }));
 
@@ -67,6 +68,17 @@ const TRUFFE_RETRAITS = ["Sans oignon", "Sans mozzarella", "Sans salade", "Sans 
 const MIDI_BURGERS = ["Bao Végé", "Fried Chicken / Spicy", "Smash Cheese", "Smash Bao Burger", "Chicken Thaï"]
   .map((name) => ({ name, price: 0, group: "Burger", required: true }));
 
+// Formule Étudiante (10 €) : un smash OU 5 wings, frites et boisson incluses.
+const ETUDIANT_SMASHS = ["Crazy Champi", "Smash Bao Burger", "Konoha Smash", "Smash Cheese", "Smash Truffée", "Smash Truffé", "Smash Chèvre Miel", "Smash Bacon", "Smash Braisé"];
+const ETUDIANT_WINGS = ["Wings Korean Style", "Wings Moutarde Miel", "Wings Parmesan", "Wings Classic Style"].map((n) => `${n} (5 pièces)`);
+const ETUDIANT_OPTIONS = [
+  ...[...ETUDIANT_SMASHS, ...ETUDIANT_WINGS].map((name) => ({ name, price: 0, group: "Plat", required: true })),
+  ...SOFTS.map((name) => ({ name, price: 0, group: "Boisson", required: true })),
+];
+
+// Badge affiché sur la carte d'un plat (par nom, donc valable avec les plats lus en base).
+export const BAOMA_BADGES = { "Formule Étudiante": "★ EXCLUSIVITÉ" };
+
 const RIZ_RETRAITS = retirer("Sans piment", "Sans graine de sésame", "Sans coriandre");
 
 // Crazy Champi : deux versions au même prix, choix obligatoire.
@@ -78,6 +90,7 @@ const BURGER_CATEGORIES = ["Bao Créations", "Smash Bao", "Smash Burger"];
 // frites + boisson ; wings = frites + boisson ; bowls = retraits + boisson.
 export function baomaOptionsFor(item) {
   if (item.id === "baoma-menu-midi") return MIDI_BURGERS;
+  if (item.id === "baoma-formule-etudiante") return ETUDIANT_OPTIONS;
   if (BURGER_CATEGORIES.includes(item.category)) {
     const retraits = item.id === "baoma-smash-truffe" ? TRUFFE_RETRAITS : BURGER_RETRAITS;
     const versions = item.id === "baoma-crazy-champi" ? CRAZY_VERSIONS : [];
@@ -138,6 +151,7 @@ const BAOMA_MENU_BASE = [
   { id: "baoma-the-glace", restaurant_id: "baoma-demo", name: "Thé Glacé Maison", description: "Thé glacé maison, menthe fraîche", price: 5.5, category: "Mojitos & Boissons", emoji: "🍽️", photo_url: "/menu/the-glace.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 47, is_menu: false },
   { id: "baoma-menu-midi", restaurant_id: "baoma-demo", name: "Menu Midi", description: "Burger + frites — formule valable de 12h à 15h, du lundi au vendredi · Au choix : Végé, Fried Chicken, Cheese Burger, Smash Bao, Chicken Thaï · Boisson au choix : +1.50€ · Cocktail au choix : +3.50€", price: 15.9, category: "Formules", emoji: "🍽️", photo_url: "/menu/menu-midi.jpg", is_popular: true, available: true, stock: null, supplements: [], extras: [], sort_order: 48, is_menu: true },
   { id: "baoma-menu-enfant", restaurant_id: "baoma-demo", name: "Menu Enfant", description: "Burger enfant : ketchup, steak, cheddar · Frites · Boisson", price: 9.9, category: "Formules", emoji: "🍽️", photo_url: "/menu/menu-enfant.jpg", is_popular: true, available: true, stock: null, supplements: [], extras: [], sort_order: 49, is_menu: true },
+  { id: "baoma-formule-etudiante", restaurant_id: "baoma-demo", name: "Formule Étudiante", description: "Un smash ou 5 wings · Frites · Boisson", price: 10, category: "Formules", emoji: "🎓", photo_url: "/menu/formule-etudiante.jpg", is_popular: false, available: true, stock: null, supplements: [], extras: [], sort_order: 50, is_menu: true },
 ];
 
 export const BAOMA_MENU = BAOMA_MENU_BASE.map((it) => ({ ...it, supplements: baomaOptionsFor(it) || it.supplements }));

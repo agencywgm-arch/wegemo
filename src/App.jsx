@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext } f
 import QRCode from "qrcode";
 import { supabase, hasSupabase, callFunction } from "./lib/supabase.js";
 import { getPrintMode, setPrintMode, getQzPrinter, setQzPrinter, getPaperWidth, setPaperWidth, listQzPrinters, qzDefaultPrinter, printTicketElement, hasQzCredentials, getQzCertificate, generateQzCredentials, clearQzCredentials } from "./lib/printStation.js";
-import { BAOMA_SLUG, BAOMA_THEME, BAOMA_CATEGORIES, BAOMA_MENU, BAOMA_RESTAURANT } from "./baomaData.js";
+import { BAOMA_SLUG, BAOMA_THEME, BAOMA_CATEGORIES, BAOMA_MENU, BAOMA_RESTAURANT, BAOMA_BADGES } from "./baomaData.js";
 
 // Restaurants qui utilisent le design premium Baoma (photos, tilt 3D, etc.)
 // avec leur propre carte réelle — pas seulement le restaurant de démo.
@@ -6056,9 +6056,9 @@ function BaomaCard({ item, onPick, onZoom }) {
 
         <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "linear-gradient(to top, rgba(10,10,10,.35), transparent 60%)" }} />
 
-        {item.is_popular && (
+        {(BAOMA_BADGES[item.name] || item.is_popular) && (
           <span style={{ ...BFF, position: "absolute", top: 8, left: 8, background: BK.orange, color: BK.ink, fontSize: 10, fontWeight: 800, padding: "3px 8px", borderRadius: 999, letterSpacing: 0.4 }}>
-            ★ POPULAIRE
+            {BAOMA_BADGES[item.name] || "★ POPULAIRE"}
           </span>
         )}
 
@@ -6478,7 +6478,7 @@ function BaomaMenu({ restaurant, menu, lang, setLang, cart, onCompose, onAdd, on
 }
 
 // Libellé de l'option "rien de plus" d'un menu déroulant, par groupe.
-const COMPOSE_GROUP_DEFAULT = { Frites: "Frites maison (incluses)", Boisson: "Sans boisson", Burger: "— Choisir un burger —", Version: "— Choisir la version —" };
+const COMPOSE_GROUP_DEFAULT = { Frites: "Frites maison (incluses)", Boisson: "Sans boisson", Burger: "— Choisir un burger —", Version: "— Choisir la version —", Plat: "— Choisir un plat —" };
 
 // Suppléments d'un plat (menu_items.supplements). Une clé `group` les regroupe
 // sous un titre : liste déroulante à choix unique (ex. Frites, Boisson) ou,
