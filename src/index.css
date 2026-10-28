@@ -129,3 +129,55 @@ a {
   .baoma-kb { animation: none; }
   .baoma-reveal { opacity: 1; transform: none; transition: none; }
 }
+
+/* THÈME BAOMA — mise en page responsive de la carte client (QR) : 2 colonnes
+   sur téléphone, 3 sur tablette portrait, 4 sur tablette paysage / grand écran. */
+.baoma-hero { height: 230px; }
+.baoma-sections { padding: 0 16px; }
+.baoma-wrap { max-width: 576px; margin-left: auto; margin-right: auto; }
+.baoma-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 16px;
+  row-gap: 40px;
+  margin-top: 20px;
+}
+@media (min-width: 700px) {
+  .baoma-hero { height: 340px; }
+  .baoma-sections { padding: 0 32px; }
+  .baoma-wrap { max-width: 920px; }
+  .baoma-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 24px; row-gap: 44px; }
+}
+@media (min-width: 1100px) {
+  .baoma-hero { height: 400px; }
+  .baoma-wrap { max-width: 1240px; }
+  .baoma-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* THÈME BAOMA — burger mis en avant (Crazy Champi) en haut de la carte client. */
+.baoma-feature {
+  position: relative; display: block; width: 100%; height: 300px; overflow: hidden;
+  border: none; border-radius: 16px; padding: 0; text-align: left; cursor: pointer;
+  background: #161310; animation: baoma-feature-glow 2.6s ease-in-out infinite;
+}
+.baoma-feature:disabled { cursor: default; opacity: .6; }
+.baoma-feature-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: baoma-feature-zoom 9s ease-in-out infinite alternate; }
+.baoma-feature-shade { position: absolute; inset: 0; background: linear-gradient(to top, rgba(10,10,10,.92) 0%, rgba(10,10,10,.45) 45%, rgba(10,10,10,.1) 100%); }
+.baoma-feature-shine { position: absolute; top: 0; bottom: 0; left: 0; width: 30%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent); animation: baoma-feature-shine 4.5s ease-in-out infinite; pointer-events: none; }
+.baoma-feature-badge {
+  position: absolute; top: 14px; left: 14px; background: #ff5a1f; color: #0a0a0a; font-size: 11px; font-weight: 800;
+  letter-spacing: .6px; padding: 5px 12px; border-radius: 999px; animation: baoma-feature-float 2.8s ease-in-out infinite;
+}
+.baoma-feature-text { position: absolute; left: 18px; right: 18px; bottom: 16px; }
+@media (min-width: 700px) { .baoma-feature { height: 380px; } .baoma-feature-text { left: 28px; bottom: 26px; } }
+@media (min-width: 1100px) { .baoma-feature { height: 440px; } }
+@keyframes baoma-feature-glow {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(255,90,31,.5), 0 0 22px rgba(255,90,31,.22); }
+  50% { box-shadow: 0 0 0 2px rgba(255,90,31,1), 0 0 46px rgba(255,90,31,.5); }
+}
+@keyframes baoma-feature-zoom { from { transform: scale(1); } to { transform: scale(1.1); } }
+@keyframes baoma-feature-float { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-5px) rotate(2deg); } }
+@keyframes baoma-feature-shine { 0% { transform: translateX(-130%) skewX(-20deg); } 55%, 100% { transform: translateX(450%) skewX(-20deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .baoma-feature, .baoma-feature-img, .baoma-feature-badge, .baoma-feature-shine { animation: none; }
+}
